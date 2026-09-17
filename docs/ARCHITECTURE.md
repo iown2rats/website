@@ -20,7 +20,7 @@ Versions below were checked against the npm registry on 2026-09-17 and are mutua
 | Realtime (later) | Supabase Realtime Broadcast | same SDK | Behind a `MessagingTransport` interface; polling fallback ships first. |
 | Images | `next/image` + `sharp` | 0.35 | Server-side re-encode of uploads (EXIF stripped, resized variants). |
 | Tests | Vitest 5, Playwright 1.63 | — | Unit and integration tests hit a real Postgres (local Docker or a Supabase branch), never mocks of Prisma. |
-| Lint/format | ESLint 10 (`eslint-config-next`), Prettier | — | |
+| Lint/format | ESLint 9 (`eslint-config-next` 16), Prettier | — | ESLint 10 breaks the React plugin bundled with `eslint-config-next`; stay on 9 until that is fixed upstream. |
 | Runtime | Node 22 LTS | — | Required by Prisma 7 (>= 22.18). |
 
 Not used: Supabase Auth (phone OTP needs our own state machine and rate limits), NextAuth (no OAuth), tRPC (server actions + a few route handlers suffice), any UI kit.
@@ -162,12 +162,13 @@ Full schema follows in Phase 3. The shape:
 - `ProfilePhoto` rows with `position` (0 = primary), storage key, width/height, blurhash, moderation status. Unique on `(profileId, position)`; reordering is a single transaction that renumbers.
 - `Interest` and `Prompt` are reference tables seeded from the prototype lists; `ProfileInterest` (max 6) and `ProfilePrompt` (max 3, with answer) are join tables with unique constraints.
 - `Location` reference table: atoll code, atoll name, island/city name, `isCity`, `isGreaterMale`. Profile references `locationId`. The prototype's flat list of 33 entries is the seed, structured so "My atoll" and "Greater Malé" filters are joins, not string matching.
-- `Like` (`fromUserId`, `toUserId`, optional `introId`, `createdAt`) unique on the pair. `Pass` same shape with `expiresAt` so passed profiles can resurface after 30 days. `Match` with `userAId < userBId` enforced in code and unique on `(userAId, userBId)`, `status` (`ACTIVE`, `UNMATCHED`, `BLOCKED`), `unmatchedById`.
+- `Like` (`fromUserId`, `toUserId`, optional `introId`, `createdAt`) unique on the pair. `Pass` same shape with `expiresAt` so passed profiles can resurface after 30 days, plus `undoneAt` so an Undo is recorded rather than deleted. `Match` with `userAId < userBId` enforced in code and unique on `(userAId, userBId)`, `status` (`ACTIVE`, `UNMATCHED`, `BLOCKED`), `unmatchedById`.
+- `UsageCounter` (`userId`, `kind` LIKES | BOOSTS, `windowStart`, `windowEnd`, `used`) with primary key `(userId, kind)`: one row per user per limited action, locked `FOR UPDATE` inside the consuming transaction. No per-event rows, no cron. `Boost` (`userId`, `startsAt`, `endsAt`) records each activation.
 - `Conversation` 1:1 with `Match`; `ConversationParticipant` (userId, lastReadMessageId, mutedAt); `Message` (conversationId, senderId, body, `kind` TEXT/INTRO/SYSTEM, createdAt, deletedAt). Messages are never hard-deleted; unmatch flips the conversation to `LOCKED` and hides it from both lists, keeping evidence for moderation.
 - `Intro` (fromUserId, toUserId, body ≤ 140, createdAt, `weekKey`) unique on `(fromUserId, weekKey)` for free users' quota (enforced in code as well since Plus users bypass it).
 - `Block` (blockerId, blockedId, reason source) unique on the pair. `Report` (reporterId, target polymorphic: `targetUserId`, `targetPostId`, `targetMessageId`, `reason` enum, note, status, resolution). Reports keep pointers even if the target is later soft-deleted.
 - `Verification` (userId, status `NONE/PHONE_VERIFIED/SELFIE_SUBMITTED/UNDER_REVIEW/VERIFIED/REJECTED`, selfieStorageKey, providerRef, reviewedById, decidedAt).
-- `Subscription` (userId, plan, status, provider, providerRef, currentPeriodEnd, cancelAtPeriodEnd) and `Entitlement` derivation is computed, not stored, except for `EntitlementOverride` (admin grants).
+- `SubscriptionPlan` (code WEEKLY | MONTHLY | QUARTERLY, interval, price in minor units, currency, badge, `isPlaceholderPrice`) and `Subscription` (userId, planId, status ACTIVE | TRIALING | PAST_DUE | CANCELLED | EXPIRED, provider, providerCustomerRef, providerSubscriptionRef, startedAt, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd). Entitlements are computed from these rows at request time, never stored on the user, except `EntitlementOverride` (admin grants with an expiry). Card data is never stored.
 - `CommunityPost`, `CommunityComment`, `CommunityLike` with soft delete and per-user unique like.
 - `Notification` (userId, type enum, actorId, refs, readAt, createdAt) indexed on `(userId, readAt, createdAt)`.
 - `ContactHash` (userId, hash, createdAt) unique on `(userId, hash)`; see CONTACT_BLOCKING.md.
@@ -201,25 +202,25 @@ One SQL predicate, built in `src/server/discovery/query.ts` and reused by Likes 
 5. `U.gender` matches V's `interestedIn`, and V's gender matches U's `interestedIn`. "Prefer not to say" is shown to users who selected Everyone.
 6. Age within V's range (computed from DOB in SQL); location filter (`Anywhere`, `Greater Malé`, `My atoll`, specific city) by join on `Location`; intent filter.
 7. Not already liked, matched or passed within 30 days by V.
-8. `visibility = ONLY_PEOPLE_I_LIKE` or `incognito`: U appears to V only if U has liked V.
-9. Advanced filters (education, occupation, interests, height) are applied only when `can(V, "advancedFilters")`.
+8. Invisible Mode (Plus): if U has `invisibleMode` on, U appears to V only if U has liked V **and** U currently holds the `invisibleMode` entitlement. If U's Plus has lapsed the clause fails closed and U is not shown to anyone new (see section 12.6). The prototype's "Only people I like" visibility option and "Incognito mode" toggle both map to this single Plus feature.
+9. Advanced filters (island, atoll, age range, intention, height, education) are applied only when `can(V, "advancedFilters")`.
 
-Ordering: verified first, then recently active, then by a per-user seeded random so refreshes do not reshuffle. Passed profiles do not reappear for 30 days.
+Ordering: active boost first (section 12.8), then verified, then recently active, then by a per-user seeded random so refreshes do not reshuffle. Passed profiles do not reappear for 30 days unless the pass was undone.
 
 Public DTO (`VisibleProfile`) contains: id (public handle, not the database id), name, age (or null when `hideAge`), location label (or null when `hideLocation`), verified flag, job, education, languages, height, bio, intent, interests, prompts with answers, photo signed URLs with blurhashes, `isActiveNow` (or null when hidden). It never contains phone, DOB, email, coordinates, internal ids, privacy flags or moderation status. `hideAge` is honoured everywhere including cards and match screens.
 
 ## 8. Likes, matching and intros
 
 - `like(actor, targetHandle, intro?)`: resolves target, runs the visibility predicate (a like against someone you cannot see is rejected), then in one transaction: insert `Like` (unique violation → idempotent success), insert `Intro` if provided and permitted, check for the reverse `Like`, and if present `INSERT ... ON CONFLICT DO NOTHING` a `Match` keyed on the sorted pair, create the `Conversation` and both participants, convert any pending intro messages into the conversation, and create `NEW_MATCH` notifications for both users. The transaction returns `{ matched: boolean, conversationId? }`, which the client uses to show the match overlay. Two concurrent mutual likes cannot double-match because the unique index resolves the race and the second transaction sees `matched: true` via the conflict path.
-- `pass(actor, targetHandle)` inserts `Pass` with `expiresAt = now + 30d`, idempotent.
-- Daily like cap for free users (configurable, default 50) enforced with a per-day counter; Plus users have no cap. Rewind (Plus) deletes the latest `Pass` within 60 s.
-- Likes You: free users get the count and anonymised, blurred tiles (server sends thumbnails already blurred via the storage transform or a 16-px variant, not a CSS blur on the real image). Plus users get the full DTO.
+- `pass(actor, targetHandle)` inserts `Pass` with `expiresAt = now + 30d`, idempotent. Passes never consume the like allowance.
+- Like allowance: 30 likes per rolling 24-hour window for Free, 90 for Plus, enforced inside the like transaction by the usage-window mechanism in section 12.3. Undo (Plus) reverses only the most recent Pass, see section 12.7.
+- Likes You: free users get the count and anonymised tiles built from server-side blurhash placeholders only (no photo URL, no id, no name, no location leaves the server). Plus users get the full DTO. See section 12.5.
 - Intros: free users may send 1 per ISO week, Plus unlimited. An intro creates a `Message` of kind `INTRO` in a `PENDING` conversation visible only to the sender until a match; the recipient sees the intro text on the liker's tile and in the match screen. On match, the conversation becomes `ACTIVE` and the intro is the first message. Quota, length (140) and permission are all enforced in `src/server/intros`.
 
 ## 9. Messaging
 
 - Authorization is a single function: `getConversationForActor(actor, conversationId)` joins `ConversationParticipant` on the actor and throws `NotFound` (not `Forbidden`, to avoid confirming existence) if absent, if the conversation is `LOCKED`, or if either party has blocked the other. Every read and write goes through it. Ids in URLs are opaque cuids; enumeration yields nothing.
-- `sendMessage(actor, conversationId, body)`: body 1–2000 chars after trim, rate limit 30 messages/minute, conversation must be `ACTIVE`, then insert and create a `MESSAGE` notification for the other participant (deduplicated: one unread notification per conversation).
+- `sendMessage(actor, conversationId, body)`: body 1–2000 chars after trim, conversation must be `ACTIVE`, the sender's global message cooldown must have elapsed (Free: 9 minutes between outgoing messages across all conversations; Plus: none; enforced transactionally, see section 12.4), then insert and create a `MESSAGE` notification for the other participant (deduplicated: one unread notification per conversation). An anti-spam ceiling of 30 messages per minute applies to everyone, Plus included. Receiving and reading are never delayed for anyone.
 - History is paginated backwards by cursor (50 per page). Read state: `lastReadMessageId` per participant; read receipts are shown to the other party only if both have `readReceipts` on.
 - Optimistic UI: the client appends a pending bubble, then reconciles with the returned message id; failures mark the bubble and offer retry.
 - `MessagingTransport`: `subscribe(conversationId, onMessage)`. `PollingTransport` (3 s while the view is focused) ships first. `SupabaseBroadcastTransport` follows: the server publishes `message.created` to a private channel `conversation:<id>` after commit; clients subscribe with a short-lived token the server mints only after the same participant check. Realtime is a delivery optimisation, never a source of truth or an authorization boundary.
@@ -235,12 +236,140 @@ Public DTO (`VisibleProfile`) contains: id (public handle, not the database id),
 
 State machine in `src/server/verification`: `NONE → PHONE_VERIFIED` (automatic after OTP) `→ SELFIE_SUBMITTED` (selfie uploaded) `→ UNDER_REVIEW → VERIFIED | REJECTED`. `REJECTED` allows a retry after 24 h. `VerificationProvider` interface: `submit(userId, selfieKey, profilePhotoKeys) → { providerRef, status }` and `onWebhook(payload)`. Default implementation is `ManualReviewProvider`, which sets `UNDER_REVIEW` and leaves the decision to a moderator. The UI shows exactly the prototype's four screens driven by real status; no step is auto-completed. The profile badge renders only for `VERIFIED`.
 
-## 12. Thundi Plus and entitlements
+## 12. Monetization: Thundi Plus, entitlements and usage limits (approved 2026-09-17)
 
-- Capabilities: `seeLikesYou`, `unlimitedLikes`, `rewind`, `advancedFilters`, `incognito`, `boost`, `unlimitedIntros`, `priorityLikes`. `getEntitlements(userId)` reads the active `Subscription` (status `ACTIVE` or `CANCELLED` with `currentPeriodEnd > now`) and any `EntitlementOverride`, and returns a `Set<Capability>`. It is cached per request on the `Actor`.
-- `can(actor, capability)` is the only way to check premium anywhere. Components receive booleans derived from it as props; they never inspect subscription rows.
-- Plans and prices come from `src/constants/plans.ts`: 1 month MVR 149, 3 months MVR 119/month, 12 months MVR 79/month, currency `MVR`.
-- `PaymentProvider` interface: `createCheckout(userId, planId) → { redirectUrl }`, `handleWebhook(rawBody, signature) → SubscriptionEvent`. Default `NotConfiguredPaymentProvider` returns a clear "payments not yet available" state in the UI; there is no path that sets a subscription active without a verified provider event or an admin override. Free users keep the full dating loop: discovery, likes (capped), matches, chat, one intro a week, base filters.
+This section supersedes every earlier statement about like caps, incognito mode, rewind and plan pricing in this document and in the prototype audit. Registration is free and the core dating loop stays usable without paying.
+
+### 12.1 Approved product rules
+
+| Rule | Free | Plus |
+| --- | --- | --- |
+| Registration, profile, photos, discovery, matching | included | included |
+| Likes | 30 per rolling 24-hour window | 90 per rolling 24-hour window |
+| Pass | unlimited, never consumes likes | unlimited |
+| Chat with matches | included | included |
+| Sending messages | 1 outgoing message every 9 minutes, global across all conversations | no cooldown |
+| Receiving and reading messages | never delayed | never delayed |
+| Likes You | count and anonymised placeholders only | full profiles |
+| Invisible Mode | not available (upsell) | enabled |
+| Profile Boosts | none | 2 per rolling 7-day window |
+| Advanced filters | basic filters only | enabled |
+| Undo last Pass | not available | enabled |
+| Intro with a like | 1 per ISO week (prototype rule, unchanged) | unlimited |
+
+Subscription pricing: **not yet approved**. Payment provider: **not yet selected**. Development pricing is placeholder data flagged as such in the database and the UI.
+
+### 12.2 Single source of truth: product configuration and the entitlement service
+
+All numbers live in one typed module, `src/config/product.ts`:
+
+```ts
+export const PRODUCT_RULES = {
+  FREE: { dailyLikeLimit: 30, messageCooldownMs: 9 * 60_000, canSeeIncomingLikes: false,
+          canUseInvisibleMode: false, boostsPerWindow: 0, canUseAdvancedFilters: false,
+          canUndoPass: false, introsPerWeek: 1 },
+  PLUS: { dailyLikeLimit: 90, messageCooldownMs: 0, canSeeIncomingLikes: true,
+          canUseInvisibleMode: true, boostsPerWindow: 2, canUseAdvancedFilters: true,
+          canUndoPass: true, introsPerWeek: null /* unlimited */ },
+} as const satisfies Record<Tier, TierRules>;
+
+export const USAGE_WINDOWS = { LIKES: 24 * 3_600_000, BOOSTS: 7 * 24 * 3_600_000 } as const;
+export const BOOST = { durationMs: 30 * 60_000, rankingWeight: 1 } as const;
+export const UNDO = { maxAgeMs: 60 * 60_000 } as const;
+export const MESSAGE_SPAM_CEILING = { perMinute: 30 } as const;
+```
+
+The entitlement service (`src/server/entitlements`) is the only code that reads subscriptions and this table:
+
+```ts
+resolveTier(userId, now): Promise<Tier>                 // FREE | PLUS, from Subscription + EntitlementOverride
+getEntitlements(userId, now): Promise<Entitlements>      // tier + the TierRules row + subscription summary
+getLikeAllowance(userId, now): Promise<{ limit, used, remaining, resetsAt }>
+getMessageAvailability(userId, now): Promise<{ canSendNow, availableAt, cooldownMs }>
+getBoostAllowance(userId, now): Promise<{ limit, used, remaining, resetsAt, activeBoostEndsAt }>
+can(entitlements, "seeIncomingLikes" | "invisibleMode" | "advancedFilters" | "undoPass")
+```
+
+Tier resolution: a user is `PLUS` when an `EntitlementOverride` covering `now` exists, or a `Subscription` has `currentPeriodEnd > now` and status in `ACTIVE`, `TRIALING`, `PAST_DUE` or `CANCELLED` (cancelled subscriptions keep their paid period; `EXPIRED` never grants). No code outside this module compares tiers or reads subscription rows; components receive already-derived booleans and numbers.
+
+### 12.3 Like allowance: rolling 24-hour usage window
+
+Semantics (approved): the window opens at the first like after the previous window has ended and closes exactly 24 hours later. Likes inside the window count against the limit; passes never do. The window is not anchored to midnight in any time zone and there is no cron.
+
+Implementation: table `UsageCounter (userId, kind, windowStart, windowEnd, used)`, one row per user per kind. `like()` runs a single transaction:
+
+1. `SELECT ... FROM "UsageCounter" WHERE "userId" = $1 AND kind = 'LIKES' FOR UPDATE` (inserting the row first with `ON CONFLICT DO NOTHING` if absent). The row lock serialises all concurrent likes by this user.
+2. If `now >= windowEnd`, reset: `windowStart = now`, `windowEnd = now + 24h`, `used = 0`.
+3. Resolve `limit` from the entitlement service (Free 30, Plus 90) inside the same transaction.
+4. If `used >= limit`, roll back and return `LikeLimitReached { resetsAt: windowEnd, limit }`.
+5. Insert the `Like`. If it already exists (unique violation), return idempotent success without incrementing.
+6. `used += 1`, then the match check from section 8.
+
+Because step 1 takes an exclusive row lock, five simultaneous requests with one like remaining execute one after another: the first increments `used` to the limit and the other four see `used >= limit`. Refreshing, changing device or logging out cannot affect the row. The UI reads `getLikeAllowance` to show "12 likes left today" or "Your 30 free likes will refresh in 6h 24m" using `resetsAt` from the server. Changing the policy later (for example sliding windows or per-day anchors) means changing steps 2 and 3 in one function.
+
+### 12.4 Message cooldown: 9 minutes, global, server-enforced
+
+Semantics: a Free user's outgoing messages to matches are spaced at least 9 minutes apart, measured from the previous outgoing message regardless of conversation. Receiving and reading are unaffected. Plus has no cooldown.
+
+Implementation uses existing message rows plus a per-user transaction lock, with no extra table:
+
+1. `sendMessage()` opens a transaction and calls `pg_advisory_xact_lock(hashtext('msg:' || userId))`, serialising all sends by this user for the duration of the transaction.
+2. Resolve entitlements. If `messageCooldownMs > 0`, read `MAX("createdAt") FROM "Message" WHERE "senderId" = $1 AND kind = 'TEXT'` (indexed on `(senderId, createdAt)`). If `now - last < cooldownMs`, roll back and return `MessageCooldown { availableAt: last + cooldownMs }`.
+3. Check the conversation is `ACTIVE` and the sender is a participant (section 9), apply the anti-spam ceiling, insert the message, commit.
+
+Two simultaneous sends therefore run sequentially; the second sees the first message's timestamp and is rejected. Disabling the Send button is a courtesy only; any direct call to the action during the cooldown gets the same rejection with `availableAt`, which the client renders as "Free message available in 6:42" and uses to re-enable Send at the right moment. A user who downgrades from Plus is measured from their last message like anyone else.
+
+### 12.5 Likes You
+
+Free: the read model returns `{ count, placeholders: [{ blurhash, verified }] }` where the blurhash is the primary photo's precomputed 28-character placeholder stored on `ProfilePhoto`. It contains no identifier, name, age, location or URL, and the list order is randomised per request so it cannot be aligned with other lists. Plus: the read model returns full `VisibleProfile` DTOs through the standard visibility predicate. There is no route that serves the real image to a Free client.
+
+### 12.6 Invisible Mode
+
+Stored as `PrivacySettings.invisibleMode` (the user's wish). It is effective only while the user holds the entitlement. In the discovery predicate, candidate U is shown to viewer V only if:
+
+```
+ps.invisibleMode = false
+OR (
+  EXISTS (active Plus entitlement for U at now)
+  AND EXISTS (SELECT 1 FROM "Like" l WHERE l."fromUserId" = U.id AND l."toUserId" = V.id)
+)
+```
+
+Consequences: A (invisible, Plus) likes B → B can now discover A. C, whom A has not liked, never receives A. Existing matches and conversations are unaffected because they are read through `Match`/`ConversationParticipant`, not through discovery. Likes You for B includes A normally.
+
+Lapse semantics (documented decision): when Plus expires with `invisibleMode = true`, the predicate's second branch fails, so the user is **not** exposed. They are effectively paused from Discover until they renew or turn the flag off (which restores normal visibility). This fails closed for privacy while granting nothing premium for free. The lapse creates an `ACCOUNT_NOTICE` notification explaining the state, and the Privacy screen shows it. Turning the flag on as a Free user is refused by the action and leads to the Plus upgrade experience.
+
+### 12.7 Undo (last Pass)
+
+Plus only. `undoLastPass(actor)` finds the actor's most recent `Pass` with `undoneAt IS NULL`, requires that it is the actor's most recent swipe action of any kind (no later `Like` or `Pass` exists), and that it is younger than `UNDO.maxAgeMs` (60 minutes). It sets `undoneAt = now` inside a transaction that locks the pass row and returns the profile so the client can put it back on top of the deck. Discovery excludes only passes with `undoneAt IS NULL`. Nothing is deleted, only the latest action can be reversed, and only once.
+
+### 12.8 Profile Boosts
+
+Plus allowance 2 per rolling 7-day window, using the same `UsageCounter` mechanism with `kind = 'BOOSTS'` and a 7-day window (Free limit 0, so any Free activation is rejected). Activation inserts a `Boost (userId, startsAt, endsAt = startsAt + BOOST.durationMs)`. Only one boost may be active at a time. Discovery ordering places candidates with an active boost first; the weight and duration live in `src/config/product.ts`, not in query code. Copy never claims a multiplier: "Get seen sooner" / "Temporarily increase your visibility in discovery."
+
+### 12.9 Advanced filters
+
+Free: age range, show me, location (Anywhere / Greater Malé / My atoll / specific city), intention, as in the prototype. Plus adds: specific island or atoll selection, height range, education, and combined filters. Distance is deliberately absent and no coordinates exist in the model.
+
+### 12.10 Plans, subscriptions and payments
+
+- `SubscriptionPlan` rows: `WEEKLY`, `MONTHLY` (badge "Most popular"), `QUARTERLY` (badge "Best value"). Prices are placeholders flagged `isPlaceholderPrice = true`; the UI must render a "development pricing" notice while any displayed plan carries that flag. Final MVR pricing is pending approval.
+- `Subscription` fields as listed in section 5. Status transitions come only from `PaymentProvider.handleWebhook` or an admin action; no user-facing action can create or activate a subscription.
+- `PaymentProvider` interface: `createCheckout(userId, planCode) → { redirectUrl }`, `handleWebhook(rawBody, signature) → SubscriptionEvent[]`, `cancel(subscriptionRef)`. Default `NotConfiguredPaymentProvider` makes the subscribe CTA explain that payments are not yet available. No card data is ever stored.
+- Upsell UX: limits surface as calm in-context prompts ("You've used today's 30 likes. More available in 4h 12m. [Get Thundi Plus] [Maybe later]", "Next free message in 7:24 [Get Thundi Plus] [Wait]"). Reading a conversation is never blocked. The Plus screen and plan selection are built in a later phase using the Thundi visual identity; the supplied Muzz screenshots inform structure only.
+
+### 12.11 Concurrency guarantees, summarised
+
+| Limit | Serialisation mechanism | Why it holds |
+| --- | --- | --- |
+| Likes per window | `SELECT ... FOR UPDATE` on the user's `UsageCounter` row inside the like transaction | Concurrent transactions queue on the row lock; each re-reads `used` after acquiring it. |
+| Duplicate like | unique index `(fromUserId, toUserId)` | Second insert conflicts; treated as idempotent success without consuming quota. |
+| Message cooldown | `pg_advisory_xact_lock` per sender + `MAX(createdAt)` check inside the transaction | Concurrent sends queue on the advisory lock; the second sees the first's committed row. |
+| Boosts per window | same `UsageCounter` row lock, kind BOOSTS, plus a check for an already-active boost | as likes |
+| Undo | row lock on the latest pass + "is latest action" check | Only one reversal can win; nothing else is mutated. |
+| Mutual match | unique `(userAId, userBId)` with `ON CONFLICT DO NOTHING` | as section 8 |
+
+All of these are covered by integration tests that fire parallel transactions against a real Postgres (section 17).
 
 ## 13. Notifications
 
@@ -294,7 +423,8 @@ Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`
 ## 17. Testing strategy
 
 - Unit (Vitest): age calculation across time zones and leap days, phone normalisation, OTP hashing and attempt rules, entitlement derivation, completion percentage, intro week keys.
-- Integration (Vitest against Postgres): under-18 rejection at onboarding completion; duplicate like idempotency; mutual like creates exactly one match under concurrency (two parallel transactions); blocked users excluded from deck, likes-you and chat; conversation and message authorization for non-participants; intro quota per week; report creation with snapshot; privacy filtering (hidden location/age, hidden visibility, incognito); premium checks for likes-you and advanced filters.
+- Integration (Vitest against Postgres): under-18 rejection at onboarding completion; duplicate like idempotency; mutual like creates exactly one match under concurrency (two parallel transactions); blocked users excluded from deck, likes-you and chat; conversation and message authorization for non-participants; intro quota per week; report creation with snapshot; privacy filtering (hidden location/age, hidden visibility); premium checks for likes-you and advanced filters.
+- Monetization (Vitest against Postgres, required): Free allowance is 30 and Plus 90; like consumes, pass does not; 30th succeeds and 31st is rejected with `resetsAt`; allowance restores after the 24-hour window; session/device changes do not reset it; N concurrent likes with one remaining yield exactly one success; expiry of Plus returns the user to Free limits. Messaging: matched Free user sends, immediate second send rejected, allowed after 9 minutes, cooldown spans conversations, receiving/reading unaffected, Plus has no cooldown, direct calls during cooldown rejected, simultaneous sends yield one success. Invisible Mode: normal discoverability, hidden from non-liked users, visible after liking, matches unaffected, lapsed Plus fails closed. Likes You: Free receives no identifying fields, Plus receives profiles. Boosts: Plus allowance 2 per 7 days, window enforced, Free rejected.
 - E2E (Playwright, dev OTP): onboarding happy path, swipe by buttons and keyboard, match modal, send message, block from profile.
 - CI: typecheck, lint, unit + integration on a Postgres service container, production build.
 
@@ -302,7 +432,7 @@ Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`
 
 | Phase | Output |
 | --- | --- |
-| 3 Database | `prisma/schema.prisma`, first migration, seed with the prototype's demo data, `src/lib/db.ts`, `prisma.config.ts`. |
+| 3 Database (done) | `prisma/schema.prisma`, migration `20260917152844_init`, seed (reference + dev-only demo data), `src/lib/db.ts`, `prisma.config.ts`, plus the monetization domain layer (`src/config/product.ts`, `src/server/{entitlements,usage,discovery,likes,matching,conversations,boosts,privacy}`) and its database-backed tests. Not yet applied to the hosted Supabase project. |
 | 4 Design system | `tokens.css`, Tailwind theme, `components/ui/*`, layout shell, storybook-free preview route under `(dev)/ui` in development only. |
 | 5 Auth + onboarding | OTP flow, sessions, `proxy.ts`, 12 steps with server-persisted progress, photo upload pipeline. |
 | 6 Discovery | Deck query, cards, gestures, filters. |
@@ -319,12 +449,17 @@ Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`
 - Polling before Realtime.
 - Blurred likes are pre-blurred server-side rather than CSS-blurred (CSS blur leaks the real image).
 - Passed profiles resurface after 30 days.
-- Free daily like cap of 50 (the prototype only says "No daily cap" for Plus; the number is a constant).
+- Invisible Mode fails closed on Plus lapse (user stays hidden rather than being exposed), see 12.6.
+- Undo window of 60 minutes and boost duration of 30 minutes are configuration defaults pending product review.
+- The prototype's free "Only people I like" visibility option is folded into the Plus-only Invisible Mode, per the approved monetization rules.
 - Community "Following" tab ships as an explanatory empty state rather than being removed.
 - TypeScript pinned to 5.9 rather than 7.0.
 
 ## 20. Open items needing the owner
 
-- Supabase credentials: `sb_publishable_*`, `sb_secret_*`, and the two database URLs for project `qkubuaicuyoaskzcabcu`. I will create the storage buckets and apply migrations through the Supabase tooling once provided; nothing destructive will be run against that project, and it is currently empty.
+- Supabase credentials: `sb_publishable_*`, `sb_secret_*`, and the two database URLs for project `qkubuaicuyoaskzcabcu`. I will create the storage buckets and apply migrations through the Supabase tooling once provided and instructed; nothing destructive will be run against that project, and it is currently empty.
 - SMS gateway choice (Dhiraagu/Ooredoo business SMS, or an international provider). The interface is provider-agnostic.
 - Payment provider for MVR (BML payment gateway or equivalent). The interface is provider-agnostic.
+- Subscription pricing (weekly / monthly / 3-month). Seeded plans carry placeholder prices flagged `isPlaceholderPrice`.
+- Product review of configuration defaults: Undo window (60 min), boost duration (30 min), pass resurfacing (30 days), anti-spam ceiling (30 messages/minute).
+- Invisible Mode lapse semantics (fail closed, §12.6) — implemented as documented; confirm or change.

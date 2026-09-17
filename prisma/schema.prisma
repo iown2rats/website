@@ -1,0 +1,835 @@
+// Thundi — Prisma schema (Phase 3)
+// Rationale for constraints and indexes: docs/ARCHITECTURE.md §5 and §12.
+// Datasource URL is configured in prisma.config.ts (Prisma 7).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum Gender {
+  WOMAN
+  MAN
+  UNSPECIFIED // "Prefer not to say"
+}
+
+enum InterestedIn {
+  WOMEN
+  MEN
+  EVERYONE
+}
+
+enum RelationshipIntent {
+  SERIOUS_RELATIONSHIP
+  DATING
+  MARRIAGE
+  FIGURING_OUT
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ONBOARDING
+  ACTIVE
+  SUSPENDED
+  BANNED
+  DELETED
+}
+
+/// Discovery visibility chosen by the user. "Only people I like" is Invisible Mode (Plus), stored separately.
+enum ProfileVisibility {
+  EVERYONE
+  HIDDEN
+}
+
+enum LocationKind {
+  CITY
+  ISLAND
+  ATOLL
+}
+
+enum LocationScope {
+  ANYWHERE
+  GREATER_MALE
+  MY_ATOLL
+  SPECIFIC
+}
+
+enum PhotoModeration {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MatchStatus {
+  ACTIVE
+  UNMATCHED
+  BLOCKED
+}
+
+/// PENDING = created by an intro before a mutual like; ACTIVE = matched; LOCKED = unmatched or blocked (read-only evidence).
+enum ConversationStatus {
+  PENDING
+  ACTIVE
+  LOCKED
+}
+
+enum MessageKind {
+  TEXT
+  INTRO
+  SYSTEM
+}
+
+enum ReportReason {
+  FAKE_PROFILE
+  UNDERAGE_USER
+  HARASSMENT
+  INAPPROPRIATE_CONTENT
+  SCAM_OR_FINANCIAL_REQUEST
+  IMPERSONATION
+  SPAM
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum VerificationStatus {
+  NONE
+  PHONE_VERIFIED
+  SELFIE_SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum PlanCode {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum EntitlementTier {
+  FREE
+  PLUS
+}
+
+/// Limited actions tracked by the rolling usage-window mechanism (§12.3, §12.8).
+enum UsageKind {
+  LIKES
+  BOOSTS
+}
+
+enum NotificationType {
+  NEW_MATCH
+  MESSAGE
+  LIKE_RECEIVED
+  INTRO_RECEIVED
+  COMMUNITY_LIKE
+  COMMUNITY_COMMENT
+  VERIFICATION_UPDATE
+  SAFETY_NOTICE
+  ACCOUNT_NOTICE
+}
+
+enum PostKind {
+  TEXT
+  QUESTION
+  PHOTO
+}
+
+enum ContactHashSource {
+  PICKER
+  MANUAL
+  NATIVE_IMPORT
+}
+
+enum BlockSource {
+  MANUAL
+  REPORT
+}
+
+// ───────────────────────────── Identity & account ─────────────────────────────
+
+/// Account record. Contains the private fields (phone, DOB) that never leave the server.
+model User {
+  id                    String     @id @default(cuid(2))
+  phoneE164             String     @unique
+  /// HMAC-SHA-256(CONTACT_HASH_SALT, phoneE164). Same keyed function as ContactHash.hash so contact matching is an indexed join.
+  phoneHash             Bytes      @unique
+  phoneHashVersion      Int        @default(1)
+  dateOfBirth           DateTime?  @db.Date
+  gender                Gender?
+  role                  UserRole   @default(USER)
+  status                UserStatus @default(ONBOARDING)
+  /// Last completed onboarding step (0–12). Lets a user resume where they left off.
+  onboardingStep        Int        @default(2)
+  onboardingCompletedAt DateTime?
+  lastActiveAt          DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  profile              Profile?
+  privacy              PrivacySettings?
+  discoveryPreferences DiscoveryPreferences?
+  notificationSettings NotificationSettings?
+  verification         Verification?
+  sessions             Session[]
+  usageCounters        UsageCounter[]
+  boosts               Boost[]
+  subscriptions        Subscription[]
+  entitlementOverrides EntitlementOverride[] @relation("OverrideUser")
+  grantedOverrides     EntitlementOverride[] @relation("OverrideGrantor")
+  likesGiven           Like[]                @relation("LikeFrom")
+  likesReceived        Like[]                @relation("LikeTo")
+  passesGiven          Pass[]                @relation("PassFrom")
+  passesReceived       Pass[]                @relation("PassTo")
+  matchesAsA           Match[]               @relation("MatchA")
+  matchesAsB           Match[]               @relation("MatchB")
+  unmatchedMatches     Match[]               @relation("MatchUnmatchedBy")
+  conversationsAsA     Conversation[]        @relation("ConvA")
+  conversationsAsB     Conversation[]        @relation("ConvB")
+  participations       ConversationParticipant[]
+  messages             Message[]
+  introsSent           Intro[]               @relation("IntroFrom")
+  introsReceived       Intro[]               @relation("IntroTo")
+  blocksGiven          Block[]               @relation("BlockFrom")
+  blocksReceived       Block[]               @relation("BlockTo")
+  reportsFiled         Report[]              @relation("ReportBy")
+  reportsReceived      Report[]              @relation("ReportTarget")
+  reportsResolved      Report[]              @relation("ReportResolver")
+  verificationsReviewed Verification[]       @relation("VerificationReviewer")
+  posts                CommunityPost[]
+  comments             CommunityComment[]
+  postLikes            CommunityLike[]
+  notifications        Notification[]        @relation("NotificationUser")
+  notificationsActed   Notification[]        @relation("NotificationActor")
+  pushSubscriptions    PushSubscription[]
+  contactHashes        ContactHash[]
+  auditLogs            AuditLog[]
+
+  @@index([status, onboardingCompletedAt])
+  @@index([lastActiveAt])
+}
+
+/// Public-facing profile. Anything selectable here may be shown to other users subject to PrivacySettings.
+model Profile {
+  id             String              @id @default(cuid(2))
+  userId         String              @unique
+  /// Opaque public identifier used in URLs instead of the database id.
+  handle         String              @unique
+  displayName    String
+  bio            String?
+  occupation     String?
+  education      String?
+  languages      String[]            @default([])
+  heightCm       Int?
+  intent         RelationshipIntent?
+  locationId     String?
+  /// Optional home island, never shown unless the user allows it.
+  homeLocationId String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location     Location?         @relation("ProfileLocation", fields: [locationId], references: [id], onDelete: SetNull)
+  homeLocation Location?         @relation("ProfileHomeLocation", fields: [homeLocationId], references: [id], onDelete: SetNull)
+  photos       ProfilePhoto[]
+  interests    ProfileInterest[]
+  prompts      ProfilePrompt[]
+
+  @@index([locationId])
+  @@index([intent])
+}
+
+model ProfilePhoto {
+  id          String          @id @default(cuid(2))
+  profileId   String
+  /// 0 = primary photo. Renumbered in one transaction on reorder.
+  position    Int
+  storageKey  String
+  thumbKey    String
+  /// Precomputed blurhash placeholder; the only photo representation a Free client receives in Likes You.
+  blurhash    String
+  width       Int
+  height      Int
+  moderation  PhotoModeration @default(PENDING)
+  createdAt   DateTime        @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, position])
+  @@unique([storageKey])
+}
+
+model Location {
+  id            String       @id @default(cuid(2))
+  slug          String       @unique
+  name          String
+  kind          LocationKind
+  atollCode     String
+  atollName     String
+  isGreaterMale Boolean      @default(false)
+  sortOrder     Int          @default(0)
+
+  profiles     Profile[]              @relation("ProfileLocation")
+  homeProfiles Profile[]              @relation("ProfileHomeLocation")
+  preferences  DiscoveryPreferences[]
+
+  @@index([atollCode])
+}
+
+model Interest {
+  id        String            @id @default(cuid(2))
+  slug      String            @unique
+  label     String
+  sortOrder Int               @default(0)
+  profiles  ProfileInterest[]
+}
+
+model ProfileInterest {
+  profileId  String
+  interestId String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, interestId])
+  @@index([interestId])
+}
+
+model Prompt {
+  id        String          @id @default(cuid(2))
+  slug      String          @unique
+  text      String
+  active    Boolean         @default(true)
+  sortOrder Int             @default(0)
+  answers   ProfilePrompt[]
+}
+
+model ProfilePrompt {
+  id        String   @id @default(cuid(2))
+  profileId String
+  promptId  String
+  answer    String
+  position  Int
+  updatedAt DateTime @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  prompt  Prompt  @relation(fields: [promptId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, promptId])
+  @@unique([profileId, position])
+}
+
+// ───────────────────────────── Settings ─────────────────────────────
+
+model PrivacySettings {
+  userId           String            @id
+  visibility       ProfileVisibility @default(EVERYONE)
+  /// Plus feature (§12.6). Stored as the user's wish; effective only while the entitlement is held.
+  invisibleMode    Boolean           @default(false)
+  hideLocation     Boolean           @default(false)
+  hideAge          Boolean           @default(false)
+  hideActiveStatus Boolean           @default(false)
+  readReceipts     Boolean           @default(true)
+  profileSharing   Boolean           @default(true)
+  blockContacts    Boolean           @default(false)
+  /// "Pause dating": hidden from Discover, chats keep working.
+  pausedAt         DateTime?
+  updatedAt        DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DiscoveryPreferences {
+  userId        String              @id
+  interestedIn  InterestedIn        @default(EVERYONE)
+  ageMin        Int                 @default(22)
+  ageMax        Int                 @default(34)
+  locationScope LocationScope       @default(ANYWHERE)
+  locationId    String?
+  intent        RelationshipIntent?
+  // Advanced (Plus) filters — ignored by the query unless the viewer holds the entitlement.
+  heightMinCm   Int?
+  heightMaxCm   Int?
+  education     String?
+  updatedAt     DateTime            @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+}
+
+model NotificationSettings {
+  userId    String   @id
+  matches   Boolean  @default(true)
+  likes     Boolean  @default(true)
+  messages  Boolean  @default(true)
+  community Boolean  @default(false)
+  marketing Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────────── Auth ─────────────────────────────
+
+model OtpRequest {
+  id         String    @id @default(cuid(2))
+  phoneHash  Bytes
+  codeHash   Bytes
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  ipHash     Bytes?
+  createdAt  DateTime  @default(now())
+
+  @@index([phoneHash, createdAt])
+  @@index([expiresAt])
+}
+
+model Session {
+  id                String   @id @default(cuid(2))
+  userId            String
+  tokenHash         Bytes    @unique
+  createdAt         DateTime @default(now())
+  lastSeenAt        DateTime @default(now())
+  expiresAt         DateTime
+  absoluteExpiresAt DateTime
+  userAgent         String?
+  ipPrefix          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Postgres-backed sliding-window rate limits (OTP, uploads, message spam ceiling).
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+}
+
+// ───────────────────────────── Dating graph ─────────────────────────────
+
+model Like {
+  id         String   @id @default(cuid(2))
+  fromUserId String
+  toUserId   String
+  introId    String?  @unique
+  createdAt  DateTime @default(now())
+
+  from  User   @relation("LikeFrom", fields: [fromUserId], references: [id], onDelete: Restrict)
+  to    User   @relation("LikeTo", fields: [toUserId], references: [id], onDelete: Restrict)
+  intro Intro? @relation(fields: [introId], references: [id], onDelete: SetNull)
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId, createdAt(sort: Desc)])
+  @@index([fromUserId, createdAt(sort: Desc)])
+}
+
+model Pass {
+  id         String    @id @default(cuid(2))
+  fromUserId String
+  toUserId   String
+  createdAt  DateTime  @default(now())
+  /// Passed profiles resurface after this time.
+  expiresAt  DateTime
+  /// Set by Undo (Plus). Never deleted, so history is preserved.
+  undoneAt   DateTime?
+
+  from User @relation("PassFrom", fields: [fromUserId], references: [id], onDelete: Restrict)
+  to   User @relation("PassTo", fields: [toUserId], references: [id], onDelete: Restrict)
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId, createdAt(sort: Desc)])
+}
+
+/// userAId < userBId is enforced in code; the unique pair index makes double-matching impossible.
+model Match {
+  id            String      @id @default(cuid(2))
+  userAId       String
+  userBId       String
+  status        MatchStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  unmatchedAt   DateTime?
+  unmatchedById String?
+
+  userA        User          @relation("MatchA", fields: [userAId], references: [id], onDelete: Restrict)
+  userB        User          @relation("MatchB", fields: [userBId], references: [id], onDelete: Restrict)
+  unmatchedBy  User?         @relation("MatchUnmatchedBy", fields: [unmatchedById], references: [id], onDelete: SetNull)
+  conversation Conversation?
+
+  @@unique([userAId, userBId])
+  @@index([userAId, status])
+  @@index([userBId, status])
+}
+
+/// One conversation per user pair (sorted). PENDING while only an intro exists, ACTIVE after a match, LOCKED after unmatch/block.
+model Conversation {
+  id            String             @id @default(cuid(2))
+  userAId       String
+  userBId       String
+  matchId       String?            @unique
+  status        ConversationStatus @default(PENDING)
+  lastMessageAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  userA        User                      @relation("ConvA", fields: [userAId], references: [id], onDelete: Restrict)
+  userB        User                      @relation("ConvB", fields: [userBId], references: [id], onDelete: Restrict)
+  match        Match?                    @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  participants ConversationParticipant[]
+  messages     Message[]
+  notifications Notification[]
+
+  @@unique([userAId, userBId])
+  @@index([status, lastMessageAt(sort: Desc)])
+}
+
+model ConversationParticipant {
+  conversationId    String
+  userId            String
+  lastReadMessageId String?
+  lastReadAt        DateTime?
+  mutedAt           DateTime?
+  joinedAt          DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+/// Messages are never hard-deleted (moderation evidence). The (senderId, createdAt) index serves the 9-minute cooldown check.
+model Message {
+  id             String      @id @default(cuid(2))
+  conversationId String
+  senderId       String
+  kind           MessageKind @default(TEXT)
+  body           String
+  createdAt      DateTime    @default(now())
+  deletedAt      DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  intro        Intro?
+  reports      Report[]
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([senderId, kind, createdAt(sort: Desc)])
+}
+
+model Intro {
+  id         String   @id @default(cuid(2))
+  fromUserId String
+  toUserId   String
+  body       String
+  /// ISO week key (e.g. 2026-W38) used for the Free quota of one intro per week.
+  weekKey    String
+  messageId  String?  @unique
+  createdAt  DateTime @default(now())
+
+  from    User     @relation("IntroFrom", fields: [fromUserId], references: [id], onDelete: Restrict)
+  to      User     @relation("IntroTo", fields: [toUserId], references: [id], onDelete: Restrict)
+  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  like    Like?
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId, weekKey])
+}
+
+// ───────────────────────────── Usage limits & monetization ─────────────────────────────
+
+/// One row per user per limited action. Locked FOR UPDATE inside the consuming transaction (§12.3, §12.11).
+model UsageCounter {
+  userId      String
+  kind        UsageKind
+  windowStart DateTime
+  windowEnd   DateTime
+  used        Int       @default(0)
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, kind])
+}
+
+model Boost {
+  id        String   @id @default(cuid(2))
+  userId    String
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, endsAt(sort: Desc)])
+  @@index([endsAt])
+}
+
+model SubscriptionPlan {
+  id                 String   @id @default(cuid(2))
+  code               PlanCode @unique
+  name               String
+  intervalDays       Int
+  /// Minor units (laari for MVR). Placeholder until pricing is approved.
+  priceMinor         Int
+  currency           String   @default("MVR")
+  badge              String?
+  discountLabel      String?
+  isPlaceholderPrice Boolean  @default(true)
+  active             Boolean  @default(true)
+  sortOrder          Int      @default(0)
+
+  subscriptions Subscription[]
+}
+
+/// Written only by PaymentProvider webhooks or admin actions. Never by a user-facing action.
+model Subscription {
+  id                      String             @id @default(cuid(2))
+  userId                  String
+  planId                  String
+  status                  SubscriptionStatus
+  provider                String
+  providerCustomerRef     String?
+  providerSubscriptionRef String?            @unique
+  startedAt               DateTime
+  currentPeriodStart      DateTime
+  currentPeriodEnd        DateTime
+  cancelAtPeriodEnd       Boolean            @default(false)
+  cancelledAt             DateTime?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([userId, currentPeriodEnd(sort: Desc)])
+  @@index([status, currentPeriodEnd])
+}
+
+/// Admin/dev grant of a tier for a period (e.g. support goodwill, QA). Also used by tests.
+model EntitlementOverride {
+  id          String          @id @default(cuid(2))
+  userId      String
+  tier        EntitlementTier
+  reason      String
+  grantedById String?
+  startsAt    DateTime        @default(now())
+  endsAt      DateTime
+  createdAt   DateTime        @default(now())
+
+  user      User  @relation("OverrideUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("OverrideGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, endsAt(sort: Desc)])
+}
+
+// ───────────────────────────── Safety & moderation ─────────────────────────────
+
+model Block {
+  id        String      @id @default(cuid(2))
+  blockerId String
+  blockedId String
+  source    BlockSource @default(MANUAL)
+  createdAt DateTime    @default(now())
+
+  blocker User @relation("BlockFrom", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockTo", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+/// Polymorphic target: exactly one of targetUserId / targetPostId / targetMessageId is set (checked in code).
+model Report {
+  id              String       @id @default(cuid(2))
+  reporterId      String
+  targetUserId    String?
+  targetPostId    String?
+  targetMessageId String?
+  reason          ReportReason
+  note            String?
+  /// Snapshot of the reported content at report time so later deletion does not destroy evidence.
+  snapshot        Json?
+  status          ReportStatus @default(OPEN)
+  resolvedById    String?
+  resolvedAt      DateTime?
+  resolution      String?
+  createdAt       DateTime     @default(now())
+
+  reporter      User             @relation("ReportBy", fields: [reporterId], references: [id], onDelete: Restrict)
+  targetUser    User?            @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  targetPost    CommunityPost?   @relation(fields: [targetPostId], references: [id], onDelete: Restrict)
+  targetMessage Message?         @relation(fields: [targetMessageId], references: [id], onDelete: Restrict)
+  resolvedBy    User?            @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([targetUserId])
+}
+
+model Verification {
+  userId           String             @id
+  status           VerificationStatus @default(NONE)
+  selfieStorageKey String?
+  provider         String?
+  providerRef      String?
+  submittedAt      DateTime?
+  reviewedById     String?
+  decidedAt        DateTime?
+  rejectionReason  String?
+  attempts         Int                @default(0)
+  updatedAt        DateTime           @updatedAt
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("VerificationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, submittedAt])
+}
+
+// ───────────────────────────── Community ─────────────────────────────
+
+model CommunityPost {
+  id           String    @id @default(cuid(2))
+  authorId     String
+  kind         PostKind  @default(TEXT)
+  body         String
+  photoKey     String?
+  photoBlurhash String?
+  likeCount    Int       @default(0)
+  commentCount Int       @default(0)
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  author   User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  comments CommunityComment[]
+  likes    CommunityLike[]
+  reports  Report[]
+  notifications Notification[]
+
+  @@index([deletedAt, createdAt(sort: Desc)])
+  @@index([authorId])
+}
+
+model CommunityComment {
+  id        String    @id @default(cuid(2))
+  postId    String
+  authorId  String
+  body      String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([postId, createdAt])
+}
+
+model CommunityLike {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+}
+
+// ───────────────────────────── Notifications ─────────────────────────────
+
+model Notification {
+  id             String           @id @default(cuid(2))
+  userId         String
+  type           NotificationType
+  actorId        String?
+  conversationId String?
+  postId         String?
+  data           Json?
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  user         User          @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor        User?         @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  post         CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid(2))
+  userId    String
+  endpoint  String   @unique
+  keys      Json
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ───────────────────────────── Contact blocking ─────────────────────────────
+
+/// See docs/CONTACT_BLOCKING.md. Hash = HMAC-SHA-256(salt, E.164). No plaintext, no names.
+model ContactHash {
+  id          String            @id @default(cuid(2))
+  userId      String
+  hash        Bytes
+  hashVersion Int               @default(1)
+  source      ContactHashSource
+  createdAt   DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hash])
+  @@index([hash])
+}
+
+// ───────────────────────────── Audit ─────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid(2))
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  data       Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+}

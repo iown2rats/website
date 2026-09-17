@@ -108,14 +108,16 @@ describe("Undo (Plus)", () => {
     expect(rows.map((r) => r.undoneAt === null)).toEqual([true, false]); // history retained
   });
 
-  it("cannot undo once a later like exists or after the age limit", async () => {
+  it("cannot undo once a later like exists, but has no time-based expiry", async () => {
     const a = await createUser(db, { now: T0 });
-    await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
+    await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24 * 3)));
     const [b, c, d] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
     await passUser(a, b.userId, { db, now: T0 });
     await likeUser(a, c.userId, { db, now: at(T0, minutes(1)) });
     await expect(undoLastPass(a, { db, now: at(T0, minutes(2)) })).rejects.toBeInstanceOf(UndoUnavailableError);
+    // A new pass is the latest action again; two days later it is still the eligible most-recent pass.
     await passUser(a, d.userId, { db, now: at(T0, minutes(3)) });
-    await expect(undoLastPass(a, { db, now: at(T0, minutes(3) + hours(2)) })).rejects.toBeInstanceOf(UndoUnavailableError);
+    const undone = await undoLastPass(a, { db, now: at(T0, minutes(3) + hours(48)) });
+    expect(undone.restoredUserId).toBe(d.userId);
   });
 });

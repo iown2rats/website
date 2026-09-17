@@ -101,8 +101,9 @@ export interface UndoResult {
 }
 
 /**
- * Undo (Plus): reverses the actor's most recent Pass if it is also their most recent swipe action
- * and younger than UNDO.maxAgeMs. Records `undoneAt`; deletes nothing.
+ * Undo (Plus): reverses the actor's most recent Pass if it is still eligible — it is their most recent
+ * swipe action, has not been undone already, and (only if UNDO.maxAgeMs is set) is young enough.
+ * Records `undoneAt`; deletes nothing. No arbitrary historical undo.
  */
 export async function undoLastPass(actor: Actor, options: LikeOptions = {}): Promise<UndoResult> {
   const db = options.db ?? getDb();
@@ -124,7 +125,9 @@ export async function undoLastPass(actor: Actor, options: LikeOptions = {}): Pro
     const last = rows[0];
     if (!last) throw new UndoUnavailableError("Nothing to undo");
     if (last.undoneAt) throw new UndoUnavailableError("Your most recent pass has already been undone");
-    if (now.getTime() - last.createdAt.getTime() > UNDO.maxAgeMs) throw new UndoUnavailableError("That pass is too old to undo");
+    if (UNDO.maxAgeMs !== null && now.getTime() - last.createdAt.getTime() > UNDO.maxAgeMs) {
+      throw new UndoUnavailableError("That pass is too old to undo");
+    }
 
     const laterLike = await tx.like.findFirst({
       where: { fromUserId: actor.userId, createdAt: { gt: last.createdAt } },

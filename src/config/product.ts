@@ -64,12 +64,19 @@ export const BOOST = {
   rankingWeight: 1,
 } as const;
 
-/** Undo (Plus): only the most recent Pass, only within this age. */
-export const UNDO = {
-  maxAgeMs: 60 * 60_000,
-} as const;
+/**
+ * Undo (Plus): only the most recent Pass, and only while it is still eligible (not already undone,
+ * no later swipe action). Approved 2026-09-17: no time-based expiry. `maxAgeMs` stays as a
+ * structural hook; set a number to reintroduce a limit later.
+ */
+export const UNDO: { readonly maxAgeMs: number | null } = {
+  maxAgeMs: null,
+};
 
-/** Anti-spam ceiling that applies to every tier, Plus included. */
+/**
+ * Anti-abuse ceiling. This is a SAFETY rule, not a monetization rule: it applies to every tier,
+ * Plus included, and is independent of the Free message cooldown in PRODUCT_RULES.
+ */
 export const MESSAGE_SPAM_CEILING = {
   perMinute: 30,
 } as const;

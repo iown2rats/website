@@ -337,11 +337,19 @@ OR (
 
 Consequences: A (invisible, Plus) likes B → B can now discover A. C, whom A has not liked, never receives A. Existing matches and conversations are unaffected because they are read through `Match`/`ConversationParticipant`, not through discovery. Likes You for B includes A normally.
 
-Lapse semantics (documented decision): when Plus expires with `invisibleMode = true`, the predicate's second branch fails, so the user is **not** exposed. They are effectively paused from Discover until they renew or turn the flag off (which restores normal visibility). This fails closed for privacy while granting nothing premium for free. The lapse creates an `ACCOUNT_NOTICE` notification explaining the state, and the Privacy screen shows it. Turning the flag on as a Free user is refused by the action and leads to the Plus upgrade experience.
+Lapse semantics (approved 2026-09-17, fail closed): when Plus expires with `invisibleMode = true`, the predicate's second branch fails, so the user is **not** exposed. They stay hidden from new discovery; existing matches and chats remain accessible. This grants nothing premium for free. A subscription expiry must never unexpectedly expose a privacy-sensitive profile. When the user returns, `getInvisibleModeState()` reports `{ enabled: true, effective: false, suspended: true }` and the UI shows a clear state, "Your Invisible Mode is still on.", with two actions: renew Thundi Plus, or turn Invisible Mode off and return to normal discovery. The lapse also creates an `ACCOUNT_NOTICE` notification. Turning the flag on as a Free user is refused by the action and leads to the Plus upgrade experience.
+
+### 12.6a Anti-abuse ceilings are not monetization
+
+The 30-messages-per-minute ceiling (`MESSAGE_SPAM_CEILING`) and the OTP/upload rate limits are **safety rules**. They apply to every tier, Plus included, and are never presented as something an upgrade removes. The Free 9-minute cooldown is the only messaging rule that Plus lifts.
+
+### 12.6b Configuration defaults confirmed 2026-09-17
+
+Boosts: 2 per rolling 7-day window, 30-minute duration, no performance multiplier claims in copy. Pass resurfacing: 30 days, configurable via `PASS_TTL_MS`. Undo: no time limit (§12.7).
 
 ### 12.7 Undo (last Pass)
 
-Plus only. `undoLastPass(actor)` finds the actor's most recent `Pass` with `undoneAt IS NULL`, requires that it is the actor's most recent swipe action of any kind (no later `Like` or `Pass` exists), and that it is younger than `UNDO.maxAgeMs` (60 minutes). It sets `undoneAt = now` inside a transaction that locks the pass row and returns the profile so the client can put it back on top of the deck. Discovery excludes only passes with `undoneAt IS NULL`. Nothing is deleted, only the latest action can be reversed, and only once.
+Plus only. `undoLastPass(actor)` locks the actor's most recent `Pass` (undone or not) and reverses it only if it is still eligible: it has not already been undone and no later `Like` exists. There is **no time-based expiry** (approved 2026-09-17); `UNDO.maxAgeMs` in `src/config/product.ts` is `null` and remains as a structural hook so a limit can be reintroduced in one line. It sets `undoneAt = now` and returns the profile so the client can put it back on top of the deck. Discovery excludes only passes with `undoneAt IS NULL`. Nothing is deleted, only the latest action can be reversed, and only once; arbitrary historical undo is impossible by construction.
 
 ### 12.8 Profile Boosts
 
@@ -461,5 +469,3 @@ Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`
 - SMS gateway choice (Dhiraagu/Ooredoo business SMS, or an international provider). The interface is provider-agnostic.
 - Payment provider for MVR (BML payment gateway or equivalent). The interface is provider-agnostic.
 - Subscription pricing (weekly / monthly / 3-month). Seeded plans carry placeholder prices flagged `isPlaceholderPrice`.
-- Product review of configuration defaults: Undo window (60 min), boost duration (30 min), pass resurfacing (30 days), anti-spam ceiling (30 messages/minute).
-- Invisible Mode lapse semantics (fail closed, §12.6) — implemented as documented; confirm or change.

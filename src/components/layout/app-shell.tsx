@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/cn";
 import { BottomNav } from "./bottom-nav";
+import { MainColumn } from "./main-column";
 import type { NavBadges } from "./nav-items";
 import { Sidebar } from "./sidebar";
 
 /*
  * Authenticated app frame (prototype "App" screen): fixed full-viewport flex row, content centred.
  * Phone: main fills the width; floating bottom nav overlays the content, which reserves clearance via `pb-nav`.
- * Desktop (≥ 900): sidebar 232 | main (max 640, or wider when `wideMain`) | optional aside 300. No bottom nav.
+ * Desktop (≥ 900): sidebar 232 | main (max 640, or wide on Chats) | optional aside 300 rendered by AsideSlot on routes that have one. No bottom nav.
  */
 export interface AppShellProps {
   children: ReactNode;
@@ -23,11 +23,11 @@ export function AppShell({ children, badges, aside, hideBottomNav = false, wideM
   return (
     <div className="fixed inset-0 flex justify-center overflow-hidden bg-background text-text">
       <Sidebar badges={badges} />
-      <main className={cn("relative flex min-w-0 flex-1 flex-col overflow-hidden", !wideMain && "desktop:max-w-[var(--content-max)]")}>
+      <MainColumn wide={wideMain}>
         {children}
         <BottomNav badges={badges} hidden={hideBottomNav} />
-      </main>
-      {aside ? <aside className="hidden desktop:flex w-[var(--aside-width)] shrink-0 flex-col gap-5.5 overflow-auto border-l border-border px-5.5 py-7">{aside}</aside> : null}
+      </MainColumn>
+      {aside}
     </div>
   );
 }

@@ -56,10 +56,10 @@ Migrations are **not** applied to the hosted Supabase project automatically. See
 prisma/          schema, migrations, seed and seed data
 src/config/      product rules (single source of truth for limits and plans)
 src/lib/         db client, env validation, errors, hashing, age, cookies, storage providers, validation schemas
-src/server/      domain layer (auth, onboarding, photos, profiles, entitlements, usage windows, discovery, likes, matching, safety, messages, boosts, privacy)
-src/actions/     server actions (auth, onboarding, photos, discovery)
-src/components/  ui primitives, layout shell, feature components (auth, onboarding, discovery)
-src/app/         Next.js routes: /, /auth/*, /onboarding/[stage], (app)/*, /api/photos, /api/media, /dev/design-system
+src/server/      domain layer (auth, onboarding, photos, profiles, entitlements, usage windows, discovery, likes, matching, conversations, safety, boosts, privacy)
+src/actions/     server actions (auth, onboarding, photos, discovery, messaging)
+src/components/  ui primitives, layout shell, feature components (auth, onboarding, discovery, chats)
+src/app/         Next.js routes: /, /auth/*, /onboarding/[stage], (app)/* incl. /chats/[conversationId], /api/photos, /api/media, /dev/design-system
 src/proxy.ts     cookie-presence route guard and security headers
 tests/           unit and integration tests
 docs/            audit, architecture, contact blocking, prototype reference sheets

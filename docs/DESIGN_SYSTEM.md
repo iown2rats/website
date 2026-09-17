@@ -225,3 +225,17 @@ Intentional differences from the prototype (documented for the owner):
 - The prototype's advanced filter list (Education, Occupation, Interests, Height) is reduced to the two the profile actually stores (Height, Education).
 - "Get Thundi Plus" on the like-limit dialog shows "Thundi Plus plans open soon." until the Plus screen ships in Phase 11; nothing pretends to be a purchase.
 
+## 14. Phase 7 verification (2026-09-17): Chats and messaging
+
+Method: Playwright against the dev server with the seeded demo conversations (Aishath, Ibrahim with two unread, Nashfa with one unread) plus fresh matches created for the run, at 375×812, then list and conversation at 390×844, 430×932 and 1280×820 in light and dark. Incoming messages were inserted directly into the local database to exercise polling.
+
+Results:
+
+- Chats list matches the prototype: 26/800 title, surface-muted search, NEW MATCHES 64 px ringed avatars with names, 52 px avatar rows with 16/700 name + seal, secondary preview with "You:" prefix, 12 px time, 20 px primary unread pill; unread rows use a bolder preview. Loading the list never marks anything read.
+- Conversation: glass header with 44 px back (phone only), 40 px avatar, name + seal, island line, ··· options; centred "You matched with {name}. Say hello." pill; bubbles at 78 % max width, primary/ocean for me with a 6 px bottom-right corner, aqua-soft for them, 11 px times; 44 px rounded composer with a multiline textarea that grows to four lines, 44 px primary Send. The prototype's "Add photo" button is omitted (no image messaging yet).
+- Free cooldown: after a send the composer shows "Next free message in 8:5x. Chat anytime with Thundi Plus." with a Get Thundi Plus text button; Send is disabled and a second Enter keeps the draft in the box; no modal opens. Plus users see no cooldown copy and sent three messages in a row.
+- Polling delivered an inserted incoming message within one 4 s interval and marked it read because the conversation was on screen; a long multi-line message with `<b>` tags rendered as text.
+- Options sheet (Report / Block / Unmatch in red / Cancel) → report reasons (eight approved categories) → "Submit report and block" → "Thanks for looking out"; Block and Unmatch each ask "Block/Unmatch {name}?" first. A closed conversation is read-only with "This conversation has ended." and no composer; another user's conversation URL is a 404.
+- Empty states are distinct: "Match with someone to start a conversation." (never matched), the New matches row with "Say hello to a new match." (matches but no messages), "No active chats." with Keep discovering (everything unmatched or blocked), and a retryable error banner for refresh failures.
+- Desktop shows the 360 px list beside the conversation with "Select a conversation" when none is open; the phone bottom nav is hidden on the conversation screen. Dark mode uses the same tokens.
+

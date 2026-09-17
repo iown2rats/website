@@ -1,53 +1,24 @@
 import { notFound } from "next/navigation";
-import { Avatar } from "@/components/ui/avatar";
-import { ChatIcon } from "@/components/ui/icons";
-import { EmptyState } from "@/components/ui/states";
-import { PageFrame } from "@/components/layout/page";
-import { PageHeader } from "@/components/layout/screen-header";
+import { Conversation } from "@/components/features/chats/conversation";
 import { getDb } from "@/lib/db";
-import { displayablePhotoWhere } from "@/lib/photo-policy";
-import { getStorageProvider } from "@/lib/storage";
-import { PHOTO_URL_TTL_SECONDS } from "@/lib/storage/provider";
 import { requireActiveUser } from "@/server/auth/current-user";
-import { getConversationForActor } from "@/server/conversations/messages";
-import { isDemoKey } from "@/server/discovery/dto";
+import { getConversationHeader } from "@/server/conversations/list";
+import { listMessages, toAvailabilityDto } from "@/server/conversations/messages";
+import { getMessageAvailability } from "@/server/entitlements";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Conversation shell (Phase 6 §16): the destination of "Say hello" on the match screen. Authorised through the
- * same participant check messaging will use; the message list and composer arrive in Phase 8.
+ * One conversation. Authorised as a participant (NotFound otherwise, never Forbidden); the newest page of history
+ * and the sender's current availability are loaded here, the rest streams through polling and older-page loads.
  */
 export default async function ConversationPage({ params }: { params: Promise<{ conversationId: string }> }) {
   const actor = await requireActiveUser();
   const { conversationId } = await params;
   const db = getDb();
-  const conversation = await getConversationForActor(db, actor, conversationId).catch(() => null);
-  if (!conversation) notFound();
-  const other = await db.profile.findUnique({
-    where: { userId: conversation.otherUserId },
-    select: { displayName: true, photos: { where: displayablePhotoWhere(), orderBy: { position: "asc" }, take: 1, select: { thumbKey: true, blurhash: true } } },
-  });
-  const first = other?.photos[0];
-  const photo = first ? (isDemoKey(first.thumbKey) ? { key: first.thumbKey, blurhash: first.blurhash } : { url: await getStorageProvider().getReadUrl(first.thumbKey, PHOTO_URL_TTL_SECONDS), blurhash: first.blurhash }) : null;
-  const name = other?.displayName ?? "Your match";
-  return (
-    <PageFrame>
-      <PageHeader
-        backHref="/chats"
-        title={
-          <span className="flex items-center gap-2.5">
-            <Avatar name={name} photo={photo} size={32} />
-            {name}
-          </span>
-        }
-      />
-      <EmptyState
-        icon={<ChatIcon />}
-        title={`You matched with ${name}.`}
-        description="Messaging opens in the next update. Your match is saved and will be here when it does."
-        className="flex-1"
-      />
-    </PageFrame>
-  );
+  const now = new Date();
+  const header = await getConversationHeader(actor, conversationId, { db, now }).catch(() => null);
+  if (!header) notFound();
+  const [page, availability] = await Promise.all([listMessages(actor, conversationId, { db, now }), getMessageAvailability(db, actor.userId, now)]);
+  return <Conversation key={conversationId} header={header} initialPage={page} initialAvailability={toAvailabilityDto(availability)} serverNow={now.toISOString()} />;
 }

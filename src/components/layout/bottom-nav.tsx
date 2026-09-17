@@ -14,12 +14,14 @@ import { NAV_ITEMS, activeNavKey, type NavBadges } from "./nav-items";
 export function BottomNav({ badges = {}, hidden = false }: { badges?: NavBadges; hidden?: boolean }) {
   const pathname = usePathname();
   const active = activeNavKey(pathname);
+  // Phase 4 rule: the conversation screen owns the bottom of the viewport (composer), so the floating nav hides there.
+  const inConversation = /^\/chats\/[^/]+/.test(pathname);
   return (
     <nav
       aria-label="Primary"
       className={cn(
         "desktop:hidden absolute inset-x-4 z-20 mx-auto flex h-16 max-w-[var(--nav-max-width)] items-center justify-around rounded-nav border border-border px-2 glass shadow-lg",
-        hidden && "hidden",
+        (hidden || inConversation) && "hidden",
       )}
       style={{ bottom: "calc(var(--nav-offset) + var(--safe-bottom))" }}
     >

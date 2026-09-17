@@ -73,10 +73,14 @@ export async function toDiscoveryCard(profile: VisibleProfile, storage: StorageP
   };
 }
 
-/** Hydrates cards for ids that have ALREADY passed the deck predicate, preserving order. One query for all ids. */
-export async function buildDiscoveryCards(db: DbLike, viewerId: string, userIds: string[], now: Date, storage: StorageProvider): Promise<DiscoveryCardDto[]> {
+/**
+ * Hydrates cards for ids that have ALREADY passed the deck predicate, preserving order. One query for all ids.
+ * `requireMinPhotos` (default true) drops profiles whose displayable photos fell below the discovery minimum
+ * between query and hydration; matched conversations pass false because a match stays a match.
+ */
+export async function buildDiscoveryCards(db: DbLike, viewerId: string, userIds: string[], now: Date, storage: StorageProvider, options: { requireMinPhotos?: boolean } = {}): Promise<DiscoveryCardDto[]> {
   const profiles = await buildVisibleProfiles(db, viewerId, userIds, now);
   const cards = await Promise.all(profiles.map((p) => toDiscoveryCard(p, storage)));
-  // A profile whose displayable photos dropped below the minimum between query and hydration is not shown.
+  if (options.requireMinPhotos === false) return cards;
   return cards.filter((c) => c.photos.length >= DISCOVERY.minDisplayablePhotos);
 }

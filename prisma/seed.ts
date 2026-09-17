@@ -12,7 +12,7 @@ import { createPrismaClient } from "../src/lib/db";
 import { hashPhone } from "../src/lib/hashing";
 import { sortPair } from "../src/server/actor";
 import { INTERESTS, LOCATIONS, PLANS, PROMPTS } from "./seed-data/reference";
-import { DEMO_CHATS, DEMO_LIKES_YOU, DEMO_MATCHES, DEMO_POSTS, DEMO_PROFILES, blurhashFor, type DemoProfile } from "./seed-data/demo";
+import { DEMO_CHATS, DEMO_COMMUNITY_POSTS, DEMO_LIKES_YOU, DEMO_MATCHES, DEMO_PROFILES, blurhashFor, type DemoProfile } from "./seed-data/demo";
 import { DEMO_PLUS_USER, DISCOVERY_SCENARIOS } from "./seed-data/discovery-scenarios";
 
 const url = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -137,27 +137,64 @@ async function seedDemo() {
     }
   }
 
-  if ((await db.communityPost.count()) === 0) {
-    for (const p of DEMO_POSTS) {
-      await db.communityPost.create({
-        data: {
-          authorId: ids.get(p.author)!,
-          kind: p.kind,
-          body: p.body,
-          photoKey: p.kind === "PHOTO" ? `demo/posts/${p.author}.hue-${p.hue}` : null,
-          photoBlurhash: p.kind === "PHOTO" ? blurhashFor(p.hue!) : null,
-          likeCount: p.likes,
-          commentCount: p.comments,
-          createdAt: new Date(now.getTime() - p.hoursAgo * 3_600_000),
-        },
-      });
-    }
-  }
   await seedDiscoveryScenarios(me, createDemoUser, minutesAgo);
-  console.log(`demo: ${DEMO_PROFILES.length} profiles, ${DEMO_LIKES_YOU.length} incoming likes, ${DEMO_MATCHES.length} matches, ${DEMO_POSTS.length} posts, ${DISCOVERY_SCENARIOS.length} discovery scenarios`);
+  await seedCommunity(ids, me);
+  console.log(`demo: ${DEMO_PROFILES.length} profiles, ${DEMO_LIKES_YOU.length} incoming likes, ${DEMO_MATCHES.length} matches, ${DISCOVERY_SCENARIOS.length} discovery scenarios`);
 }
 
 const DAY = 24 * 3_600_000;
+
+/** Community scenarios (see seed-data/demo.ts DEMO_COMMUNITY_POSTS). Idempotent: keyed ids, upserts. */
+async function seedCommunity(ids: Map<string, string>, me: string) {
+  const now = new Date();
+  // Discovery scenario users are looked up by their demo phone → user id.
+  const byPhone = async (phone: string) => (await db.user.findUnique({ where: { phoneE164: phone }, select: { id: true } }))?.id ?? null;
+  const scenarioPhones: Record<string, string> = { "s-hidden-loc": "+9607000104", "s-i-blocked": "+9607000112", "s-blocked-me": "+9607000113", "s-suspended": "+9607000118" };
+  const resolve = async (key: string) => ids.get(key) ?? (scenarioPhones[key] ? byPhone(scenarioPhones[key]) : null);
+  let posts = 0;
+  for (const d of DEMO_COMMUNITY_POSTS) {
+    const authorId = await resolve(d.author);
+    if (!authorId) continue;
+    const createdAt = new Date(now.getTime() - d.hoursAgo * 3_600_000);
+    const postId = `demo-${d.key}`;
+    await db.communityPost.upsert({
+      where: { id: postId },
+      create: {
+        id: postId,
+        authorId,
+        kind: d.kind,
+        body: d.body,
+        photoKey: d.kind === "PHOTO" ? `demo/posts/${d.key}.hue-${d.hue ?? 190}` : null,
+        photoBlurhash: d.kind === "PHOTO" ? blurhashFor(d.hue ?? 190) : null,
+        photoModeration: d.photoModeration ?? "APPROVED",
+        createdAt,
+        deletedAt: d.deleted ? new Date(createdAt.getTime() + 60_000) : null,
+        likeCount: 0,
+        commentCount: 0,
+      },
+      update: {},
+    });
+    posts++;
+    for (const [i, c] of (d.comments ?? []).entries()) {
+      const cAuthor = await resolve(c.author);
+      if (!cAuthor) continue;
+      await db.communityComment.upsert({ where: { id: `${postId}-c${i}` }, create: { id: `${postId}-c${i}`, postId, authorId: cAuthor, body: c.body, createdAt: new Date(createdAt.getTime() + c.minutesAfter * 60_000) }, update: {} });
+    }
+    for (const who of d.likedBy ?? []) {
+      const uid = await resolve(who);
+      if (uid) await db.communityLike.upsert({ where: { postId_userId: { postId, userId: uid } }, create: { postId, userId: uid, createdAt: new Date(createdAt.getTime() + 5 * 60_000) }, update: {} });
+    }
+    if (d.reportedByMe) {
+      const exists = await db.report.findFirst({ where: { reporterId: me, targetPostId: postId } });
+      if (!exists) await db.report.create({ data: { reporterId: me, targetUserId: authorId, targetPostId: postId, reason: d.reportedByMe, snapshot: { kind: d.kind, body: d.body }, createdAt: new Date(createdAt.getTime() + 3_600_000) } });
+    }
+    // Counters mirror the persisted rows.
+    await db.$executeRaw`UPDATE "CommunityPost" p SET "likeCount" = (SELECT count(*) FROM "CommunityLike" l WHERE l."postId" = p.id), "commentCount" = (SELECT count(*) FROM "CommunityComment" c WHERE c."postId" = p.id AND c."deletedAt" IS NULL) WHERE p.id = ${postId}`;
+  }
+  // The demo viewer opted into Community notifications so reactions/comments on their post are visible in dev.
+  await db.notificationSettings.update({ where: { userId: me }, data: { community: true } });
+  console.log(`community: ${posts} scenario posts`);
+}
 
 /** Discovery scenarios around "me" (see seed-data/discovery-scenarios.ts). Idempotent: skips rows that exist. */
 async function seedDiscoveryScenarios(

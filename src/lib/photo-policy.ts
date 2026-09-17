@@ -35,3 +35,12 @@ export function displayablePhotoStates(): readonly DisplayablePhotoState[] {
 export function displayablePhotoWhere(): { moderation: { in: DisplayablePhotoState[] } } {
   return { moderation: { in: [...displayablePhotoStates()] } };
 }
+
+/**
+ * Community media follows the same policy as profile photos (pending visible outside production, approved only in
+ * production) but has its own moderation column (CommunityPost.photoModeration). A post whose photo is not
+ * displayable is hidden from other users' feeds and shown only to its author as "under review".
+ */
+export function displayableCommunityMediaStates(): readonly DisplayablePhotoState[] {
+  return displayablePhotoStates();
+}

@@ -84,6 +84,28 @@ export const MESSAGE_SPAM_CEILING = {
 /** Passed profiles resurface after this long unless undone. */
 export const PASS_TTL_MS = 30 * 24 * 3_600_000;
 
+/**
+ * Community limits (docs/ARCHITECTURE.md §14). Kinds and the single heart reaction follow the prototype.
+ * Ceilings are anti-abuse for every tier, never monetization.
+ */
+export const COMMUNITY = {
+  postMaxLength: 1000,
+  commentMaxLength: 500,
+  feedPageSize: 12,
+  commentsPageSize: 30,
+  /** "New" tab window. */
+  newWindowMs: 24 * 3_600_000,
+  /** Anti-abuse ceilings (RateLimitBucket). */
+  postsPerHour: 10,
+  commentsPerMinute: 20,
+  reactionsPerMinute: 60,
+  /**
+   * Interim behaviour pending the owner's product decision: Invisible Mode is defined as a Discover rule only
+   * (§12.6), and Community never feeds discovery, so Community participation is currently independent of it.
+   */
+  invisibleModeParticipation: "ALLOWED" as "ALLOWED" | "READ_ONLY",
+} as const;
+
 /** Message body limits. */
 export const MESSAGE_LIMITS = { minLength: 1, maxLength: 2000 } as const;
 export const INTRO_LIMITS = { maxLength: 140 } as const;

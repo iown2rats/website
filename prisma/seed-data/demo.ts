@@ -65,9 +65,48 @@ export const DEMO_CHATS: Record<string, DemoMessage[]> = {
   ],
 };
 
-export const DEMO_POSTS = [
-  { author: "p6", hoursAgo: 2, kind: "TEXT" as const, body: "Anyone else think Malé needs more benches facing the sea? Just sat on a pipe for an hour.", likes: 48, comments: 12 },
-  { author: "p3", hoursAgo: 5, kind: "PHOTO" as const, body: "Cycled the full Addu link road today. Legs gone, spirits high.", likes: 126, comments: 31, hue: 175 },
-  { author: "p9", hoursAgo: 8, kind: "QUESTION" as const, body: "Question: best breakfast spot in Hulhumalé that opens before 7?", likes: 22, comments: 40 },
-  { author: "p2", hoursAgo: 24, kind: "PHOTO" as const, body: "Sunrise from the Hulhumalé bridge never gets old.", likes: 210, comments: 18, hue: 25 },
+/**
+ * Community scenarios (Phase 8), keyed so the seed is idempotent. Authors are demo profile keys or discovery
+ * scenario keys (prisma/seed-data/discovery-scenarios.ts). `state` exercises one feed rule each.
+ */
+export interface DemoCommunityPost {
+  key: string;
+  author: string;
+  hoursAgo: number;
+  kind: "TEXT" | "PHOTO" | "QUESTION";
+  body: string;
+  hue?: number;
+  /** Photo moderation for PHOTO posts (default APPROVED). */
+  photoModeration?: "PENDING" | "APPROVED" | "REJECTED";
+  deleted?: boolean;
+  comments?: { author: string; body: string; minutesAfter: number }[];
+  /** Demo profile keys who liked the post ("me" included where relevant). */
+  likedBy?: string[];
+  /** "me" reported this post (evidence preserved, no block). */
+  reportedByMe?: "SPAM" | "INAPPROPRIATE_CONTENT";
+}
+
+export const DEMO_COMMUNITY_POSTS: DemoCommunityPost[] = [
+  { key: "cm-own", author: "me", hoursAgo: 1, kind: "TEXT", body: "Finally tried the new coffee place near Rasfannu. Flat white passes the test.", comments: [{ author: "p6", body: "The one with the blue chairs? Their croissants are the real win.", minutesAfter: 12 }, { author: "p1", body: "Adding to the weekend list ☕", minutesAfter: 40 }], likedBy: ["p1", "p6", "p9"] },
+  { key: "cm-q1", author: "p1", hoursAgo: 3, kind: "QUESTION", body: "Question: is the 6:15 Villingili ferry still running on Fridays? Timetable online says one thing, the jetty says another.", comments: [{ author: "p8", body: "It runs, but it left at 6:25 last Friday.", minutesAfter: 30 }, { author: "me", body: "Left at 6:20 the week before. Aim for 6:10.", minutesAfter: 55 }], likedBy: ["me", "p8"] },
+  { key: "cm-long", author: "p8", hoursAgo: 6, kind: "TEXT", body: "Long read for a Friday: I spent the week going through the old Malé maps in the national archive and it changes how you see the city. The eastern harbour used to be a lagoon you could wade across, the mosque at the centre was the only stone building for a century, and half the street names still point at families who moved to the atolls generations ago. If anyone wants to walk it one evening, I'll bring the photocopies and the tea. No experience needed, just comfortable sandals and patience for a history teacher who talks too much.", comments: [{ author: "p5", body: "Yes please. Sunday evening?", minutesAfter: 90 }], likedBy: ["me", "p1", "p5", "p9"] },
+  { key: "cm-photo-nuha", author: "s-hidden-loc", hoursAgo: 9, kind: "PHOTO", body: "Lunch break view. Not saying where.", hue: 200, likedBy: ["p2"] },
+  { key: "cm-pending-photo", author: "p5", hoursAgo: 11, kind: "PHOTO", body: "Baa Atoll from the seaplane this morning.", hue: 190, photoModeration: "PENDING", likedBy: ["p1"] },
+  { key: "cm-blocked-author", author: "s-i-blocked", hoursAgo: 12, kind: "TEXT", body: "You should never see this post: its author is blocked by the demo viewer." },
+  { key: "cm-blocked-me", author: "s-blocked-me", hoursAgo: 13, kind: "TEXT", body: "You should never see this post: its author blocked the demo viewer." },
+  { key: "cm-suspended", author: "s-suspended", hoursAgo: 14, kind: "TEXT", body: "You should never see this post: its author is suspended." },
+  { key: "cm-deleted", author: "p4", hoursAgo: 15, kind: "TEXT", body: "You should never see this post: it was deleted by its author.", deleted: true },
+  { key: "cm-reported", author: "p9", hoursAgo: 16, kind: "TEXT", body: "Follow my other account for daily giveaways!! Link in bio.", reportedByMe: "SPAM" },
+  { key: "cm-q2", author: "p6", hoursAgo: 20, kind: "QUESTION", body: "Question: anyone know a printer in Hulhumalé that does A2 posters same day?", comments: [{ author: "p9", body: "Novelty Printers, near the bus stop. Ask for Shafeeu.", minutesAfter: 25 }] },
+  { key: "cm-old-1", author: "p3", hoursAgo: 30, kind: "TEXT", body: "Addu link road at golden hour is still the best cycling in the country. Change my mind.", likedBy: ["me"] },
+  { key: "cm-old-2", author: "p2", hoursAgo: 40, kind: "TEXT", body: "Bridge sunrise crowd this morning was bigger than the sunrise." },
+  { key: "cm-old-3", author: "p7", hoursAgo: 52, kind: "TEXT", body: "Night shift tip: the tea shop behind IGMH opens at 4am and the roshi is fresh." },
+  { key: "cm-old-4", author: "p5", hoursAgo: 60, kind: "QUESTION", body: "Question: does anyone in B. Atoll run a book swap? Happy to start one on Eydhafushi." },
+  { key: "cm-old-5", author: "p8", hoursAgo: 75, kind: "TEXT", body: "Marking exams with the sound of the boduberu practice next door. Not complaining." },
+  { key: "cm-old-6", author: "p1", hoursAgo: 90, kind: "PHOTO", body: "Maaya Thila, 7am. Zero current, a hundred fish.", hue: 185, likedBy: ["me", "p4"] },
+  // The four Phase 4 fixture posts, now persisted with real reactions and comments (counters are derived from rows).
+  { key: "cm-bench", author: "p6", hoursAgo: 2, kind: "TEXT", body: "Anyone else think Malé needs more benches facing the sea? Just sat on a pipe for an hour.", likedBy: ["p1", "p2", "p3", "p5", "p7", "p8"], comments: [{ author: "p3", body: "The stretch by Rasfannu had some, until the last storm.", minutesAfter: 20 }, { author: "p7", body: "Pipe gang.", minutesAfter: 35 }] },
+  { key: "cm-addu-ride", author: "p3", hoursAgo: 5, kind: "PHOTO", body: "Cycled the full Addu link road today. Legs gone, spirits high.", hue: 175, likedBy: ["me", "p1", "p2", "p6", "p8", "p9"], comments: [{ author: "p2", body: "Which direction? Hithadhoo to Gan is the one with the wind.", minutesAfter: 15 }] },
+  { key: "cm-breakfast-q", author: "p9", hoursAgo: 8, kind: "QUESTION", body: "Question: best breakfast spot in Hulhumalé that opens before 7?", likedBy: ["p5", "p6"], comments: [{ author: "p6", body: "The tea shop opposite the ferry terminal. Mas huni by 6.", minutesAfter: 10 }, { author: "p5", body: "Second the ferry terminal one.", minutesAfter: 42 }, { author: "p1", body: "Nothing in the flats side opens before 7, sadly.", minutesAfter: 80 }] },
+  { key: "cm-bridge-photo", author: "p2", hoursAgo: 24, kind: "PHOTO", body: "Sunrise from the Hulhumalé bridge never gets old.", hue: 25, likedBy: ["me", "p1", "p3", "p6", "p7", "p8", "p9"], comments: [{ author: "p8", body: "Was up there too, the 5:50 crowd.", minutesAfter: 30 }] },
 ];

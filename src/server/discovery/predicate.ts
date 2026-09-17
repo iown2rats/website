@@ -66,6 +66,27 @@ export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array, no
   `;
 }
 
+/**
+ * Relationship-only visibility between the viewer and a user aliased `u` (User): no Block in either direction and
+ * no contact-hash intersection where the owner has blockContacts on. Used by Community, where account state and
+ * Invisible Mode (discovery rules) do not apply but blocks and contact blocking do.
+ */
+export function noBlockOrContactSql(viewerId: string, viewerPhoneHash: Uint8Array): Prisma.Sql {
+  return Prisma.sql`
+    NOT EXISTS (
+      SELECT 1 FROM "Block" b
+      WHERE (b."blockerId" = ${viewerId} AND b."blockedId" = u.id)
+         OR (b."blockerId" = u.id AND b."blockedId" = ${viewerId})
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM "ContactHash" ch
+      JOIN "PrivacySettings" ops ON ops."userId" = ch."userId" AND ops."blockContacts" = true
+      WHERE (ch."userId" = u.id AND ch.hash = ${Buffer.from(viewerPhoneHash)})
+         OR (ch."userId" = ${viewerId} AND ch.hash = u."phoneHash")
+    )
+  `;
+}
+
 /** Discovery-only: the candidate must be open to being discovered right now and have enough displayable photos. */
 export function discoverableSql(): Prisma.Sql {
   return Prisma.sql`

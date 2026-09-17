@@ -239,3 +239,19 @@ Results:
 - Empty states are distinct: "Match with someone to start a conversation." (never matched), the New matches row with "Say hello to a new match." (matches but no messages), "No active chats." with Keep discovering (everything unmatched or blocked), and a retryable error banner for refresh failures.
 - Desktop shows the 360 px list beside the conversation with "Select a conversation" when none is open; the phone bottom nav is hidden on the conversation screen. Dark mode uses the same tokens.
 
+## 15. Phase 8 verification (2026-09-17): Community
+
+Method: Playwright against the dev server with the seeded Community scenarios (own post with comments, questions, a long post, a hidden-location author, a PENDING photo, authors blocked in each direction, a suspended author, a deleted post, a reported post, older posts for paging) at 375×812 as the Free demo user, then 390×844 as the Plus user, 430×932 dark, and 1280×900 light and dark. 66 scripted checks passed, including database assertions after every write.
+
+Results:
+
+- Feed matches the prototype: 26/800 title, 38 px pill tabs (ocean when active), radius-24 cards with 44 px avatar, 15/700 name + seal, 12.5 px "Malé · 2h" meta (time only when the author hides their island), 36 px ··· button, QUESTION tag, 16 px body at 1.5 (long posts render in full), 240 px radius-18 photo, 38 px heart and comment controls with counts. The prototype's Share button is not rendered.
+- Paging: first page of 12, then Load more (also triggered by scrolling) completes the feed and ends with "You're all caught up."; New shows the last 24 hours; Following shows "Nothing to follow yet." with the explanation.
+- Reactions: the heart toggles optimistically with `aria-pressed`, the count follows, and the database row and counter agree after unlike → like.
+- Thread `/community/[postId]`: back header, the card, "n COMMENTS" label, 40 px avatar comment rows with name + seal + time, a 44 px rounded composer pinned to the bottom (bottom nav hidden, like a conversation). A comment appears immediately (dimmed until confirmed), the counter updates, and the author can delete it from ··· → Delete comment.
+- Author avatar opens the read-only full profile (no Like/Pass/Message); a hidden-location author shows no Location row; blocked or unavailable profiles read "This profile isn't available."
+- ··· on another user's post: Report post / Block {name} / Cancel. Report → eight approved reasons → Submit report → "Thanks for looking out" stating the author has not been blocked, with "Also block {name}" as a separate button. Block asks "Block {name}?" and removes all of their posts at once; after reload they stay hidden and their comments leave threads. Own content shows Delete only, with confirmation.
+- Compose: "New post" sheet (modal on desktop) with Text / Photo / Question pills, kind-specific placeholder, "Posting as Malé · Community posts don't create matches", Post disabled until valid; Photo requires a JPEG/PNG/WebP under 8 MB (wrong types rejected before upload), shows a preview and an upload progress bar, and stores a re-encoded WebP marked PENDING. "Posted to Community" toast; the new post appears first with "now".
+- States are distinct: "Nothing here yet. / Be the first to post something." (no posts), "Nothing new in the last 24 hours." (New), the Following explanation, "Community couldn't load" with Try again (a failed request; retry recovers), "This post isn't available." with Back to Community (deleted or blocked post URL), inline "Couldn't load more" with retry.
+- Desktop: the 640 px main column with no right panel (no empty aside), FAB 24 px from the bottom, compose as a centred modal, the thread and profile overlay inside the column. Dark mode uses the same tokens throughout.
+

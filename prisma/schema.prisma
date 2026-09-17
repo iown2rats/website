@@ -691,12 +691,13 @@ model Block {
   @@index([blockedId])
 }
 
-/// Polymorphic target: exactly one of targetUserId / targetPostId / targetMessageId is set (checked in code).
+/// Polymorphic target: exactly one of targetUserId / targetPostId / targetCommentId / targetMessageId is set (checked in code).
 model Report {
   id              String       @id @default(cuid(2))
   reporterId      String
   targetUserId    String?
   targetPostId    String?
+  targetCommentId String?
   targetMessageId String?
   reason          ReportReason
   note            String?
@@ -711,6 +712,7 @@ model Report {
   reporter      User             @relation("ReportBy", fields: [reporterId], references: [id], onDelete: Restrict)
   targetUser    User?            @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
   targetPost    CommunityPost?   @relation(fields: [targetPostId], references: [id], onDelete: Restrict)
+  targetComment CommunityComment? @relation(fields: [targetCommentId], references: [id], onDelete: Restrict)
   targetMessage Message?         @relation(fields: [targetMessageId], references: [id], onDelete: Restrict)
   resolvedBy    User?            @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
 
@@ -746,6 +748,8 @@ model CommunityPost {
   body         String
   photoKey     String?
   photoBlurhash String?
+  /// Community media has its own moderation state (src/lib/photo-policy.ts decides what other users may see).
+  photoModeration PhotoModeration @default(PENDING)
   likeCount    Int       @default(0)
   commentCount Int       @default(0)
   createdAt    DateTime  @default(now())
@@ -769,8 +773,9 @@ model CommunityComment {
   createdAt DateTime  @default(now())
   deletedAt DateTime?
 
-  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  post    CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  reports Report[]
 
   @@index([postId, createdAt])
 }

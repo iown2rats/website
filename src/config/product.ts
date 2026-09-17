@@ -100,8 +100,12 @@ export const COMMUNITY = {
   commentsPerMinute: 20,
   reactionsPerMinute: 60,
   /**
-   * Interim behaviour pending the owner's product decision: Invisible Mode is defined as a Discover rule only
-   * (§12.6), and Community never feeds discovery, so Community participation is currently independent of it.
+   * OWNER DECISION (approved 2026-09-17): Invisible Mode controls dating-discovery visibility only. An Invisible
+   * Mode user may view Community, post, comment, react and have their Community profile/content viewed under the
+   * normal Community privacy rules. Community participation never makes them eligible for or visible in Discover
+   * unless the Phase 6 discovery rules independently allow it, and Community never reveals dating eligibility,
+   * discovery preferences, likes or the Invisible Mode state. The setting UI discloses this (§12.6). Regression
+   * test: tests/integration/community.test.ts "Invisible Mode + Community".
    */
   invisibleModeParticipation: "ALLOWED" as "ALLOWED" | "READ_ONLY",
 } as const;

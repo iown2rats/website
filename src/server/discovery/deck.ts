@@ -35,7 +35,7 @@ export interface DeckCapabilities {
   tier: "FREE" | "PLUS";
 }
 
-export type EmptyReason = "NONE" | "FILTERS" | "EXHAUSTED";
+export type EmptyReason = "NONE" | "FILTERS" | "EXHAUSTED" | "PAUSED";
 
 export interface DeckPage {
   cards: DiscoveryCardDto[];
@@ -43,7 +43,7 @@ export interface DeckPage {
   capabilities: DeckCapabilities;
   /** Authoritative server time; the client renders countdowns relative to this, never to its own clock alone. */
   serverNow: string;
-  /** Only meaningful when `cards` is empty: FILTERS = relaxing your filters would show people, EXHAUSTED = nobody new. */
+  /** Only meaningful when `cards` is empty: FILTERS = relaxing your filters would show people, EXHAUSTED = nobody new, PAUSED = the viewer paused dating. */
   emptyReason: EmptyReason;
   /** The viewer's own primary photo for the match screen. */
   me: { name: string; photo: { url: string | null; demoKey: string | null; blurhash: string } | null };
@@ -83,15 +83,18 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
   const storage = deps.storage ?? getStorageProvider();
   const now = deps.now ?? new Date();
   const excludeIds = await resolveHandles(db, input.excludeHandles ?? []);
+  const privacy = await db.privacySettings.findUnique({ where: { userId: actor.userId }, select: { visibility: true, pausedAt: true } });
+  const paused = privacy?.visibility === "HIDDEN" || Boolean(privacy?.pausedAt);
   const [ids, allowance, entitlements, me] = await Promise.all([
-    getDeckCandidateIds(db, actor, { now, limit: input.limit, excludeIds }),
+    paused ? Promise.resolve([] as string[]) : getDeckCandidateIds(db, actor, { now, limit: input.limit, excludeIds }),
     getLikeAllowance(db, actor.userId, now),
     getEntitlements(db, actor.userId, now),
     loadMe(db, actor, storage),
   ]);
   const cards = await buildDiscoveryCards(db, actor.userId, ids, now, storage);
   let emptyReason: EmptyReason = "NONE";
-  if (cards.length === 0 && excludeIds.length === 0) {
+  if (paused) emptyReason = "PAUSED";
+  else if (cards.length === 0 && excludeIds.length === 0) {
     emptyReason = (await countRelaxedCandidates(db, actor, now)) > 0 ? "FILTERS" : "EXHAUSTED";
   }
   return {

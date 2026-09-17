@@ -14,8 +14,9 @@ import { NAV_ITEMS, activeNavKey, type NavBadges } from "./nav-items";
 export function BottomNav({ badges = {}, hidden = false }: { badges?: NavBadges; hidden?: boolean }) {
   const pathname = usePathname();
   const active = activeNavKey(pathname);
-  // Screens whose composer owns the bottom of the viewport (a conversation, a Community post thread) hide the nav.
-  const inConversation = /^\/(chats|community)\/[^/]+/.test(pathname);
+  // Screens that own the bottom of the viewport (a conversation, a Community thread) and the prototype's full-screen
+  // page overlays (Edit profile, Preview, Settings and its sub-pages) hide the floating nav.
+  const inConversation = /^\/(chats|community)\/[^/]+|^\/settings(\/|$)|^\/profile\//.test(pathname);
   return (
     <nav
       aria-label="Primary"

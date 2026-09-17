@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { ChevronRightIcon } from "./icons";
 
@@ -97,6 +98,24 @@ export function ListRow({ label, meta, leading, trailing, chevron = true, tone =
     <button type="button" className={classes} style={{ minHeight: height }} {...rest}>
       {content}
     </button>
+  );
+}
+
+/** ListRow rendered as a navigation link (Profile and Settings rows that open a page). */
+export function LinkRow({ href, label, meta, leading, trailing, chevron = true, tone = "default", height = 56, className, ...rest }: Omit<ListRowProps, "asDiv" | "onClick"> & { href: string } & Omit<React.ComponentProps<typeof Link>, "href">) {
+  return (
+    <Link
+      href={href}
+      className={cn("w-full flex items-center gap-3.5 px-4.5 text-left bg-transparent border-0 hover:bg-surface-muted transition-colors duration-150", tone === "danger" ? "text-danger" : "text-text", className)}
+      style={{ minHeight: height }}
+      {...rest}
+    >
+      {leading}
+      <span className="flex-1 min-w-0 text-body font-semibold truncate">{label}</span>
+      {meta ? <span className="text-caption text-text-secondary font-medium shrink-0">{meta}</span> : null}
+      {trailing}
+      {chevron ? <ChevronRightIcon size={18} className="text-text-secondary shrink-0" /> : null}
+    </Link>
   );
 }
 

@@ -27,8 +27,11 @@ export const PHOTO_RULES = {
 export interface PhotoDto {
   id: string;
   position: number;
-  url: string;
-  thumbUrl: string;
+  /** Signed, short-lived URLs. Null only for development demo placeholders (see `demoKey`). */
+  url: string | null;
+  thumbUrl: string | null;
+  /** Development demo placeholder key (renders as a gradient). Never set for real photos. */
+  demoKey: string | null;
   blurhash: string;
   width: number;
   height: number;
@@ -111,8 +114,9 @@ export async function listPhotos(actor: Actor, deps: { db?: Db; storage: Storage
     rows.map(async (r) => ({
       id: r.id,
       position: r.position,
-      url: await deps.storage.getReadUrl(r.storageKey, PHOTO_URL_TTL_SECONDS),
-      thumbUrl: await deps.storage.getReadUrl(r.thumbKey, PHOTO_URL_TTL_SECONDS),
+      url: r.storageKey.startsWith("demo/") ? null : await deps.storage.getReadUrl(r.storageKey, PHOTO_URL_TTL_SECONDS),
+      thumbUrl: r.thumbKey.startsWith("demo/") ? null : await deps.storage.getReadUrl(r.thumbKey, PHOTO_URL_TTL_SECONDS),
+      demoKey: r.storageKey.startsWith("demo/") ? r.storageKey : null,
       blurhash: r.blurhash,
       width: r.width,
       height: r.height,
@@ -122,11 +126,28 @@ export async function listPhotos(actor: Actor, deps: { db?: Db; storage: Storage
   );
 }
 
+/**
+ * Minimum-photo rule (docs/ARCHITECTURE.md §6, Phase 9 §7): once onboarding is complete, a profile must keep at
+ * least PHOTO_LIMITS.min non-rejected photos, so removing a photo that would drop below the minimum is refused with
+ * an explanation instead of leaving the account in an invalid dating state. Rejected photos can always be removed;
+ * during onboarding the completion gate enforces the minimum instead.
+ */
+export async function assertCanRemovePhoto(db: DbLike, userId: string, photoModeration: "PENDING" | "APPROVED" | "REJECTED"): Promise<void> {
+  if (photoModeration === "REJECTED") return;
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { onboardingCompletedAt: true } });
+  if (!user.onboardingCompletedAt) return;
+  const active = await countActivePhotos(db, userId);
+  if (active <= PHOTO_RULES.min) {
+    throw new InvalidStateError(`Keep at least ${PHOTO_RULES.min} photos on your profile. Add another photo before removing this one.`);
+  }
+}
+
 /** Deletes one of the actor's photos and renumbers the rest. Unknown or foreign ids read as NotFound. */
 export async function deletePhoto(actor: Actor, photoId: string, deps: { db?: Db; storage: StorageProvider }): Promise<void> {
   const db = deps.db ?? getDb();
-  const photo = await db.profilePhoto.findFirst({ where: { id: photoId, profile: { userId: actor.userId } }, select: { id: true, profileId: true, storageKey: true, thumbKey: true } });
+  const photo = await db.profilePhoto.findFirst({ where: { id: photoId, profile: { userId: actor.userId } }, select: { id: true, profileId: true, storageKey: true, thumbKey: true, moderation: true } });
   if (!photo) throw new NotFoundError("Photo");
+  await assertCanRemovePhoto(db, actor.userId, photo.moderation);
   await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT id FROM "Profile" WHERE id = ${photo.profileId} FOR UPDATE`;
     await tx.profilePhoto.delete({ where: { id: photo.id } });

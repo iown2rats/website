@@ -13,7 +13,7 @@ import { AppScreen, DiscoveryFrame } from "@/components/layout/page";
 import { TabHeader } from "@/components/layout/screen-header";
 import type { AllowanceDto, DeckCapabilities, DeckPage, EmptyReason } from "@/server/discovery/deck";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
-import { DeckError, DeckExhausted, DeckFiltered, DeckLoading, LikesExhaustedNote } from "./deck-states";
+import { DeckError, DeckExhausted, DeckFiltered, DeckLoading, LikesExhaustedNote, DeckPaused } from "./deck-states";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "./filters-sheet";
 import { FullProfile } from "./full-profile";
 import { LikeLimitDialog } from "./like-limit-dialog";
@@ -224,6 +224,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     status === "loading" ? <DeckLoading /> :
     status === "error" ? <DeckError onRetry={() => void loadMore("retry")} /> :
     likesExhausted && emptyReason === "EXHAUSTED" ? <LikesExhaustedNote limit={allowance.limit} msUntilReset={msUntilReset} /> :
+    emptyReason === "PAUSED" ? <DeckPaused /> :
     emptyReason === "FILTERS" ? <DeckFiltered onAdjustFilters={() => setFiltersOpen(true)} /> :
     <DeckExhausted onAdjustFilters={() => setFiltersOpen(true)} onRefresh={() => void loadMore("retry")} />;
 

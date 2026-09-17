@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { FilterIcon, HeartIcon, WavesIcon } from "@/components/ui/icons";
+import { EyeOffIcon, FilterIcon, HeartIcon, WavesIcon } from "@/components/ui/icons";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { formatDuration } from "@/lib/time";
 
@@ -59,6 +60,20 @@ export function LikesExhaustedNote({ limit, msUntilReset }: { limit: number; msU
       icon={<HeartIcon />}
       title={`You've used today's ${limit} likes.`}
       description={msUntilReset != null ? `Your likes refresh in ${formatDuration(msUntilReset)}. You can keep browsing and passing.` : "You can keep browsing and passing."}
+    />
+  );
+}
+
+/** Pause Dating (Privacy & Safety → Hidden): the viewer is hidden from Discover and gets no deck until they resume. */
+export function DeckPaused() {
+  return (
+    <EmptyState
+      framed
+      className="h-full"
+      icon={<EyeOffIcon strokeWidth={2} />}
+      title="Dating is paused."
+      description="You're hidden from Discover and won't see new people. Your matches and chats keep working."
+      actions={<Link href="/settings/privacy" className="inline-flex h-11 items-center rounded-lg bg-primary px-5 text-body-sm font-bold text-on-primary">Resume in Privacy &amp; Safety</Link>}
     />
   );
 }

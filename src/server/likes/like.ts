@@ -3,7 +3,7 @@
  */
 import { PASS_TTL_MS, UNDO } from "@/config/product";
 import { getDb, type Db, type Tx } from "@/lib/db";
-import { EntitlementRequiredError, LikeLimitReachedError, NotFoundError, UndoUnavailableError, ValidationError } from "@/lib/errors";
+import { EntitlementRequiredError, InvalidStateError, LikeLimitReachedError, NotFoundError, UndoUnavailableError, ValidationError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { canView } from "@/server/discovery/query";
 import { getEntitlements } from "@/server/entitlements";
@@ -34,6 +34,10 @@ export async function likeUser(actor: Actor, targetUserId: string, options: Like
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
   if (targetUserId === actor.userId) throw new ValidationError("You cannot like yourself");
+  // Pause Dating (Phase 9 §24): a paused user is hidden from Discover and may not start new dating interactions,
+  // otherwise pausing would grant Invisible Mode for free. Matches and chats are unaffected.
+  const privacy = await db.privacySettings.findUnique({ where: { userId: actor.userId }, select: { visibility: true, pausedAt: true } });
+  if (privacy?.visibility === "HIDDEN" || privacy?.pausedAt) throw new InvalidStateError("Dating is paused. Resume it in Privacy & Safety to like people.");
 
   // Visibility is checked before entering the transaction; it never depends on the counter.
   if (!(await canView(db, actor.userId, targetUserId, now))) throw new NotFoundError("Profile");

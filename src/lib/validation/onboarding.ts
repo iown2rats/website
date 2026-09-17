@@ -6,7 +6,7 @@ import { INTEREST_LIMITS, PROMPT_LIMITS } from "@/config/product";
  * them for inline hints only. Text fields reject markup characters outright (React escapes output too).
  */
 
-const noMarkup = (max: number, label: string) =>
+export const noMarkup = (max: number, label: string) =>
   z
     .string()
     .transform((s) => s.replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim())

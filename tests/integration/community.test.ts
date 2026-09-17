@@ -9,6 +9,7 @@ import { getCommunityProfile } from "@/server/community/profile";
 import { setReaction } from "@/server/community/reactions";
 import { blockPostAuthor, reportComment, reportPost } from "@/server/community/reports";
 import { getLikeAllowance } from "@/server/entitlements";
+import { canView, getDeckCandidateIds } from "@/server/discovery/query";
 import { likeByHandle } from "@/server/discovery/deck";
 import { likeUser } from "@/server/likes/like";
 import { blockUser } from "@/server/safety/block";
@@ -291,5 +292,49 @@ describe("dating boundary", () => {
     // Community interactions created no matches or conversations for anyone.
     expect(await db.match.count()).toBe(0);
     expect(await db.conversation.count()).toBe(0);
+  });
+});
+
+describe("Invisible Mode + Community (owner decision, approved 2026-09-17)", () => {
+  it("an Invisible Mode user participates in Community normally, is never made discoverable by it, and the DTO never reveals the state", async () => {
+    expect(COMMUNITY.invisibleModeParticipation).toBe("ALLOWED");
+    const viewer = await createUser(db, { now: T0, gender: "MAN", interestedIn: "WOMEN", age: 27, ageMin: 20, ageMax: 40 });
+    const ghost = await createUser(db, { now: T0, gender: "WOMAN", interestedIn: "MEN", age: 26, ageMin: 20, ageMax: 40, invisibleMode: true, name: "Ghost" });
+    await grantPlus(db, ghost.userId, at(T0, -hours(1)), at(T0, hours(24)));
+
+    // Baseline: without Invisible Mode the pair would be mutually discoverable; with it, the viewer never gets Ghost.
+    expect(await canView(db, viewer.userId, ghost.userId, T0)).toBe(false);
+    expect(await getDeckCandidateIds(db, viewer, { now: T0 })).not.toContain(ghost.userId);
+
+    // Ghost can view, post, comment and react.
+    const ghostPost = await post(ghost, "Not in the deck, but here in Community");
+    expect((await getFeed(ghost, {}, deps())).posts.length).toBeGreaterThan(0);
+    const viewerPost = await post(viewer, "Hello from the viewer", at(T0, 1000));
+    const comment = await addComment(ghost, viewerPost.id, "Hi from Ghost", deps(at(T0, 2000)));
+    expect(comment.author.name).toBe("Ghost");
+    expect((await setReaction(ghost, viewerPost.id, true, deps(at(T0, 3000)))).likeCount).toBe(1);
+
+    // Ghost's content and profile are visible to others under the normal Community rules.
+    const feed = await getFeed(viewer, {}, deps(at(T0, 4000)));
+    const seen = feed.posts.find((p) => p.id === ghostPost.id);
+    expect(seen?.author.name).toBe("Ghost");
+    expect((await listComments(viewer, viewerPost.id, {}, deps())).comments.map((c) => c.body)).toEqual(["Hi from Ghost"]);
+    const profile = await getCommunityProfile(viewer, ghost.handle, deps());
+    expect(profile.name).toBe("Ghost");
+
+    // Nothing in Community reveals dating eligibility, preferences, likes or the Invisible Mode flag.
+    const payload = JSON.stringify({ seen, profile, feed: feed.posts });
+    expect(payload).not.toMatch(/invisible|visibility|discoverable|interestedIn|ageMin|ageMax|likedBy(?!Me)|dateOfBirth|phone/i);
+
+    // Community activity has not made Ghost discoverable; a dating Like from the viewer still fails through the Phase 6 path.
+    expect(await canView(db, viewer.userId, ghost.userId, at(T0, 5000))).toBe(false);
+    expect(await getDeckCandidateIds(db, viewer, { now: at(T0, 5000) })).not.toContain(ghost.userId);
+    await expect(likeUser(viewer, ghost.userId, { db, now: at(T0, 5000) })).rejects.toBeInstanceOf(NotFoundError);
+
+    // Plus lapses: Community participation continues; discovery stays fail-closed (§12.6).
+    const later = at(T0, hours(48));
+    const afterLapse = await post(ghost, "Still here after Plus lapsed", later);
+    expect((await getFeed(viewer, {}, deps(later))).posts.map((p) => p.id)).toContain(afterLapse.id);
+    expect(await canView(db, viewer.userId, ghost.userId, later)).toBe(false);
   });
 });

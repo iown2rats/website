@@ -107,7 +107,15 @@ export interface VerifyOtpInput {
   now?: Date;
 }
 
-export async function verifyOtp(db: Db, input: VerifyOtpInput): Promise<VerifyOtpResult> {
+export type VerifyOtpCodeResult =
+  | { ok: true; phoneE164: string }
+  | { ok: false; code: "INVALID_CODE" | "CODE_EXPIRED" | "CODE_USED" | "TOO_MANY_ATTEMPTS"; attemptsRemaining?: number };
+
+/**
+ * Checks and consumes a challenge without signing anyone in. Shared by sign-in and by re-authentication before
+ * destructive account actions (docs/ARCHITECTURE.md §4.4). Same attempt limits and one-time use as sign-in.
+ */
+export async function verifyOtpCode(db: Db, input: { challengeId: string; code: string; now?: Date }): Promise<VerifyOtpCodeResult> {
   const now = input.now ?? new Date();
   const code = (input.code ?? "").replace(/\D/g, "");
   if (!/^[0-9a-f-]{36}$/i.test(input.challengeId ?? "")) return { ok: false, code: "INVALID_CODE" };
@@ -129,11 +137,17 @@ export async function verifyOtp(db: Db, input: VerifyOtpInput): Promise<VerifyOt
     return remaining === 0 ? { ok: false, code: "TOO_MANY_ATTEMPTS", attemptsRemaining: 0 } : { ok: false, code: "INVALID_CODE", attemptsRemaining: remaining };
   }
 
-  // One-time use: the conditional update is the race guard. Two concurrent correct submissions yield one session.
+  // One-time use: the conditional update is the race guard. Two concurrent correct submissions yield one success.
   const consumed = await db.otpRequest.updateMany({ where: { id: challenge.id, consumedAt: null }, data: { consumedAt: now } });
   if (consumed.count === 0) return { ok: false, code: "CODE_USED" };
+  return { ok: true, phoneE164: challenge.phoneE164 };
+}
 
-  const account = await createAccountForPhone(db, challenge.phoneE164, now);
+export async function verifyOtp(db: Db, input: VerifyOtpInput): Promise<VerifyOtpResult> {
+  const now = input.now ?? new Date();
+  const checked = await verifyOtpCode(db, { challengeId: input.challengeId, code: input.code, now });
+  if (!checked.ok) return checked;
+  const account = await createAccountForPhone(db, checked.phoneE164, now);
   if (account.status === "SUSPENDED" || account.status === "BANNED" || account.status === "DELETED") {
     return { ok: false, code: "ACCOUNT_UNAVAILABLE" };
   }

@@ -5,6 +5,7 @@ Meet someone closer to home. Dating for the Maldives. 18+.
 - Design source of truth: `prototype/` (read-only) and `docs/PROTOTYPE_AUDIT.md`
 - Architecture and approved product rules: `docs/ARCHITECTURE.md` (monetization in §12)
 - Contact blocking design: `docs/CONTACT_BLOCKING.md`
+- Design system and per-phase visual verification: `docs/DESIGN_SYSTEM.md`
 
 ## Stack
 
@@ -24,6 +25,10 @@ THUNDI_SEED_DEMO=true npm run db:seed   # + prototype demo profiles (development
 npm run dev
 ```
 
+Signing in locally: `SMS_PROVIDER=console` prints the code to the server log and `THUNDI_DEV_OTP_ECHO=true` shows it on the code screen. Photos are stored under `LOCAL_STORAGE_DIR` (`.storage`, git-ignored) and served through signed `/api/media` URLs. Both switches are refused when `NODE_ENV=production`.
+
+Next 16 only serves dev assets to the origin it is bound to, so open `http://localhost:3000` (not `127.0.0.1`) when checking pages in a browser.
+
 If you have Docker: `docker run -d --name thundi-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 postgres:17` and use `postgresql://postgres@localhost:5432/thundi_dev`.
 
 ## Checks
@@ -39,16 +44,19 @@ Integration tests run against a real Postgres and include concurrency tests for 
 
 ## Hosted database
 
-Migrations are **not** applied to the hosted Supabase project automatically. See `docs/ARCHITECTURE.md` §5 for the connection strategy; apply with `npm run db:deploy` against `DIRECT_DATABASE_URL` only when instructed.
+Migrations are **not** applied to the hosted Supabase project automatically. See `docs/ARCHITECTURE.md` §5 for the connection strategy; apply with `npm run db:deploy` against `DIRECT_DATABASE_URL` only when instructed. Before switching `STORAGE_PROVIDER=supabase`, a private bucket named by `SUPABASE_STORAGE_BUCKET_PHOTOS` (`profile-photos`) must exist and `SUPABASE_SECRET_KEY` must be set on the server only.
 
 ## Layout
 
 ```
 prisma/          schema, migrations, seed and seed data
 src/config/      product rules (single source of truth for limits and plans)
-src/lib/         db client, errors, hashing, age
-src/server/      domain layer (entitlements, usage windows, discovery predicate, likes, matching, messages, boosts, privacy)
-src/app/         Next.js routes (placeholder until Phase 4/5)
+src/lib/         db client, env validation, errors, hashing, age, cookies, storage providers, validation schemas
+src/server/      domain layer (auth, onboarding, photos, profiles, entitlements, usage windows, discovery, likes, matching, messages, boosts, privacy)
+src/actions/     server actions (auth, onboarding, photos)
+src/components/  ui primitives, layout shell, feature components (auth, onboarding, discovery)
+src/app/         Next.js routes: /, /auth/*, /onboarding/[stage], (app)/*, /api/photos, /api/media, /dev/design-system
+src/proxy.ts     cookie-presence route guard and security headers
 tests/           unit and integration tests
 docs/            audit, architecture, contact blocking, prototype reference sheets
 ```

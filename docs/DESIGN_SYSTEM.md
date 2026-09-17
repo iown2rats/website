@@ -179,3 +179,27 @@ Defects found and fixed during verification: the deck's top card collapsed becau
 Tooling note: Next 16 blocks dev resources, including the HMR socket, for origins other than the one the dev server is bound to, so pages opened via `127.0.0.1` never hydrate in development. Use `http://localhost:<port>` for browser checks (the production build hydrates on any host).
 
 Intentionally deferred to later phases: real photos (signed URLs), Likes You grids, conversation list and composer, community posts, full-profile overlay, filters sheet content, onboarding steps, Plus screen and plan selection.
+
+## 12. Phase 5 verification (2026-09-17): authentication and onboarding
+
+Method: Playwright against the dev server (`http://localhost:3100`) driving the complete journey at 375×812, then every auth and onboarding screen at 375×812, 390×844, 430×932 and 1280×820 in light and dark, plus scripted checks of the guards and error paths (60 assertions, all passing on the final run). Uploads used generated 1200×1600 JPEGs, a 200×200 PNG and an HTML file renamed `.jpg`.
+
+Results:
+
+- Step chrome matches the prototype: 44 px bordered back button (hidden on the first stage), 4 px progress bar, "n / 12" counter, 24/800 titles, 14 px secondary subtitles, 52 px inputs and radio cards, 52 px primary CTA; the same 520 px column is centred on desktop.
+- Phone: fixed 🇲🇻 +960 chip, 7-digit input formatted "7XX XXXX", numeric keyboard, Continue enabled at 7 digits; an invalid number shows "Enter a Maldivian mobile number: 7 digits starting with 7 or 9." and the message clears as soon as the user types again.
+- Code: six 52 px boxes mirror one real input (`inputmode=numeric`, `autocomplete=one-time-code`, paste and backspace work, auto-submits at six digits); "Code sent to +960 … Resend in 45s" counts down from server time; the development-only echo banner is aqua-soft. Wrong code → "That code isn't correct. Try again." with the boxes cleared, "2 attempts left" near the limit; expired → "Your code has expired. Request a new one."; locked → "Too many attempts. Request a new code."; both replace the CTA with "Request a new code", which returns to the phone screen with the number prefilled.
+- Birthday: the year list starts at the current year − 18; a live "You're N. That's what people will see." or "You must be 18 or older to use Thundi." line; the CTA stays disabled under 18 and a forged submission is refused by the server with the same sentence and nothing stored.
+- Photos: 3-column 3:4 tiles, dashed empty tiles ("Main photo" / "Add photo" / +), per-tile progress, error tiles with the server's reason and "Tap to retry", ✕ remove, hover/focus move buttons and drag to reorder, "Add N more photos" CTA until two are present.
+- About, Privacy and Done follow the prototype copy; the privacy card tells the truth about the web (see CONTACT_BLOCKING.md §7) and shows Invisible Mode as a Plus item.
+- Dark mode uses the same tokens throughout; nothing overflows horizontally at any width.
+
+Defects found and fixed during verification: uploaded tiles were captured before decode (script timing, not a bug); the "Main photo" tag rendered uppercase and collided with the remove button (now the prototype's white sentence-case pill at the bottom-left); a non-image error tile showed a broken preview icon (hidden on error); repeating the same wrong code left the boxes filled because the error text was unchanged (clear on every rejected submission); an expired or locked code bounced to the phone screen because the challenge cookie was cleared (cookie now outlives the challenge and the screen renders the "request a new code" state); the About textarea and the Privacy card/list were squeezed at 375 px because the forms allowed their children to shrink (`min-h-0` removed); the birthday selects blanked after a server rejection while the stale error stayed (manual action dispatch avoids React's form reset; errors dismiss on edit); the hidden back button on the first stage was faintly visible (spacer instead of a disabled button).
+
+Intentional differences from the prototype (documented for the owner):
+
+- The on-screen numeric keypad on the code step is replaced by the device keyboard. The prototype's keypad was a mock; the native keyboard gives autofill, paste and accessibility for free.
+- On long steps (About, Privacy) the Continue button scrolls with the content instead of being pinned, so the whole form stays reachable on small screens. Short steps keep it at the bottom.
+- The "Main photo" pill sits at the bottom-left of the tile instead of the top-left so it never overlaps the remove button at 375 px.
+- The privacy step's free "Only people I like" option is presented as the Plus-only Invisible Mode; the contact-blocking button records the preference and explains what the web can do instead of faking an address-book import.
+

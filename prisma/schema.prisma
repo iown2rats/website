@@ -48,6 +48,21 @@ enum UserStatus {
   DELETED
 }
 
+/// Named onboarding stages (docs/ARCHITECTURE.md §4, Phase 5). The furthest stage the user has reached;
+/// each stage's save action advances it. COMPLETE is set only by the completion action after validating all required data.
+enum OnboardingStage {
+  NAME
+  DOB
+  GENDER
+  MEET
+  INTENT
+  LOCATION
+  PHOTOS
+  ABOUT
+  PRIVACY
+  COMPLETE
+}
+
 /// Discovery visibility chosen by the user. "Only people I like" is Invisible Mode (Plus), stored separately.
 enum ProfileVisibility {
   EVERYONE
@@ -186,8 +201,8 @@ model User {
   gender                Gender?
   role                  UserRole   @default(USER)
   status                UserStatus @default(ONBOARDING)
-  /// Last completed onboarding step (0–12). Lets a user resume where they left off.
-  onboardingStep        Int        @default(2)
+  /// Furthest onboarding stage reached. Lets a user resume exactly where they left off.
+  onboardingStage       OnboardingStage @default(NAME)
   onboardingCompletedAt DateTime?
   lastActiveAt          DateTime?
   deletedAt             DateTime?
@@ -398,17 +413,21 @@ model NotificationSettings {
 
 // ───────────────────────────── Auth ─────────────────────────────
 
+/// One OTP challenge. Only the HMAC of the code is stored. A new request supersedes earlier open ones.
 model OtpRequest {
-  id         String    @id @default(cuid(2))
-  phoneHash  Bytes
-  codeHash   Bytes
-  attempts   Int       @default(0)
-  expiresAt  DateTime
-  consumedAt DateTime?
-  ipHash     Bytes?
-  createdAt  DateTime  @default(now())
+  id           String    @id @default(cuid(2))
+  phoneHash    Bytes
+  /// Needed to create the account on first successful verification; never returned to clients.
+  phoneE164    String
+  codeHash     Bytes
+  attempts     Int       @default(0)
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  supersededAt DateTime?
+  ipHash       Bytes?
+  createdAt    DateTime  @default(now())
 
-  @@index([phoneHash, createdAt])
+  @@index([phoneHash, createdAt(sort: Desc)])
   @@index([expiresAt])
 }
 

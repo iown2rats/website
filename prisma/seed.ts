@@ -63,7 +63,7 @@ async function seedDemo() {
         dateOfBirth: dobForAge(d.age, now),
         gender: d.gender,
         status: "ACTIVE",
-        onboardingStep: 12,
+        onboardingStage: "COMPLETE",
         onboardingCompletedAt: now,
         lastActiveAt: new Date(now.getTime() - Math.floor(Math.random() * 6) * 3_600_000),
         profile: {

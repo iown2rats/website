@@ -72,6 +72,6 @@ Both directions are hidden, matching the prototype copy. Turning the setting off
 
 Native clients will call the same actions with `source = NATIVE_IMPORT` after reading the address book locally.
 
-## 7. What the UI will say
+## 7. What the UI says
 
-Onboarding step 11 and Privacy & Safety keep the prototype's card, title and body text. The button becomes "Choose contacts to hide from" on browsers with the Contact Picker, and "Add numbers to hide from" elsewhere, with one line: "Full address-book blocking is available in the Thundi app." No fake permission dialog, no fabricated count.
+Onboarding step 11 (built in Phase 5) keeps the prototype's ocean card, title and body text. Its button, "Turn on contact blocking" / "Contact blocking on ✓", records `PrivacySettings.blockContacts` and nothing else; a second line states plainly: "Full address-book blocking is available in the Thundi app. On the web you can add numbers to hide from later in Privacy & Safety." There is no fake permission dialog and no fabricated count. Phase 10 adds the Privacy & Safety screen with "Choose contacts to hide from" on browsers that support the Contact Picker API and "Add numbers to hide from" elsewhere, hashing on the device as described in §4.

@@ -134,25 +134,27 @@ Rules that keep this maintainable:
 
 ## 4. Authentication and sessions
 
-### 4.1 Phone + OTP
+### 4.1 Phone + OTP (as built in Phase 5)
 
-- Phone input accepts 7 digits, normalised to E.164 `+960XXXXXXX`. Validation rejects anything outside Maldivian mobile ranges (7xx xxxx and 9xx xxxx). Stored as `User.phoneE164` (unique) plus `phoneHash` (HMAC-SHA-256 with a server secret) for lookups without exposing the number in indexes that might be dumped.
-- OTP: 6 digits from `crypto.randomInt`. Stored only as `sha256(code + otpRequestId + pepper)`. Expires in 5 minutes. Max 5 verify attempts per request, then the request is void. Resend cooldown 45 s; max 5 requests per phone per hour and 20 per IP per hour (Postgres-backed sliding window in `RateLimitBucket`; no Redis dependency).
-- `SmsProvider` interface: `send(to, message)`. Implementations: `ConsoleSmsProvider` (dev; prints the code to the server log and, when `THUNDI_DEV_OTP_ECHO=true` and `NODE_ENV !== "production"`, returns it in the action result so the UI can auto-fill) and a provider stub for the chosen SMS gateway. In production the code path that echoes the OTP is compiled out by an `env.ts` refinement that throws at boot if `THUNDI_DEV_OTP_ECHO` is set.
-- Enumeration: the request step responds identically whether or not the phone exists; account creation happens only after a successful verify.
+- `normalizeMaldivianPhone` (`src/server/auth/phone.ts`) accepts local, `+960`, `960` and `00960` forms, strips spaces and punctuation, and requires seven digits starting with 7 or 9. Everything else is `INVALID_PHONE` and never touches the database. The canonical form `+960XXXXXXX` is stored on `User.phoneE164` (unique) and looked up through `phoneHash` (HMAC-SHA-256 with `SESSION_SECRET`), so differently formatted entries can never create two accounts.
+- Challenges (`OtpRequest`): six digits from `crypto.randomInt`; only `HMAC-SHA-256(OTP_PEPPER, challengeId:code)` is stored, along with `phoneE164`, `expiresAt` (5 min), `attempts`, `consumedAt` and `supersededAt`. Requesting a new code supersedes every open challenge for that phone, so only the newest code verifies. Verification is constant-time, increments `attempts` atomically before comparing, and consumes the challenge with a conditional `updateMany` so a code can be redeemed exactly once even under concurrent submission. After 5 wrong attempts the challenge is void even if the right code follows.
+- Limits are server time only: 45 s resend cooldown, 5 requests per phone per hour, 20 per IP per hour, through the atomic `RateLimitBucket` upsert in `src/server/auth/rate-limit.ts` (no Redis). Every request attempt counts against the buckets, including ones refused by the cooldown.
+- The challenge id travels between the two screens in a signed HttpOnly cookie `thundi_otp` (path `/auth`, signed with `SESSION_SECRET`, 30 min). It carries no secret; the cookie outlives the challenge so the code screen can explain that a code expired instead of silently returning to the phone screen.
+- Enumeration: request and verify return the same shapes and messages whether or not the phone has an account; unknown or malformed challenge ids answer exactly like a wrong code. The account is created (with its settings rows) only inside a successful verify, race-safely on the unique phone.
+- `SmsProvider` (`src/server/auth/sms.ts`): `ConsoleSmsProvider` (development; logs the code), `NotConfiguredSmsProvider` (production placeholder: throws, surfaced to the user as "We couldn't send your code right now"), `MemorySmsProvider` (tests). The production gateway (Dhiraagu/Ooredoo business SMS or an international provider) plugs in as one more class selected by `SMS_PROVIDER`; the file marks the exact hook. The development echo (`THUNDI_DEV_OTP_ECHO`) is validated in `src/lib/env.ts`, which refuses to boot in production with the echo, the console provider or local storage enabled.
 
-### 4.2 Sessions
+### 4.2 Sessions (as built)
 
-- Opaque 256-bit random token in an `HttpOnly; Secure; SameSite=Lax; Path=/` cookie named `thundi_session`. The database stores `sha256(token)`, user id, created/lastSeen/expires, user agent and IP prefix.
-- Sliding expiry: 30 days idle, 90 days absolute. Logout deletes the row. "Log out everywhere" deletes all rows for the user.
-- `proxy.ts` only checks for cookie presence and redirects unauthenticated requests away from `(app)` and `(onboarding)`; the actual session lookup happens in `getActor()` (server, `React.cache` per request) which also enforces account state: `ACTIVE` proceeds, `ONBOARDING` redirects to the next incomplete step, `PAUSED` proceeds with discovery disabled, `SUSPENDED`/`BANNED` are logged out with a message, `DELETED` is treated as absent.
-- CSRF: server actions are same-origin by construction in Next; the few route handlers that mutate (upload signing, webhooks) check `Origin`/`Sec-Fetch-Site` or a provider signature respectively.
-- Security headers set in `proxy.ts`: CSP (self, Supabase storage host for images, no inline scripts except Next's nonce), `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera only on the verification route), `X-Content-Type-Options`, `frame-ancestors 'none'`.
+- Opaque 32-byte token (base64url) in cookie `thundi_session`: `HttpOnly; SameSite=Lax; Path=/`, `Secure` in production. The database stores only `sha256(token)` plus user id, created/lastSeen/expires, user agent and the IP /24 prefix.
+- 30 days idle, 90 days absolute, sliding refresh at most hourly; expired rows are deleted on first sight. Logout (`POST /auth/logout`, same-origin checked) revokes exactly that session; `revokeAllSessions` exists for "log out everywhere".
+- Route protection has two layers with no possible loop (`src/server/auth/route-access.ts`, unit-tested): `proxy.ts` sees only cookie presence and bounces anonymous requests away from `/onboarding` and the app; the server layouts call `getAuthState()` (React `cache`, one lookup per request) and apply `resolveAccess`: anonymous → `/auth/phone`, onboarding → `/onboarding`, active → `/discover`. Suspended, banned or deleted accounts cannot sign in (`ACCOUNT_UNAVAILABLE`) and an existing session for them resolves as anonymous. Server actions never accept a user id; `requireActor()` derives it from the session and Zod strips unknown keys.
+- CSRF: server actions are same-origin by construction; the two mutating route handlers (`/api/photos`, `/auth/logout`) refuse cross-site `Sec-Fetch-Site`. Baseline headers from `proxy.ts`: `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options: DENY`, `Permissions-Policy` (camera self, geolocation denied). A nonce-based CSP is scheduled for Phase 12 hardening.
 
-### 4.3 Age gate
+### 4.3 Age gate and onboarding state (as built)
 
-- DOB is collected once during onboarding, validated server-side (`age(dob) >= 18` computed in UTC), stored on `User.dateOfBirth`, and can only be changed by a moderator. Age is derived at read time and exposed as `age` on profile DTOs; DOB is never selected into any public DTO.
-- Every write that would complete onboarding re-checks age. A user whose stored DOB implies under 18 (for example after a moderator correction) is set to `SUSPENDED` with reason `UNDERAGE`.
+- Onboarding progress is a named pointer, `User.onboardingStage` (`NAME → DOB → GENDER → MEET → INTENT → LOCATION → PHOTOS → ABOUT → PRIVACY → COMPLETE`), never a numeric step. Each stage saves immediately and advances the pointer only forwards; going back and editing never moves it backwards; `COMPLETE` is set only by `completeOnboarding`, which re-validates every required field and the age on the server before switching the account to `ACTIVE`. `/onboarding` resumes at the pointer; a URL for a later stage redirects to it.
+- Date of birth is validated as a real calendar date and `ageFromDateOfBirth(dob, now) >= 18` on the server (UTC, tested at exactly 18 and 17 years 364 days). A refused date is never stored. DOB lives only on `User.dateOfBirth`; profile DTOs expose the derived `age` and the owner's onboarding data exposes day/month/year only to the owner.
+- Required to finish: name, DOB, gender, who to meet, intention, location and at least two non-rejected photos. Bio, interests, prompts and verification are optional and feed the completion percentage (`src/server/profiles/completion.ts`, single source of truth for both the onboarding "done" screen and the Profile ring).
 
 ## 5. Database design principles
 
@@ -183,13 +185,12 @@ Conventions: `cuid2` ids; `createdAt`/`updatedAt` on every table; foreign keys w
 - Two env vars: `DATABASE_URL` (pooled, runtime) and `DIRECT_DATABASE_URL` (session/direct, tooling). `prisma.config.ts` reads `DIRECT_DATABASE_URL`; `src/lib/db.ts` reads `DATABASE_URL` through the pg adapter.
 - The app connects with a dedicated Postgres role (`thundi_app`) that owns only the `public` schema, not the Supabase `postgres` superuser. Row Level Security is not used for the app's own tables because access control lives in the domain layer with a single privileged connection; RLS remains enabled by default on any table Supabase clients could reach directly (none planned).
 
-## 6. Storage and photos
+## 6. Storage and photos (as built in Phase 5)
 
-- `StorageProvider` interface: `createUploadTicket(userId, kind, contentType, size)`, `finalizeUpload(key)`, `getSignedReadUrl(key, ttl)`, `delete(key)`. Implementations: `SupabaseStorageProvider` (private buckets `profile-photos`, `community-photos`, `verification-selfies`) and `LocalDiskStorageProvider` for tests.
-- Upload flow: client requests a ticket (server checks photo count < 6, size ≤ 8 MB, declared type in `image/jpeg|png|webp|heic`) → client PUTs directly to the signed URL → client calls `finalizePhoto(ticketId)` → server downloads the object, sniffs the real type with `sharp`, rejects mismatches, strips EXIF (GPS), re-encodes to WebP at 1080 and 400 widths plus a blurhash, writes variants under `profile-photos/<userId>/<photoId>/{full,thumb}.webp`, deletes the raw upload, inserts `ProfilePhoto` with `moderation = PENDING`. Only variants the server produced are ever served.
-- Read: `next/image` with a custom loader pointing at short-lived signed URLs (1 hour) generated server-side per render; keys never appear in client HTML for users who cannot see the profile. Community photos follow the same path with a 24 h TTL.
-- Verification selfies go to a separate bucket, are never resized for display, never signed for the profile owner or other users, and are only readable by the moderation role.
-- Reorder: `reorderPhotos(actor, orderedPhotoIds)` validates all ids belong to the actor, then renumbers positions in one transaction. Position 0 is the primary photo. Delete refuses to drop below the minimum of 2 once onboarding is complete.
+- `StorageProvider` (`src/lib/storage/provider.ts`): `put(key, bytes, contentType)`, `delete(key)`, `getReadUrl(key, ttlSeconds)`. `LocalDiskStorageProvider` (development and tests) writes under `LOCAL_STORAGE_DIR` and serves through `/api/media/<key>?exp&sig`, an HMAC-signed expiring URL verified in constant time. `SupabaseStorageProvider` uploads with the server secret key to the private bucket `SUPABASE_STORAGE_BUCKET_PHOTOS` and returns Supabase signed URLs. Keys are validated against path traversal. The provider is chosen by `STORAGE_PROVIDER`; production refuses `local`.
+- Upload flow: the browser posts one file to `POST /api/photos` (multipart, XHR for real progress, same-origin only, session required). The server caps the body at 8 MB, sniffs the real format with `sharp` (JPEG, PNG, WebP; the declared MIME type is ignored), requires at least 400 px on each side, strips all metadata by re-encoding to WebP at 1080 (full) and 400 (thumb) widths, computes a blurhash, and writes `profile-photos/<userId>/<photoId>/{full,thumb}.webp`. The profile row is locked `FOR UPDATE` while counting so the maximum of six holds under concurrent uploads (tested). Rows are inserted with `moderation = PENDING`; a `REJECTED` photo is never the primary and does not count towards the minimum of two.
+- Read: DTOs carry signed URLs (1 h) generated per render; storage keys never reach the client. Reorder validates that the id set is exactly the actor's photos and renumbers in one transaction (position 0 is primary); delete removes the row and both objects and renumbers. Ownership is resolved through `profile.userId`, and a foreign id answers NotFound.
+- Community photos and verification selfies follow the same provider in later phases (separate buckets, verification never signed for display).
 
 ## 7. Discovery and privacy filtering
 
@@ -396,44 +397,49 @@ Posts (text, question, photo) with author, location label, timestamps; comments;
 | Duplicate likes / matches | Unique constraints plus `ON CONFLICT` inside one transaction. |
 | OTP brute force / abuse | Hashed codes, 5 attempts, 5 min expiry, per-phone and per-IP sliding-window limits, resend cooldown, constant-time compare. |
 | Session theft | HttpOnly Secure cookie, hashed token at rest, idle and absolute expiry, logout-everywhere. |
-| XSS | React escaping; no `dangerouslySetInnerHTML`; CSP with nonces; user text rendered as text. |
+| XSS | React escaping; no `dangerouslySetInnerHTML` (the only inline script is the static theme initialiser); names and bios refuse `<`/`>` and control characters; CSP with nonces scheduled for Phase 12. |
 | CSRF | Server actions same-origin; mutating route handlers check `Sec-Fetch-Site`/`Origin`; webhooks verify signatures. |
-| Malicious uploads | Signed tickets, size cap, MIME sniffing with `sharp`, re-encode, EXIF strip, private buckets, server-produced variants only. |
+| Malicious uploads | Session + same-origin check, size cap, MIME sniffing with `sharp`, minimum dimensions, re-encode, metadata strip, private bucket / signed local route, server-produced variants only. |
 | Enumeration | Uniform OTP responses; opaque handles; rate limits on lookup endpoints. |
 | Spam | Message and post rate limits, daily like cap for free users, report pipeline. |
 | Secret exposure | `env.ts` splits server/public; only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are public; the secret key never leaves the server. |
-| Minor access | DOB required, server-side age check on onboarding completion and on every login; moderator-only DOB edits. |
+| Minor access | DOB required, server-side age check when the date is saved and again on onboarding completion (a tampered row is refused); moderator-only DOB edits. |
 | Privilege escalation | `role` and `Subscription` are not writable by any user-facing action. |
 | Evidence destruction | Soft deletes for messages, posts, matches; report snapshots. |
 
 ## 16. Environment variables
 
-`.env.example` will contain, with comments:
+`.env.example` is the reference (kept current). Summary:
 
 ```
 DATABASE_URL=            # pooled, transaction mode, ?pgbouncer=true&connection_limit=5
 DIRECT_DATABASE_URL=     # session pooler or direct; used by prisma migrate/seed
+TEST_DATABASE_URL=       # server on which the test run creates a throwaway database
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=   # sb_publishable_...
-SUPABASE_SECRET_KEY=                    # sb_secret_... server only
-SESSION_SECRET=          # 32+ bytes, used to HMAC phone lookups and sign upload tickets
-OTP_PEPPER=              # 32+ bytes
+SUPABASE_SECRET_KEY=                    # sb_secret_... server only; required when STORAGE_PROVIDER=supabase
+SUPABASE_STORAGE_BUCKET_PHOTOS=profile-photos   # private bucket, must exist before switching the provider
+SESSION_SECRET=          # 32+ bytes: HMAC for phone lookups, OTP cookie and local media URLs
+OTP_PEPPER=              # 32+ bytes: HMAC for stored OTP hashes
 CONTACT_HASH_SALT=       # 32+ bytes, see CONTACT_BLOCKING.md
-SMS_PROVIDER=console     # console | <gateway> (gateway credentials documented when chosen)
+SMS_PROVIDER=console     # console (dev) | none (production placeholder) | <gateway id once chosen>
+STORAGE_PROVIDER=local   # local (dev/test) | supabase
+LOCAL_STORAGE_DIR=.storage
 PAYMENT_PROVIDER=none
 VERIFICATION_PROVIDER=manual
 THUNDI_DEV_OTP_ECHO=true # dev only; boot fails in production if set
 APP_URL=http://localhost:3000
 ```
 
-Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`/`service_role` keys still work until end of 2026 but the code will use the new names.
+`src/lib/env.ts` validates all of this with Zod at first use and refuses a production boot with `THUNDI_DEV_OTP_ECHO=true`, `SMS_PROVIDER=console` or `STORAGE_PROVIDER=local`. Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`/`service_role` keys still work until end of 2026 but the code uses the new names.
 
 ## 17. Testing strategy
 
 - Unit (Vitest): age calculation across time zones and leap days, phone normalisation, OTP hashing and attempt rules, entitlement derivation, completion percentage, intro week keys.
 - Integration (Vitest against Postgres): under-18 rejection at onboarding completion; duplicate like idempotency; mutual like creates exactly one match under concurrency (two parallel transactions); blocked users excluded from deck, likes-you and chat; conversation and message authorization for non-participants; intro quota per week; report creation with snapshot; privacy filtering (hidden location/age, hidden visibility); premium checks for likes-you and advanced filters.
 - Monetization (Vitest against Postgres, required): Free allowance is 30 and Plus 90; like consumes, pass does not; 30th succeeds and 31st is rejected with `resetsAt`; allowance restores after the 24-hour window; session/device changes do not reset it; N concurrent likes with one remaining yield exactly one success; expiry of Plus returns the user to Free limits. Messaging: matched Free user sends, immediate second send rejected, allowed after 9 minutes, cooldown spans conversations, receiving/reading unaffected, Plus has no cooldown, direct calls during cooldown rejected, simultaneous sends yield one success. Invisible Mode: normal discoverability, hidden from non-liked users, visible after liking, matches unaffected, lapsed Plus fails closed. Likes You: Free receives no identifying fields, Plus receives profiles. Boosts: Plus allowance 2 per 7 days, window enforced, Free rejected.
-- E2E (Playwright, dev OTP): onboarding happy path, swipe by buttons and keyboard, match modal, send message, block from profile.
+- Authentication and onboarding (Phase 5, Vitest): phone normalisation table; OTP hash-only storage, cooldown, per-phone and per-IP limits, uniform responses for new and existing numbers, supersede, dev echo and its production refusal, correct/wrong/expired/used/locked codes, exactly-once redemption under concurrency, suspended accounts; session hashing, expiry (idle and absolute), revoke one/all, client-supplied identity ignored; onboarding persistence and resume, backwards edits, exactly-18 accepted and 17y364d refused, tampered DOB refused at completion, DOB absent from public DTOs, location/interest/prompt relations, required-field gate, Invisible Mode never enabled from onboarding; photo processing, rejection of non-images/oversize/tiny files, max-six under concurrency, ownership on delete/reorder, contiguous positions and primary rules, signed URL tamper resistance; route-access decision table and completion weights.
+- E2E (Playwright, dev OTP, scripted outside the repo for now): the full sign-up journey with wrong, expired and locked codes, forged under-age submission, refresh and forward-jump mid-onboarding, logout and re-login resuming the exact stage, upload errors with retry, reorder/remove, completion to Discover, and every route guard; screenshots at 375/390/430/1280 in light and dark.
 - CI: typecheck, lint, unit + integration on a Postgres service container, production build.
 
 ## 18. Delivery plan mapping
@@ -441,8 +447,8 @@ Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`
 | Phase | Output |
 | --- | --- |
 | 3 Database (done) | `prisma/schema.prisma`, migration `20260917152844_init`, seed (reference + dev-only demo data), `src/lib/db.ts`, `prisma.config.ts`, plus the monetization domain layer (`src/config/product.ts`, `src/server/{entitlements,usage,discovery,likes,matching,conversations,boosts,privacy}`) and its database-backed tests. Not yet applied to the hosted Supabase project. |
-| 4 Design system | `tokens.css`, Tailwind theme, `components/ui/*`, layout shell, storybook-free preview route under `(dev)/ui` in development only. |
-| 5 Auth + onboarding | OTP flow, sessions, `proxy.ts`, 12 steps with server-persisted progress, photo upload pipeline. |
+| 4 Design system (done) | `tokens.css`, Tailwind theme, `components/ui/*`, layout shell, preview route `/dev/design-system` in development only. |
+| 5 Auth + onboarding (done) | Migration `20260917170000_onboarding_stage_otp_phone`, `src/server/auth/*`, `src/server/onboarding/*`, `src/server/photos/*`, `src/lib/storage/*`, `src/lib/env.ts`, `proxy.ts`, server actions in `src/actions/*`, routes `/auth/*`, `/onboarding/[stage]`, `/api/photos`, `/api/media`, onboarding and auth components, tests. Hosted Supabase still untouched (migrations and the `profile-photos` bucket await approval). |
 | 6 Discovery | Deck query, cards, gestures, filters. |
 | 7 Matching + likes | Like/pass/match transaction, Likes tab, match overlay, intros. |
 | 8 Messaging | Conversations, authorization, polling transport, read state. |
@@ -458,14 +464,16 @@ Supabase now issues `sb_publishable_*` and `sb_secret_*` keys; the legacy `anon`
 - Blurred likes are pre-blurred server-side rather than CSS-blurred (CSS blur leaks the real image).
 - Passed profiles resurface after 30 days.
 - Invisible Mode fails closed on Plus lapse (user stays hidden rather than being exposed), see 12.6.
-- Undo window of 60 minutes and boost duration of 30 minutes are configuration defaults pending product review.
+- Undo has no time window (approved after Phase 3); boost duration of 30 minutes is a configuration default.
+- The prototype's on-screen OTP keypad is replaced by the device keyboard (numeric input mode, one-time-code autofill, paste), see DESIGN_SYSTEM.md §12.
+- The prototype's onboarding "Only people I like" free option is shown on the privacy step as the Plus-only Invisible Mode (mentioned, not offered); the free controls remain Hide my location and Hide my age.
 - The prototype's free "Only people I like" visibility option is folded into the Plus-only Invisible Mode, per the approved monetization rules.
 - Community "Following" tab ships as an explanatory empty state rather than being removed.
 - TypeScript pinned to 5.9 rather than 7.0.
 
 ## 20. Open items needing the owner
 
-- Supabase credentials: `sb_publishable_*`, `sb_secret_*`, and the two database URLs for project `qkubuaicuyoaskzcabcu`. I will create the storage buckets and apply migrations through the Supabase tooling once provided and instructed; nothing destructive will be run against that project, and it is currently empty.
+- Supabase credentials: `sb_publishable_*`, `sb_secret_*`, and the two database URLs for project `qkubuaicuyoaskzcabcu`. Before the first hosted deployment the owner must approve: (1) applying both migrations (`20260917152844_init`, `20260917170000_onboarding_stage_otp_phone`) with `npm run db:deploy`, (2) creating the private storage bucket `profile-photos` and setting `STORAGE_PROVIDER=supabase`. Nothing destructive will be run against that project, and it is currently empty.
 - SMS gateway choice (Dhiraagu/Ooredoo business SMS, or an international provider). The interface is provider-agnostic.
 - Payment provider for MVR (BML payment gateway or equivalent). The interface is provider-agnostic.
 - Subscription pricing (weekly / monthly / 3-month). Seeded plans carry placeholder prices flagged `isPlaceholderPrice`.

@@ -44,7 +44,7 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
       dateOfBirth: dob,
       gender,
       status,
-      onboardingStep: 12,
+      onboardingStage: status === "ACTIVE" ? "COMPLETE" : "NAME",
       onboardingCompletedAt: status === "ACTIVE" ? now : null,
       lastActiveAt: now,
       profile: {

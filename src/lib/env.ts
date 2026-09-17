@@ -10,12 +10,17 @@ const schema = z
     DATABASE_URL: z.string().min(1).optional(),
     DIRECT_DATABASE_URL: z.string().min(1).optional(),
     SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
-    OTP_PEPPER: z.string().min(32, "OTP_PEPPER must be at least 32 characters"),
     CONTACT_HASH_SALT: z.string().min(32, "CONTACT_HASH_SALT must be at least 32 characters"),
-    SMS_PROVIDER: z.enum(["console", "none"]).default("console"),
+    /**
+     * Sign-in is Google-only. `google` talks to Google's OIDC endpoints and needs the OAuth client below.
+     * `dev` is a local stand-in identity provider (same code path: PKCE, state, nonce, signed ID token) for
+     * development and tests; production refuses it.
+     */
+    AUTH_PROVIDER: z.enum(["google", "dev"]).optional(),
+    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     STORAGE_PROVIDER: z.enum(["local", "supabase"]).default("local"),
     LOCAL_STORAGE_DIR: z.string().default(".storage"),
-    THUNDI_DEV_OTP_ECHO: z.enum(["true", "false"]).optional(),
     APP_URL: z.string().url().default("http://localhost:3000"),
     NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
     SUPABASE_SECRET_KEY: z.string().optional(),
@@ -25,6 +30,7 @@ const schema = z
   })
   .transform((env) => ({
     ...env,
+    AUTH_PROVIDER: env.AUTH_PROVIDER ?? (env.NODE_ENV === "production" ? ("google" as const) : ("dev" as const)),
     PHOTO_VISIBILITY_POLICY: env.PHOTO_VISIBILITY_POLICY ?? (env.NODE_ENV === "production" ? ("approved-only" as const) : ("approved-and-pending" as const)),
   }))
   .superRefine((env, ctx) => {
@@ -32,15 +38,15 @@ const schema = z
       if (env.PHOTO_VISIBILITY_POLICY !== "approved-only") {
         ctx.addIssue({ code: "custom", path: ["PHOTO_VISIBILITY_POLICY"], message: "Production may only display APPROVED photos; PENDING photos need a moderation workflow or an approved alternative policy" });
       }
-      if (env.THUNDI_DEV_OTP_ECHO === "true") {
-        ctx.addIssue({ code: "custom", path: ["THUNDI_DEV_OTP_ECHO"], message: "THUNDI_DEV_OTP_ECHO must not be set in production" });
-      }
-      if (env.SMS_PROVIDER === "console") {
-        ctx.addIssue({ code: "custom", path: ["SMS_PROVIDER"], message: "The console SMS provider is not allowed in production" });
+      if (env.AUTH_PROVIDER !== "google") {
+        ctx.addIssue({ code: "custom", path: ["AUTH_PROVIDER"], message: "Production sign-in must use Google (AUTH_PROVIDER=google); the development identity provider is refused" });
       }
       if (env.STORAGE_PROVIDER === "local") {
         ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "Local disk storage is not allowed in production" });
       }
+    }
+    if (env.AUTH_PROVIDER === "google" && (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET)) {
+      ctx.addIssue({ code: "custom", path: ["AUTH_PROVIDER"], message: "AUTH_PROVIDER=google needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" });
     }
     if (env.STORAGE_PROVIDER === "supabase" && (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SECRET_KEY)) {
       ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "Supabase storage needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY" });
@@ -60,12 +66,6 @@ export function getEnv(): Env {
   }
   cached = parsed.data;
   return cached;
-}
-
-/** True only outside production and when explicitly enabled: the OTP is echoed to the client for local testing. */
-export function isDevOtpEchoEnabled(): boolean {
-  const env = getEnv();
-  return env.NODE_ENV !== "production" && env.THUNDI_DEV_OTP_ECHO === "true";
 }
 
 /** Test hook: clears the cache so a test can change process.env between cases. */

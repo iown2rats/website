@@ -2,6 +2,10 @@
 
 The prototype promises: "People you block from your contacts won't be shown your dating profile, and you won't see theirs. Numbers are hashed on your device and never stored in plain text." This document defines how the production system honours that promise, what it cannot promise, and what must be true before it is implemented (Phase 10).
 
+## 0. Phone is optional (Google-auth migration)
+
+Sign-in is Google-only, so a user may have no phone number on file (`User.phoneE164` / `phoneHash` are nullable). The hashing and normalisation described below are unaffected and remain the contact-blocking mechanism. Direction "someone hides from me through my number" only works once the user has added their own number (a future optional Settings step); direction "I hide from numbers on my list" always works. Numbers are never verified by sign-in.
+
 ## 1. Goal
 
 A user U can prevent people in their phone's address book from seeing U's dating profile, and U will not see theirs, without Thundi ever receiving U's address book in the clear.

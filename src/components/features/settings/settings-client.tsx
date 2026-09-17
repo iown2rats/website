@@ -15,7 +15,7 @@ import { PageOverlay } from "@/components/layout/page-overlay";
 import { useTheme } from "@/components/layout/theme-toggle";
 import type { NotificationSettingsDto } from "@/server/notifications/settings";
 import type { PrivacySettingsDto } from "@/server/privacy/settings";
-import { DeleteAccountSheet } from "./delete-account-sheet";
+import { DeleteAccountSheet, type RecentAuthDto } from "./delete-account-sheet";
 
 /*
  * Prototype "Settings": groups of 54 px rows (label, 13 px meta, chevron or 44×26 toggle) with uppercase group
@@ -24,10 +24,16 @@ import { DeleteAccountSheet } from "./delete-account-sheet";
  * Privacy Policy, Report a Problem) are shown as "Not yet available" rather than dead links.
  */
 export interface SettingsClientProps {
-  maskedPhone: string;
+  /** Masked (+960 •••• 123) when the user has added a phone; null otherwise — phones are optional profile data. */
+  maskedPhone: string | null;
+  /** The Google account the user signs in with (owner-facing only). */
+  googleEmail: string | null;
   verificationStatus: keyof typeof VERIFICATION_LABELS;
   notifications: NotificationSettingsDto;
   privacy: PrivacySettingsDto;
+  recentAuth: RecentAuthDto;
+  /** Open the deletion sheet immediately (returning from the Google confirmation). */
+  openDelete?: boolean;
 }
 
 const GROUPS = ["Account", "Notifications", "Privacy", "App", "Support", "Account management"] as const;
@@ -41,7 +47,7 @@ const NOTIFICATION_ROWS: { key: keyof NotificationSettingsDto; label: string; de
   { key: "marketing", label: "Marketing", description: "News and offers from Thundi" },
 ];
 
-export function SettingsClient({ maskedPhone, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy }: SettingsClientProps) {
+export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy, recentAuth, openDelete = false }: SettingsClientProps) {
   const router = useRouter();
   const toast = useToast();
   const desktop = useIsDesktop();
@@ -50,7 +56,7 @@ export function SettingsClient({ maskedPhone, verificationStatus, notifications:
   const [notifications, setNotifications] = useState(initialNotifications);
   const [privacy, setPrivacy] = useState(initialPrivacy);
   const [pauseOpen, setPauseOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(openDelete);
   const [busy, setBusy] = useState(false);
   const [loggingOut, startLogout] = useTransition();
 
@@ -91,7 +97,8 @@ export function SettingsClient({ maskedPhone, verificationStatus, notifications:
           <SectionLabel id="settings-account">Account</SectionLabel>
           <ListGroup>
             <LinkRow href="/profile/edit?section=info" height={54} label="Personal information" />
-            <ListRow asDiv height={54} label="Phone number" meta={maskedPhone} />
+            <ListRow asDiv height={54} label="Google account" meta={googleEmail ?? "—"} />
+            <ListRow asDiv height={54} label="Phone number" meta={maskedPhone ?? "Not added"} />
             <LinkRow href="/settings/verification" height={54} label="Verification" meta={VERIFICATION_LABELS[verificationStatus]} />
             <LinkRow href="/settings/discovery" height={54} label="Discovery preferences" />
             <LinkRow href="/settings/membership" height={54} label="Membership" />
@@ -180,7 +187,7 @@ export function SettingsClient({ maskedPhone, verificationStatus, notifications:
         confirmLabel="Pause dating"
         loading={busy}
       />
-      <DeleteAccountSheet open={deleteOpen} onClose={() => setDeleteOpen(false)} maskedPhone={maskedPhone} />
+      <DeleteAccountSheet open={deleteOpen} onClose={() => setDeleteOpen(false)} email={googleEmail} recentAuth={recentAuth} />
     </PageOverlay>
   );
 }

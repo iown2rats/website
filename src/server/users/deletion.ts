@@ -1,41 +1,36 @@
 /**
- * Account deletion (Phase 9 §25–§26). A destructive action needs recent authentication: the user requests a code to
- * their own phone (same OTP rules and provider abstraction as sign-in) and confirms with it. Deletion anonymises the
- * account and removes personal data while keeping safety evidence (reports, blocks, message history, audit log):
- * see docs/ARCHITECTURE.md §4.4 for what is removed, what is kept and the retention decision still open.
+ * Account deletion (Phase 9 §25–§26; Google-auth migration). A destructive action needs recent authentication: the
+ * user re-authenticates with Google for the same identity (docs/ARCHITECTURE.md §4.4), which marks their current
+ * session; deletion consumes that mark and refuses without it, so an old application session alone can never
+ * delete an account. Deletion anonymises the account and removes personal data while keeping safety evidence
+ * (reports, blocks, message history, audit log). The sign-in identity row is kept with its email scrubbed and
+ * `releasedAt` set, so the same Google account is told its previous account was deleted before it may start a
+ * new one — the deleted profile itself is never revived.
  */
 import { randomBytes } from "node:crypto";
 import { getDb, type Db } from "@/lib/db";
-import { InvalidStateError, ValidationError } from "@/lib/errors";
+import { InvalidStateError } from "@/lib/errors";
 import type { StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
-import { requestOtp, verifyOtpCode, type RequestOtpResult } from "@/server/auth/otp";
-import type { SmsProvider } from "@/server/auth/sms";
+import { consumeRecentAuthentication } from "@/server/auth/recent-auth";
 
-export async function requestDeletionCode(actor: Actor, deps: { db?: Db; sms: SmsProvider; ip?: string | null; now?: Date }): Promise<RequestOtpResult> {
-  const db = deps.db ?? getDb();
-  const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { phoneE164: true, status: true } });
-  if (user.status === "DELETED") throw new InvalidStateError("This account is already deleted");
-  return requestOtp(db, { phoneInput: user.phoneE164, ip: deps.ip ?? null, now: deps.now, sms: deps.sms });
-}
-
-export type DeleteAccountResult = { ok: true } | { ok: false; code: "INVALID_CODE" | "CODE_EXPIRED" | "CODE_USED" | "TOO_MANY_ATTEMPTS"; attemptsRemaining?: number };
+export type DeleteAccountResult = { ok: true } | { ok: false; code: "REAUTH_REQUIRED" };
 
 /**
- * Verifies the fresh code (must belong to this account's own phone), then anonymises the account in one transaction.
- * Kept: Report, Block, Message, AuditLog, Subscription rows (billing records), the anonymised User row.
- * Removed: photos (rows + files), profile text, interests, prompts, likes, passes, notifications, contact hashes,
- * push subscriptions, sessions, community likes; posts and comments are soft-deleted; matches end and conversations lock.
+ * Consumes the session's recent Google re-authentication, then anonymises the account in one transaction.
+ * Kept: Report, Block, Message, AuditLog, Subscription rows (billing records), the anonymised User row and the
+ * scrubbed identity row. Removed: photos (rows + files), profile text, interests, prompts, likes, passes,
+ * notifications, contact hashes, push subscriptions, sessions, community likes; posts and comments are
+ * soft-deleted; matches end and conversations lock.
  */
-export async function deleteAccount(actor: Actor, input: { challengeId: string; code: string }, deps: { db?: Db; storage: StorageProvider; now?: Date }): Promise<DeleteAccountResult> {
+export async function deleteAccount(actor: Actor, input: { sessionId: string }, deps: { db?: Db; storage: StorageProvider; now?: Date }): Promise<DeleteAccountResult> {
   const db = deps.db ?? getDb();
   const now = deps.now ?? new Date();
-  const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { id: true, phoneE164: true, status: true } });
+  const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { id: true, status: true } });
   if (user.status === "DELETED") throw new InvalidStateError("This account is already deleted");
 
-  const checked = await verifyOtpCode(db, { challengeId: input.challengeId, code: input.code, now });
-  if (!checked.ok) return checked;
-  if (checked.phoneE164 !== user.phoneE164) throw new ValidationError("That code wasn't sent to this account's phone.");
+  const fresh = await consumeRecentAuthentication(db, input.sessionId, now);
+  if (!fresh) return { ok: false, code: "REAUTH_REQUIRED" };
 
   const photos = await db.profilePhoto.findMany({ where: { profile: { userId: user.id } }, select: { storageKey: true, thumbKey: true } });
   const verification = await db.verification.findUnique({ where: { userId: user.id }, select: { selfieStorageKey: true } });
@@ -72,13 +67,13 @@ export async function deleteAccount(actor: Actor, input: { challengeId: string; 
     await tx.contactHash.deleteMany({ where: { userId: uid } });
     await tx.pushSubscription.deleteMany({ where: { userId: uid } });
     await tx.session.deleteMany({ where: { userId: uid } });
-    await tx.otpRequest.updateMany({ where: { phoneE164: user.phoneE164, consumedAt: null, supersededAt: null }, data: { supersededAt: now } });
+    await tx.authIdentity.updateMany({ where: { userId: uid }, data: { email: "", displayName: null, releasedAt: now } });
     await tx.verification.updateMany({ where: { userId: uid }, data: { status: "NONE", selfieStorageKey: null, providerRef: null } });
     await tx.privacySettings.updateMany({ where: { userId: uid }, data: { visibility: "HIDDEN", pausedAt: now, invisibleMode: false } });
-    // The account itself: unusable phone, unrecoverable hash, no DOB or gender.
+    // The account itself: no phone, unrecoverable hash, no DOB or gender.
     await tx.user.update({
       where: { id: uid },
-      data: { status: "DELETED", deletedAt: now, phoneE164: `deleted:${uid}`, phoneHash: randomBytes(32), dateOfBirth: null, gender: null, lastActiveAt: null },
+      data: { status: "DELETED", deletedAt: now, phoneE164: null, phoneHash: randomBytes(32), dateOfBirth: null, gender: null, lastActiveAt: null },
     });
     await tx.auditLog.create({ data: { actorId: uid, action: "account.deleted", targetType: "User", targetId: uid, createdAt: now } });
   });

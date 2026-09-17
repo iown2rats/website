@@ -27,7 +27,7 @@ npm run dev
 
 Demo logins (after the demo seed): `+960 700 0010` is the prototype's Ismail (Free), `+960 700 0011` is a Plus account (Undo, boosts, advanced filters). The other demo numbers are the profiles they discover; `prisma/seed-data/discovery-scenarios.ts` lists which rule each one exercises.
 
-Signing in locally: `SMS_PROVIDER=console` prints the code to the server log and `THUNDI_DEV_OTP_ECHO=true` shows it on the code screen. Photos are stored under `LOCAL_STORAGE_DIR` (`.storage`, git-ignored) and served through signed `/api/media` URLs. Both switches are refused when `NODE_ENV=production`.
+Signing in locally: sign-in is Google-only. With `AUTH_PROVIDER=dev` (the default outside production) "Continue with Google" opens a local stand-in for Google's account chooser at `/dev/google/authorize`, listing the seeded demo identities (`me@demo.thundi.dev` is the prototype's Ismail, `plus@demo.thundi.dev` the Plus user) or any typed email. Production needs `AUTH_PROVIDER=google` plus a Google OAuth client. Photos are stored under `LOCAL_STORAGE_DIR` (`.storage`, git-ignored) and served through signed `/api/media` URLs. The dev provider and local storage are refused when `NODE_ENV=production`.
 
 Photo visibility: outside production, pending (unmoderated) photos are displayable so uploads can be tested; production shows approved photos only and refuses `PHOTO_VISIBILITY_POLICY=approved-and-pending`. See `src/lib/photo-policy.ts` and `docs/ARCHITECTURE.md` §7.1 for the launch requirement.
 
@@ -59,7 +59,7 @@ src/lib/         db client, env validation, errors, hashing, age, cookies, stora
 src/server/      domain layer (auth, onboarding, photos, profiles, entitlements, usage windows, discovery, likes, matching, conversations, safety, community, media, boosts, privacy, notifications, users)
 src/actions/     server actions (auth, onboarding, photos, discovery, messaging, community, profile, settings, account)
 src/components/  ui primitives, layout shell, feature components (auth, onboarding, discovery, chats, community, profile, settings)
-src/app/         Next.js routes: /, /auth/*, /onboarding/[stage], (app)/* incl. /chats/[conversationId], /community/[postId], /profile/{edit,preview}, /settings/*, /api/photos, /api/media, /api/community/posts, /dev/design-system
+src/app/         Next.js routes: /, /auth/google/{start,callback}, /auth/{deleted,error,logout}, /onboarding/[stage], (app)/* incl. /chats/[conversationId], /community/[postId], /profile/{edit,preview}, /settings/*, /api/photos, /api/media, /api/community/posts, /dev/design-system
 src/proxy.ts     cookie-presence route guard and security headers
 tests/           unit and integration tests
 docs/            audit, architecture, contact blocking, prototype reference sheets

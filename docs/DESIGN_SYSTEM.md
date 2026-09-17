@@ -271,3 +271,17 @@ Results:
 - Membership: Free sees the approved perks, plan cards with "Price TBA" and the honest "Plus isn't on sale yet" note; Plus sees "You're on Thundi Plus" with no payment internals. Safety Center accordion cards open with the prototype's guidance and an honest support card (119 kept). Verification shows phone Done, selfie Next and the "coming" note without marking anyone verified. Discovery preferences reuse the Filters sheet and save through the Phase 6 path.
 - Dark mode at 430 and 1280 uses the same tokens; every page overlay hides the phone bottom nav and keeps the 640 px column on desktop except Settings and Privacy (900).
 
+## 17. Google-auth migration verification (2026-09-17): sign-in, re-authentication, deleted accounts
+
+Method: Playwright against the dev server with `AUTH_PROVIDER=dev` (the local stand-in for Google's account chooser; identical start/callback code path) at 375×812, 430×932 dark and 1280×900. 27 scripted checks passed, each sign-in or deletion confirmed in the database.
+
+Results:
+
+- Welcome keeps the lagoon hero and offers a single white "Continue with Google" with the G mark; no phone, SMS or code copy anywhere; `/auth/phone` and `/auth/verify` are gone (404); an anonymous request for the app returns to the welcome screen.
+- Start: the authorization request carries a random state, a nonce, an S256 PKCE challenge and the exact callback URI; the pending-auth cookie is HttpOnly and signed. A callback with a forged state lands on `/auth/error` ("That sign-in link expired") without account detail.
+- Existing demo account (seeded identity `me@demo.thundi.dev`): signs straight into the app on the same `User.id` with profile and counts intact; one identity row, one new session. Settings → Account shows "Google account · email" and "Phone number · Not added" (phones are optional). Verification shows "Get verified" with selfie and review steps only, states that Google sign-in is not identity verification, and the status is NONE. A signed-in visit to the start endpoint goes to the app, not to Google.
+- Delete account: step 1 explains the consequences and offers "Continue with Google to confirm"; the re-authentication request preselects the same account (`login_hint`, `prompt=select_account`). Confirming as a different Google account lands on "That's a different Google account" and marks nothing; confirming as the same account marks this session and reopens the sheet at "Confirm deletion" with "Delete my account". Keeping the account leaves it ACTIVE.
+- New person: "Use another account" creates an ONBOARDING account with no phone and verification NONE and lands on onboarding step 2 of 11; signing out and back in maps to the same `User.id`.
+- Deleted account (430 dark): after Google confirmation the account is DELETED with no phone, sessions gone, the identity kept with its email scrubbed and `releasedAt` set. The same Google account signing in again is told "Your previous Thundi account was deleted" (no session, nothing revived); "Create a new account" creates a new `User.id` in onboarding while the old row stays DELETED and anonymised, with an `account.recreated` audit entry.
+- Desktop 1280: welcome, the dev account chooser, Settings with the Google row, and the deletion sheet as a centred modal with the Google step.
+

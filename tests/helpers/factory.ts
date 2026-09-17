@@ -26,6 +26,8 @@ export interface UserOptions {
   hideAge?: boolean;
   verified?: boolean;
   lastActiveAt?: Date | null;
+  /** null = no phone on file (Google-only sign-in). Default: a unique test number, kept as contact-blocking data. */
+  phone?: string | null;
   now?: Date;
 }
 
@@ -39,7 +41,7 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
   const now = o.now ?? new Date();
   const age = o.age ?? 27;
   const dob = new Date(Date.UTC(now.getUTCFullYear() - age, now.getUTCMonth(), Math.max(1, now.getUTCDate() - 1)));
-  const phoneE164 = `+9607${String(100000 + seq).padStart(6, "0")}`;
+  const phoneE164 = o.phone === null ? null : (o.phone ?? `+9607${String(100000 + seq).padStart(6, "0")}`);
   const handle = `u${seq}_${Math.random().toString(36).slice(2, 8)}`;
   const gender = o.gender ?? (seq % 2 === 0 ? "WOMAN" : "MAN");
   const status = o.status ?? "ACTIVE";
@@ -47,7 +49,7 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
   const user = await db.user.create({
     data: {
       phoneE164,
-      phoneHash: hashPhone(phoneE164),
+      phoneHash: phoneE164 ? hashPhone(phoneE164) : null,
       dateOfBirth: dob,
       gender,
       status,
@@ -77,11 +79,20 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
       privacy: { create: { invisibleMode: o.invisibleMode ?? false, visibility: o.visibility ?? "EVERYONE", hideLocation: o.hideLocation ?? false, hideAge: o.hideAge ?? false } },
       discoveryPreferences: { create: { interestedIn: o.interestedIn ?? "EVERYONE", ageMin: o.ageMin ?? 18, ageMax: o.ageMax ?? 99 } },
       notificationSettings: { create: {} },
-      verification: { create: { status: o.verified ? "VERIFIED" : "PHONE_VERIFIED" } },
+      verification: { create: { status: o.verified ? "VERIFIED" : "NONE" } },
     },
     select: { id: true },
   });
-  return { userId: user.id, handle, phoneE164 };
+  return { userId: user.id, handle, phoneE164: phoneE164 ?? "" };
+}
+
+/** A Google sign-in identity for a test user (AUTH_PROVIDER-independent: the row is what the mapping code reads). */
+export async function createIdentity(db: Db, userId: string, o: { subject?: string; email?: string; name?: string | null } = {}): Promise<{ subject: string; email: string }> {
+  seq += 1;
+  const subject = o.subject ?? `google-sub-${seq}`;
+  const email = o.email ?? `user${seq}@example.com`;
+  await db.authIdentity.create({ data: { userId, provider: "GOOGLE", providerSubject: subject, email, emailVerified: true, displayName: o.name ?? null } });
+  return { subject, email };
 }
 
 /** Grants Plus via an EntitlementOverride covering [from, to). */

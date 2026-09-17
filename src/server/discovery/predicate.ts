@@ -11,9 +11,18 @@ import { DISCOVERY } from "@/config/product";
 import { displayablePhotoStates } from "@/lib/photo-policy";
 import { activePlusSql } from "@/server/entitlements";
 
+/**
+ * "Someone else's hidden-contacts list contains the viewer's number." Without a phone on file the viewer cannot be
+ * matched this way (FALSE); their own list (the other branch) still applies.
+ */
+function contactMatchesViewerSql(viewerPhoneHash: Uint8Array | null): Prisma.Sql {
+  return viewerPhoneHash ? Prisma.sql`ch.hash = ${Buffer.from(viewerPhoneHash)}` : Prisma.sql`FALSE`;
+}
+
 export interface ViewerContext {
   userId: string;
-  phoneHash: Uint8Array;
+  /** Null when the viewer has not added a phone number: only their own hidden-contacts list applies then. */
+  phoneHash: Uint8Array | null;
   gender: "WOMAN" | "MAN" | "UNSPECIFIED" | null;
   /** Viewer's own age, used for the candidate's age preference (mutual compatibility). */
   age: number | null;
@@ -39,7 +48,7 @@ export function displayableModerationSql(): Prisma.Sql {
  * Base visibility: may viewer V see candidate U at all? Independent of V's filters.
  * Used by discovery, Likes You, like(), profile views.
  */
-export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array, now: Date): Prisma.Sql {
+export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array | null, now: Date): Prisma.Sql {
   return Prisma.sql`
     u.id <> ${viewerId}
     AND u.status = 'ACTIVE'
@@ -53,7 +62,7 @@ export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array, no
     AND NOT EXISTS (
       SELECT 1 FROM "ContactHash" ch
       JOIN "PrivacySettings" ops ON ops."userId" = ch."userId" AND ops."blockContacts" = true
-      WHERE (ch."userId" = u.id AND ch.hash = ${Buffer.from(viewerPhoneHash)})
+      WHERE (ch."userId" = u.id AND ${contactMatchesViewerSql(viewerPhoneHash)})
          OR (ch."userId" = ${viewerId} AND ch.hash = u."phoneHash")
     )
     AND (
@@ -71,7 +80,7 @@ export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array, no
  * no contact-hash intersection where the owner has blockContacts on. Used by Community, where account state and
  * Invisible Mode (discovery rules) do not apply but blocks and contact blocking do.
  */
-export function noBlockOrContactSql(viewerId: string, viewerPhoneHash: Uint8Array): Prisma.Sql {
+export function noBlockOrContactSql(viewerId: string, viewerPhoneHash: Uint8Array | null): Prisma.Sql {
   return Prisma.sql`
     NOT EXISTS (
       SELECT 1 FROM "Block" b
@@ -81,7 +90,7 @@ export function noBlockOrContactSql(viewerId: string, viewerPhoneHash: Uint8Arra
     AND NOT EXISTS (
       SELECT 1 FROM "ContactHash" ch
       JOIN "PrivacySettings" ops ON ops."userId" = ch."userId" AND ops."blockContacts" = true
-      WHERE (ch."userId" = u.id AND ch.hash = ${Buffer.from(viewerPhoneHash)})
+      WHERE (ch."userId" = u.id AND ${contactMatchesViewerSql(viewerPhoneHash)})
          OR (ch."userId" = ${viewerId} AND ch.hash = u."phoneHash")
     )
   `;

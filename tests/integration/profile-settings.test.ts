@@ -4,7 +4,7 @@ import { resetEnvCache } from "@/lib/env";
 import { EntitlementRequiredError, InvalidStateError, NotFoundError, ValidationError } from "@/lib/errors";
 import { LocalDiskStorageProvider } from "@/lib/storage/local";
 import { infoSchema } from "@/lib/validation/profile";
-import { MemorySmsProvider } from "@/server/auth/sms";
+import { recordReauthentication } from "@/server/auth/identity";
 import { createSession, resolveSession, revokeSession } from "@/server/auth/session";
 import { getFeed } from "@/server/community/feed";
 import { createPost } from "@/server/community/posts";
@@ -25,9 +25,9 @@ import { getMyProfileSummary } from "@/server/profiles/me";
 import { buildVisibleProfiles } from "@/server/profiles/visible-profile";
 import { blockUser } from "@/server/safety/block";
 import { listBlockedUsers, unblockUser } from "@/server/safety/blocked";
-import { deleteAccount, requestDeletionCode } from "@/server/users/deletion";
+import { deleteAccount } from "@/server/users/deletion";
 import { disconnectDb, resetDb, testDb } from "../helpers/db";
-import { at, createLocation, createUser, grantPlus, hours, minutes, type TestUser } from "../helpers/factory";
+import { at, createIdentity, createLocation, createUser, grantPlus, hours, minutes, type TestUser } from "../helpers/factory";
 
 const db = testDb();
 const T0 = new Date("2026-09-17T20:00:00Z");
@@ -63,7 +63,7 @@ describe("own profile and editing", () => {
     expect(data.age).toBe(27);
     expect(data.dob?.year).toBe(T0.getUTCFullYear() - 27);
     const summary = await getMyProfileSummary(me, { db, now: T0 });
-    expect(summary).toMatchObject({ name: "Ismail", age: 27, tier: "FREE", likesGiven: 0, activeMatches: 0, verificationStatus: "PHONE_VERIFIED" });
+    expect(summary).toMatchObject({ name: "Ismail", age: 27, tier: "FREE", likesGiven: 0, activeMatches: 0, verificationStatus: "NONE" });
     expect(JSON.stringify(summary)).not.toMatch(/phoneE164|phoneHash|dateOfBirth|"dob"/i);
   });
 
@@ -311,33 +311,33 @@ describe("account: sessions, deletion", () => {
     expect((await resolveSession(db, b.token, at(T0, 1000)))?.user.id).toBe(me.userId);
   });
 
-  it("deletion requires a fresh code for this account's own phone; wrong, foreign or expired codes change nothing", async () => {
+  it("deletion requires a recent Google re-authentication on the current session; a foreign or stale confirmation changes nothing", async () => {
     const me = await createUser(db, { now: T0 });
     const other = await createUser(db, { now: T0 });
-    const sms = new MemorySmsProvider();
-    const req = await requestDeletionCode(me, { db, sms, now: T0 });
-    if (!req.ok) throw new Error("setup");
-    expect(sms.sent[0]!.to).toBe(me.phoneE164);
-    const code = sms.sent[0]!.code;
-    const wrong = code === "000000" ? "111111" : "000000";
-    expect(await deleteAccount(me, { challengeId: req.challengeId, code: wrong }, { db, storage, now: T0 })).toMatchObject({ ok: false, code: "INVALID_CODE" });
-    expect((await db.user.findUniqueOrThrow({ where: { id: me.userId } })).status).toBe("ACTIVE");
-    // A code issued to another account's phone can never delete this one.
-    const otherReq = await requestDeletionCode(other, { db, sms: new MemorySmsProvider(), now: at(T0, minutes(1)) });
-    if (!otherReq.ok) throw new Error("setup");
-    const otherCode = (await db.otpRequest.findUniqueOrThrow({ where: { id: otherReq.challengeId } })).phoneE164;
-    expect(otherCode).toBe(other.phoneE164);
-    await expect(deleteAccount(me, { challengeId: otherReq.challengeId, code: "123456" }, { db, storage, now: at(T0, minutes(1)) })).resolves.toMatchObject({ ok: false });
-    expect((await db.user.findUniqueOrThrow({ where: { id: me.userId } })).status).toBe("ACTIVE");
-    // Expired code.
-    expect(await deleteAccount(me, { challengeId: req.challengeId, code }, { db, storage, now: at(T0, minutes(10)) })).toMatchObject({ ok: false, code: "CODE_EXPIRED" });
+    const mine = await createIdentity(db, me.userId);
+    const theirs = await createIdentity(db, other.userId);
+    const claims = (i: { subject: string; email: string }) => ({ subject: i.subject, email: i.email, emailVerified: true, name: null, authTime: null, issuedAt: T0 });
+    const session = await createSession(db, me.userId, {}, T0);
+    // An ordinary, even brand-new, session is not enough.
+    expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: T0 })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
+    // A confirmation by a different Google identity never marks my session.
+    expect(await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: claims(theirs) }, T0)).toBe(false);
+    expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: T0 })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
+    // A confirmation older than the window is stale.
+    expect(await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: claims(mine) }, T0)).toBe(true);
+    expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: at(T0, minutes(6)) })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
+    // Another session of mine does not inherit the mark.
+    const second = await createSession(db, me.userId, {}, T0);
+    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: claims(mine) }, at(T0, minutes(7)));
+    expect(await deleteAccount(me, { sessionId: second.sessionId }, { db, storage, now: at(T0, minutes(7)) })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
     expect((await db.user.findUniqueOrThrow({ where: { id: me.userId } })).status).toBe("ACTIVE");
   });
 
-  it("deleting anonymises the account, ends sessions, matches and discovery, keeps safety evidence and frees the phone", async () => {
+  it("deleting anonymises the account, ends sessions, matches and discovery, keeps safety evidence and releases the identity", async () => {
     const me = await createUser(db, { now: T0, gender: "WOMAN", interestedIn: "MEN", ageMin: 20, ageMax: 40, name: "Leaving" });
     const partner = await createUser(db, { now: T0, gender: "MAN", interestedIn: "WOMEN", ageMin: 20, ageMax: 40 });
     const reporter = await createUser(db, { now: T0 });
+    const identity = await createIdentity(db, me.userId, { email: "leaving@example.com" });
     const conv = await matchPair(me, partner);
     await sendMessage(me, conv, "Hello there", { db, now: at(T0, minutes(1)) });
     const post = await createPost(me, { kind: "TEXT", body: "Bye" }, { db, storage, now: at(T0, minutes(2)) });
@@ -346,18 +346,19 @@ describe("account: sessions, deletion", () => {
     const session = await createSession(db, me.userId, {}, T0);
     const phone = me.phoneE164;
 
-    const sms = new MemorySmsProvider();
-    const req = await requestDeletionCode(me, { db, sms, now: at(T0, minutes(4)) });
-    if (!req.ok) throw new Error("setup");
-    expect(await deleteAccount(me, { challengeId: req.challengeId, code: sms.sent[0]!.code }, { db, storage, now: at(T0, minutes(5)) })).toEqual({ ok: true });
+    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: { subject: identity.subject, email: identity.email, emailVerified: true, name: null, authTime: null, issuedAt: T0 } }, at(T0, minutes(4)));
+    expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: at(T0, minutes(5)) })).toEqual({ ok: true });
 
-    const user = await db.user.findUniqueOrThrow({ where: { id: me.userId }, include: { profile: { include: { photos: true } } } });
+    const user = await db.user.findUniqueOrThrow({ where: { id: me.userId }, include: { profile: { include: { photos: true } }, identities: true } });
     expect(user.status).toBe("DELETED");
     expect(user.deletedAt).not.toBeNull();
-    expect(user.phoneE164).not.toBe(phone);
+    expect(user.phoneE164).toBeNull();
     expect(user.dateOfBirth).toBeNull();
     expect(user.profile?.displayName).toBe("Deleted member");
     expect(user.profile?.photos).toHaveLength(0);
+    expect(user.identities).toHaveLength(1);
+    expect(user.identities[0]).toMatchObject({ email: "", displayName: null, providerSubject: identity.subject });
+    expect(user.identities[0]!.releasedAt).not.toBeNull();
     expect(await resolveSession(db, session.token, at(T0, minutes(6)))).toBeNull();
     expect(await canView(db, partner.userId, me.userId, at(T0, minutes(6)))).toBe(false);
     expect(await getDeckCandidateIds(db, partner, { now: at(T0, minutes(6)) })).not.toContain(me.userId);
@@ -367,10 +368,9 @@ describe("account: sessions, deletion", () => {
     expect(await db.report.count({ where: { targetUserId: me.userId } })).toBe(1);
     expect(await db.block.count({ where: { blockedId: me.userId } })).toBe(1);
     expect(await db.auditLog.count({ where: { action: "account.deleted", targetId: me.userId } })).toBe(1);
-    // The number can register again as a brand-new account.
+    // The number is no longer attached to anyone; a second deletion is refused.
     expect(await db.user.count({ where: { phoneE164: phone } })).toBe(0);
-    // A second deletion attempt is refused.
-    await expect(requestDeletionCode(me, { db, sms, now: at(T0, minutes(7)) })).rejects.toBeInstanceOf(InvalidStateError);
+    await expect(deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: at(T0, minutes(7)) })).rejects.toBeInstanceOf(InvalidStateError);
   });
 });
 

@@ -35,18 +35,18 @@ export function authKind(state: AuthState): AuthKind {
   return state.kind;
 }
 
-/** For app routes: redirects anonymous users to phone entry and incomplete users to onboarding. */
+/** For app routes: redirects anonymous users to the welcome screen (Continue with Google) and incomplete users to onboarding. */
 export async function requireActiveUser(): Promise<Actor & { user: SessionUser }> {
   const state = await getAuthState();
-  if (state.kind === "anonymous") redirect(ROUTES.phone);
+  if (state.kind === "anonymous") redirect(ROUTES.welcome);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
   return { userId: state.user.id, user: state.user };
 }
 
-/** For onboarding routes: anonymous → phone entry; completed → Discover. */
+/** For onboarding routes: anonymous → welcome; completed → Discover. */
 export async function requireOnboardingUser(): Promise<Actor & { user: SessionUser }> {
   const state = await getAuthState();
-  if (state.kind === "anonymous") redirect(ROUTES.phone);
+  if (state.kind === "anonymous") redirect(ROUTES.welcome);
   if (state.kind === "active") redirect(ROUTES.home);
   return { userId: state.user.id, user: state.user };
 }

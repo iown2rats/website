@@ -9,28 +9,27 @@ export const metadata = { title: "Verification" };
 export const dynamic = "force-dynamic";
 
 /*
- * Prototype "Verification": badge disc, title/subtitle by state, three steps (phone, selfie, review) and a CTA.
- * Driven by the real Verification status. Phone is done for every account (OTP sign-in). The selfie and review
- * steps arrive with the Phase 10 verification workflow, so the CTA says that instead of advancing anything —
- * nobody is marked verified here.
+ * Prototype "Verification": badge disc, title/subtitle by state, steps and a CTA, driven by the real Verification
+ * status. Signing in with Google confirms a Google account, not a phone and not the person, so there is no
+ * "phone verified" step and sign-in never grants the seal. The selfie and review steps arrive with the Phase 10
+ * verification workflow, so the CTA says that instead of advancing anything.
  */
 export default async function VerificationPage() {
   const actor = await requireActiveUser();
   const v = await getDb().verification.findUnique({ where: { userId: actor.userId }, select: { status: true, rejectionReason: true } });
   const status = v?.status ?? "NONE";
-  // Steps completed: phone (every signed-in account), selfie (submitted / under review), review (verified).
-  const doneCount = status === "VERIFIED" ? 3 : status === "UNDER_REVIEW" || status === "SELFIE_SUBMITTED" ? 2 : status === "NONE" ? 0 : 1;
-  const title = status === "VERIFIED" ? "You're verified" : doneCount === 2 ? "Under review" : "Get verified";
+  // Steps completed: selfie (submitted / under review), review (verified). PHONE_VERIFIED is a legacy value and counts as nothing.
+  const doneCount = status === "VERIFIED" ? 2 : status === "UNDER_REVIEW" || status === "SELFIE_SUBMITTED" ? 1 : 0;
+  const title = status === "VERIFIED" ? "You're verified" : doneCount === 1 ? "Under review" : "Get verified";
   const subtitle =
     status === "VERIFIED"
       ? "Your badge is live. Thank you for keeping Thundi trustworthy."
-      : doneCount === 2
+      : doneCount === 1
         ? "Our team checks your selfie against your photos within 24 hours."
         : status === "REJECTED"
           ? `Your last attempt wasn't approved${v?.rejectionReason ? `: ${v.rejectionReason}` : ""}. You can try again.`
           : "A verified badge shows people you are who you say you are. Takes about a minute.";
   const steps: [string, string][] = [
-    ["Verify phone number", "Confirms your +960 number"],
     ["Verify selfie", "A quick pose check, never shown publicly"],
     ["Profile review", "Our team checks your photos within 24 h"],
   ];
@@ -60,7 +59,7 @@ export default async function VerificationPage() {
         })}
       </ListGroup>
       {status !== "VERIFIED" ? (
-        <Callout tone="info" title="Selfie verification is coming">Your phone is verified. Selfie verification and profile review open in an upcoming update; nothing else is needed from you right now.</Callout>
+        <Callout tone="info" title="Selfie verification is coming">Signing in with Google confirms your Google account, not who you are on Thundi. Selfie verification and profile review open in an upcoming update; nothing is needed from you right now.</Callout>
       ) : null}
     </PageOverlay>
   );

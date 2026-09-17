@@ -127,6 +127,8 @@ enum ReportStatus {
 
 enum VerificationStatus {
   NONE
+  /// Legacy value from SMS sign-in; no longer assigned (Google sign-in does not verify a phone). Kept so the enum
+  /// type need not be rebuilt; existing rows were migrated to NONE.
   PHONE_VERIFIED
   SELFIE_SUBMITTED
   UNDER_REVIEW
@@ -193,9 +195,11 @@ enum BlockSource {
 /// Account record. Contains the private fields (phone, DOB) that never leave the server.
 model User {
   id                    String     @id @default(cuid(2))
-  phoneE164             String     @unique
+  /// Optional. Authentication is Google-only (docs/ARCHITECTURE.md §4.1); the phone, when present, is profile /
+  /// contact-blocking data and is NOT verified by sign-in.
+  phoneE164             String?    @unique
   /// HMAC-SHA-256(CONTACT_HASH_SALT, phoneE164). Same keyed function as ContactHash.hash so contact matching is an indexed join.
-  phoneHash             Bytes      @unique
+  phoneHash             Bytes?     @unique
   phoneHashVersion      Int        @default(1)
   dateOfBirth           DateTime?  @db.Date
   gender                Gender?
@@ -214,6 +218,7 @@ model User {
   discoveryPreferences DiscoveryPreferences?
   notificationSettings NotificationSettings?
   verification         Verification?
+  identities           AuthIdentity[]
   sessions             Session[]
   usageCounters        UsageCounter[]
   boosts               Boost[]
@@ -413,22 +418,30 @@ model NotificationSettings {
 
 // ───────────────────────────── Auth ─────────────────────────────
 
-/// One OTP challenge. Only the HMAC of the code is stored. A new request supersedes earlier open ones.
-model OtpRequest {
-  id           String    @id @default(cuid(2))
-  phoneHash    Bytes
-  /// Needed to create the account on first successful verification; never returned to clients.
-  phoneE164    String
-  codeHash     Bytes
-  attempts     Int       @default(0)
-  expiresAt    DateTime
-  consumedAt   DateTime?
-  supersededAt DateTime?
-  ipHash       Bytes?
-  createdAt    DateTime  @default(now())
+enum AuthProvider {
+  GOOGLE
+}
 
-  @@index([phoneHash, createdAt(sort: Desc)])
-  @@index([expiresAt])
+/// A sign-in identity from an external provider, mapped to our canonical User.id (docs/ARCHITECTURE.md §4.1).
+/// One identity per (provider, subject). After account deletion the row is kept with the email scrubbed and
+/// releasedAt set, so the same Google account is told its previous account was deleted before a new one is made.
+model AuthIdentity {
+  id              String       @id @default(cuid(2))
+  userId          String
+  provider        AuthProvider
+  /// The provider's stable subject identifier (Google `sub`). Never an email: emails can change.
+  providerSubject String
+  email           String
+  emailVerified   Boolean      @default(false)
+  displayName     String?
+  createdAt       DateTime     @default(now())
+  lastLoginAt     DateTime?
+  releasedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
 }
 
 model Session {
@@ -441,6 +454,8 @@ model Session {
   absoluteExpiresAt DateTime
   userAgent         String?
   ipPrefix          String?
+  /// Set when this session completed a fresh Google re-authentication; destructive actions require it to be recent.
+  reauthenticatedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

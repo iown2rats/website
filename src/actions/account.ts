@@ -1,67 +1,35 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { isDomainError } from "@/lib/errors";
-import { clearSessionCookie } from "@/lib/session-cookie";
+import { clearPendingIdentity, readPendingIdentity } from "@/lib/oauth-cookie";
+import { clearSessionCookie, setSessionCookie } from "@/lib/session-cookie";
 import { getStorageProvider } from "@/lib/storage";
-import { otpConfirmSchema } from "@/lib/validation/profile";
-import { OTP_RULES } from "@/server/auth/otp";
-import { requireActor } from "@/server/auth/current-user";
+import { getAuthState } from "@/server/auth/current-user";
+import { createFreshAccountForIdentity } from "@/server/auth/identity";
 import { ROUTES } from "@/server/auth/route-access";
-import { getSmsProvider } from "@/server/auth/sms";
-import { deleteAccount, requestDeletionCode } from "@/server/users/deletion";
+import { createSession } from "@/server/auth/session";
+import { deleteAccount } from "@/server/users/deletion";
 
 /*
- * Destructive account actions (Phase 9 §25–§26). Deleting requires a fresh code sent to the account's own phone
- * through the same OTP rules and provider abstraction as sign-in (development: console provider + echo). The
- * challenge id is returned to the client for the confirm step; it carries no secret and is bound to this phone.
+ * Destructive account actions (docs/ARCHITECTURE.md §4.4). Deleting requires that THIS session completed a fresh
+ * Google re-authentication moments ago (/auth/google/start?purpose=reauth); the server consumes that mark. An old
+ * application session on its own is never enough.
  */
 
-export type DeletionRequestResult =
-  | { ok: true; challengeId: string; expiresAt: number; resendAvailableAt: number; devCode?: string }
-  | { ok: false; code: "COOLDOWN" | "RATE_LIMITED" | "SMS_FAILED" | "ERROR"; message: string; retryAt?: number };
+export type DeletionConfirmResult = { ok: true } | { ok: false; code: "REAUTH_REQUIRED" | "ERROR"; message: string };
 
-export async function requestAccountDeletionCode(): Promise<DeletionRequestResult> {
-  try {
-    const actor = await requireActor();
-    const h = await headers();
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-    const r = await requestDeletionCode(actor, { sms: getSmsProvider(), ip });
-    if (!r.ok) {
-      if (r.code === "COOLDOWN") return { ok: false, code: "COOLDOWN", message: "We just sent you a code. Wait a moment before requesting another.", retryAt: r.retryAt?.getTime() };
-      if (r.code === "RATE_LIMITED") return { ok: false, code: "RATE_LIMITED", message: "Too many codes requested. Try again later.", retryAt: r.retryAt?.getTime() };
-      return { ok: false, code: "SMS_FAILED", message: "We couldn't send your code right now. Try again in a moment." };
-    }
-    return { ok: true, challengeId: r.challengeId, expiresAt: r.expiresAt.getTime(), resendAvailableAt: r.resendAvailableAt.getTime(), ...(r.devCode ? { devCode: r.devCode } : {}) };
-  } catch (e) {
-    console.error("[account] deletion code failed", e);
-    return { ok: false, code: "ERROR", message: "Thundi couldn't do that right now. Try again." };
-  }
-}
-
-export type DeletionConfirmResult = { ok: true } | { ok: false; code: "INVALID_CODE" | "CODE_EXPIRED" | "CODE_USED" | "TOO_MANY_ATTEMPTS" | "ERROR"; message: string; attemptsRemaining?: number };
-
-export async function confirmAccountDeletion(input: unknown): Promise<DeletionConfirmResult> {
+export async function confirmAccountDeletion(): Promise<DeletionConfirmResult> {
   let deleted = false;
   try {
-    const actor = await requireActor();
-    const parsed = otpConfirmSchema.safeParse(input);
-    if (!parsed.success) return { ok: false, code: "INVALID_CODE", message: "Enter the 6-digit code." };
-    const r = await deleteAccount(actor, parsed.data, { storage: getStorageProvider(), db: getDb() });
-    if (!r.ok) {
-      const messages = {
-        INVALID_CODE: r.attemptsRemaining != null ? `That code isn't right. ${r.attemptsRemaining} attempt${r.attemptsRemaining === 1 ? "" : "s"} left.` : "That code isn't right.",
-        CODE_EXPIRED: `That code expired. Codes last ${OTP_RULES.ttlMs / 60_000} minutes — request a new one.`,
-        CODE_USED: "That code was already used. Request a new one.",
-        TOO_MANY_ATTEMPTS: "Too many attempts. Request a new code.",
-      } as const;
-      return { ok: false, code: r.code, message: messages[r.code], attemptsRemaining: r.attemptsRemaining };
-    }
+    const state = await getAuthState();
+    if (state.kind === "anonymous") return { ok: false, code: "ERROR", message: "Your session ended. Sign in again." };
+    const r = await deleteAccount({ userId: state.user.id }, { sessionId: state.sessionId }, { storage: getStorageProvider(), db: getDb() });
+    if (!r.ok) return { ok: false, code: "REAUTH_REQUIRED", message: "Your Google confirmation has expired. Continue with Google again to delete your account." };
     deleted = true;
   } catch (e) {
-    if (isDomainError(e)) return { ok: false, code: "INVALID_CODE", message: e.message };
+    if (isDomainError(e)) return { ok: false, code: "ERROR", message: e.message };
     console.error("[account] deletion failed", e);
     return { ok: false, code: "ERROR", message: "Thundi couldn't delete your account right now. Try again." };
   }
@@ -70,4 +38,26 @@ export async function confirmAccountDeletion(input: unknown): Promise<DeletionCo
     redirect(ROUTES.welcome);
   }
   return { ok: true };
+}
+
+/**
+ * The explicit choice on /auth/deleted: the Google account that just signed in belongs to a deleted Thundi
+ * account; start a brand-new one. Nothing from the deleted profile comes back.
+ */
+export async function startFreshAccount(): Promise<{ ok: false; message: string } | never> {
+  const pending = await readPendingIdentity();
+  if (!pending) return { ok: false, message: "That sign-in has expired. Continue with Google again." };
+  const db = getDb();
+  const now = new Date();
+  try {
+    const { userId } = await createFreshAccountForIdentity(db, { subject: pending.subject, email: pending.email, name: pending.name, emailVerified: true }, now);
+    const session = await createSession(db, userId, {}, now);
+    await clearPendingIdentity();
+    await setSessionCookie(session.token, session.expiresAt);
+  } catch (e) {
+    if (isDomainError(e)) return { ok: false, message: e.message };
+    console.error("[account] fresh account failed", e);
+    return { ok: false, message: "Thundi couldn't create your account right now. Try again." };
+  }
+  redirect(ROUTES.onboarding);
 }

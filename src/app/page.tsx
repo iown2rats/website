@@ -1,12 +1,13 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ContinueWithGoogle } from "@/components/features/auth/google-button";
 import { ThundiLogo } from "@/components/ui/icons";
 import { getAuthState } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
 
 /**
- * Welcome screen (prototype onboarding step 0): full-bleed lagoon gradient, wordmark, hero copy,
- * white primary CTA and a ghost secondary. Signed-in users are sent on to where they belong.
+ * Welcome screen (prototype onboarding step 0): full-bleed lagoon gradient, wordmark, hero copy and one CTA.
+ * Sign-in and sign-up are the same action — Continue with Google (docs/ARCHITECTURE.md §4.1) — so the
+ * prototype's "Get started" / "I already have an account" pair collapses into it. Signed-in users move on.
  */
 export default async function WelcomePage() {
   const state = await getAuthState();
@@ -30,12 +31,10 @@ export default async function WelcomePage() {
         </div>
         <h1 className="text-hero">Meet someone closer to home.</h1>
         <p className="text-body-lg text-white/80">Dating for the Maldives. Private by design, 18+ only.</p>
-        <Link href={ROUTES.phone} className="mt-2 flex h-13 items-center justify-center rounded-lg bg-white text-cta-lg text-ocean pressable">
-          Get started
-        </Link>
-        <Link href={ROUTES.phone} className="-mt-1.5 flex h-11 items-center justify-center text-body-sm font-semibold text-white/75">
-          I already have an account
-        </Link>
+        <ContinueWithGoogle className="mt-2" />
+        <p className="text-caption leading-relaxed text-white/70">
+          New or returning, this is the only way in. Google confirms your Google account; your Thundi profile and verification are separate. Your email is never shown to other members.
+        </p>
       </div>
     </main>
   );

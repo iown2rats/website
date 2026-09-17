@@ -45,7 +45,7 @@ function decodeCursor(cursor: string | null | undefined): { createdAt: Date; id:
   }
 }
 
-async function viewerHash(db: DbLike, viewerId: string): Promise<Uint8Array> {
+async function viewerHash(db: DbLike, viewerId: string): Promise<Uint8Array | null> {
   const viewer = await db.user.findUnique({ where: { id: viewerId }, select: { phoneHash: true } });
   if (!viewer) throw new NotFoundError("User");
   return viewer.phoneHash;
@@ -56,7 +56,7 @@ function mediaStatesSql(): Prisma.Sql {
 }
 
 /** Aliases: p = CommunityPost, u = author User. */
-export function postVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array): Prisma.Sql {
+export function postVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array | null): Prisma.Sql {
   return Prisma.sql`
     p."deletedAt" IS NULL
     AND u.status = 'ACTIVE' AND u."deletedAt" IS NULL

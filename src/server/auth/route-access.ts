@@ -8,8 +8,11 @@ export type RouteGroup = "public" | "auth" | "onboarding" | "app" | "system";
 
 export const ROUTES = {
   welcome: "/",
-  phone: "/auth/phone",
-  verify: "/auth/verify",
+  /** Starts Google sign-in (route handler). `?purpose=reauth` re-authenticates the current session instead. */
+  signIn: "/auth/google/start",
+  callback: "/auth/google/callback",
+  deleted: "/auth/deleted",
+  authError: "/auth/error",
   logout: "/auth/logout",
   onboarding: "/onboarding",
   home: "/discover",
@@ -26,19 +29,28 @@ export function classifyRoute(pathname: string): RouteGroup {
 export type AccessDecision = { allow: true } | { allow: false; redirectTo: string };
 
 /**
+ * The Google flow endpoints decide for themselves (sign-in for anonymous users, re-authentication for signed-in
+ * ones), and the error screen must be visible to a signed-in user whose re-authentication failed.
+ */
+function isAuthFlowEndpoint(pathname: string): boolean {
+  return pathname === ROUTES.signIn || pathname === ROUTES.callback || pathname === ROUTES.logout || pathname === ROUTES.authError;
+}
+
+/**
  * Decides whether `kind` may see `pathname`. Each state redirects to exactly one destination group,
  * and that destination always allows the state, so loops are impossible:
- *   anonymous  → app/onboarding blocked → /auth/phone
- *   onboarding → app/auth/public blocked → /onboarding (logout is always allowed)
+ *   anonymous  → app/onboarding blocked → / (welcome, "Continue with Google")
+ *   onboarding → app/auth/public blocked → /onboarding
  *   active     → auth/onboarding/public blocked → /discover
+ * The sign-in start/callback, logout and error endpoints are allowed for every state.
  */
 export function resolveAccess(kind: AuthKind, pathname: string): AccessDecision {
   const group = classifyRoute(pathname);
   if (group === "system") return { allow: true };
-  if (pathname === ROUTES.logout) return { allow: true };
+  if (isAuthFlowEndpoint(pathname)) return { allow: true };
   switch (kind) {
     case "anonymous":
-      return group === "public" || group === "auth" ? { allow: true } : { allow: false, redirectTo: ROUTES.phone };
+      return group === "public" || group === "auth" ? { allow: true } : { allow: false, redirectTo: ROUTES.welcome };
     case "onboarding":
       return group === "onboarding" ? { allow: true } : { allow: false, redirectTo: ROUTES.onboarding };
     case "active":

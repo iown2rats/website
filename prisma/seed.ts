@@ -51,9 +51,24 @@ async function seedDemo() {
   const prompts = (await db.prompt.findMany({ orderBy: { sortOrder: "asc" } })).map((p) => p.id);
   const ids = new Map<string, string>();
 
+  /**
+   * Development sign-in identity for a demo account (AUTH_PROVIDER=dev). The mapping is explicit — demo key →
+   * subject `dev-<key>` — never inferred from a name, and the demo phone stays as optional contact-blocking data.
+   */
+  async function ensureDevIdentity(userId: string, d: DemoProfile): Promise<void> {
+    await db.authIdentity.upsert({
+      where: { provider_providerSubject: { provider: "GOOGLE", providerSubject: `dev-${d.key}` } },
+      create: { userId, provider: "GOOGLE", providerSubject: `dev-${d.key}`, email: `${d.key}@demo.thundi.dev`, emailVerified: true, displayName: d.name },
+      update: { userId, email: `${d.key}@demo.thundi.dev`, displayName: d.name },
+    });
+  }
+
   async function createDemoUser(d: DemoProfile, o: { status?: "ACTIVE" | "ONBOARDING" | "SUSPENDED"; hideLocation?: boolean; hideAge?: boolean; invisibleMode?: boolean; ageMin?: number; ageMax?: number } = {}): Promise<string> {
     const existing = await db.user.findUnique({ where: { phoneE164: d.phone }, select: { id: true } });
-    if (existing) return existing.id;
+    if (existing) {
+      await ensureDevIdentity(existing.id, d);
+      return existing.id;
+    }
     const status = o.status ?? "ACTIVE";
     const user = await db.user.create({
       data: {
@@ -94,10 +109,11 @@ async function seedDemo() {
         privacy: { create: { hideLocation: o.hideLocation ?? false, hideAge: o.hideAge ?? false, invisibleMode: o.invisibleMode ?? false } },
         discoveryPreferences: { create: { interestedIn: d.interestedIn, ageMin: o.ageMin ?? 22, ageMax: o.ageMax ?? 34 } },
         notificationSettings: { create: {} },
-        verification: { create: { status: d.verified ? "VERIFIED" : "PHONE_VERIFIED", decidedAt: d.verified ? now : null } },
+        verification: { create: { status: d.verified ? "VERIFIED" : "NONE", decidedAt: d.verified ? now : null } },
       },
       select: { id: true },
     });
+    await ensureDevIdentity(user.id, d);
     return user.id;
   }
 

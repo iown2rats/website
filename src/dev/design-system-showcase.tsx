@@ -361,10 +361,37 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
 
         <Section id="deck" title="Swipe deck" note="Drag, rotation, stamps, stacked next card, spring back, keyboard (←, →, ↑) and buttons. Preview only.">
           <div className="relative mx-auto h-[640px] w-full max-w-[var(--deck-max)]">
-            <SwipeDeck profiles={cards} showPlaceholderLabels onLike={(p) => toast.show(`Liked ${p.name}`)} onOpen={(p) => toast.show(`Open ${p.name}`)} onIntro={(p) => toast.show(`Intro to ${p.name}`)} onReset={() => toast.show("Reset")} />
+            <ShowcaseDeck cards={cards} />
           </div>
         </Section>
       </div>
     </div>
+  );
+}
+
+/** Fixture-driven deck for the showcase: local state only, no server round-trips. */
+function ShowcaseDeck({ cards }: { cards: CardProfile[] }) {
+  const toast = useToast();
+  const [deck, setDeck] = useState(cards);
+  const advance = () => setDeck((d) => d.slice(1));
+  return (
+    <SwipeDeck
+      profiles={deck}
+      showPlaceholderLabels
+      onLike={(p) => { toast.show(`Liked ${p.name}`); advance(); }}
+      onPass={advance}
+      onOpen={(p) => toast.show(`Open ${p.name}`)}
+      onIntro={(p) => toast.show(`Intro to ${p.name}`)}
+      empty={
+        <EmptyState
+          framed
+          className="h-full"
+          icon={<WavesIcon strokeWidth={2} />}
+          title="That's everyone for now."
+          description="Check back later or adjust your preferences."
+          actions={<Button size="md" onClick={() => setDeck(cards)}>Reset demo deck</Button>}
+        />
+      }
+    />
   );
 }

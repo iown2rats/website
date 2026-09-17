@@ -12,7 +12,8 @@ import { createPrismaClient } from "../src/lib/db";
 import { hashPhone } from "../src/lib/hashing";
 import { sortPair } from "../src/server/actor";
 import { INTERESTS, LOCATIONS, PLANS, PROMPTS } from "./seed-data/reference";
-import { DEMO_CHATS, DEMO_LIKES_YOU, DEMO_MATCHES, DEMO_POSTS, DEMO_PROFILES, blurhashFor } from "./seed-data/demo";
+import { DEMO_CHATS, DEMO_LIKES_YOU, DEMO_MATCHES, DEMO_POSTS, DEMO_PROFILES, blurhashFor, type DemoProfile } from "./seed-data/demo";
+import { DEMO_PLUS_USER, DISCOVERY_SCENARIOS } from "./seed-data/discovery-scenarios";
 
 const url = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
 if (!url) throw new Error("DIRECT_DATABASE_URL or DATABASE_URL must be set");
@@ -50,21 +51,19 @@ async function seedDemo() {
   const prompts = (await db.prompt.findMany({ orderBy: { sortOrder: "asc" } })).map((p) => p.id);
   const ids = new Map<string, string>();
 
-  for (const d of DEMO_PROFILES) {
+  async function createDemoUser(d: DemoProfile, o: { status?: "ACTIVE" | "ONBOARDING" | "SUSPENDED"; hideLocation?: boolean; hideAge?: boolean; invisibleMode?: boolean; ageMin?: number; ageMax?: number } = {}): Promise<string> {
     const existing = await db.user.findUnique({ where: { phoneE164: d.phone }, select: { id: true } });
-    if (existing) {
-      ids.set(d.key, existing.id);
-      continue;
-    }
+    if (existing) return existing.id;
+    const status = o.status ?? "ACTIVE";
     const user = await db.user.create({
       data: {
         phoneE164: d.phone,
         phoneHash: hashPhone(d.phone),
         dateOfBirth: dobForAge(d.age, now),
         gender: d.gender,
-        status: "ACTIVE",
-        onboardingStage: "COMPLETE",
-        onboardingCompletedAt: now,
+        status,
+        onboardingStage: status === "ONBOARDING" ? "PHOTOS" : "COMPLETE",
+        onboardingCompletedAt: status === "ONBOARDING" ? null : now,
         lastActiveAt: new Date(now.getTime() - Math.floor(Math.random() * 6) * 3_600_000),
         profile: {
           create: {
@@ -92,15 +91,17 @@ async function seedDemo() {
             prompts: { create: [{ promptId: prompts[d.prompt]!, answer: d.answer, position: 0 }] },
           },
         },
-        privacy: { create: {} },
-        discoveryPreferences: { create: { interestedIn: d.interestedIn, ageMin: 22, ageMax: 34 } },
+        privacy: { create: { hideLocation: o.hideLocation ?? false, hideAge: o.hideAge ?? false, invisibleMode: o.invisibleMode ?? false } },
+        discoveryPreferences: { create: { interestedIn: d.interestedIn, ageMin: o.ageMin ?? 22, ageMax: o.ageMax ?? 34 } },
         notificationSettings: { create: {} },
         verification: { create: { status: d.verified ? "VERIFIED" : "PHONE_VERIFIED", decidedAt: d.verified ? now : null } },
       },
       select: { id: true },
     });
-    ids.set(d.key, user.id);
+    return user.id;
   }
+
+  for (const d of DEMO_PROFILES) ids.set(d.key, await createDemoUser(d));
 
   const me = ids.get("me")!;
   const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000);
@@ -152,7 +153,97 @@ async function seedDemo() {
       });
     }
   }
-  console.log(`demo: ${DEMO_PROFILES.length} profiles, ${DEMO_LIKES_YOU.length} incoming likes, ${DEMO_MATCHES.length} matches, ${DEMO_POSTS.length} posts`);
+  await seedDiscoveryScenarios(me, createDemoUser, minutesAgo);
+  console.log(`demo: ${DEMO_PROFILES.length} profiles, ${DEMO_LIKES_YOU.length} incoming likes, ${DEMO_MATCHES.length} matches, ${DEMO_POSTS.length} posts, ${DISCOVERY_SCENARIOS.length} discovery scenarios`);
+}
+
+const DAY = 24 * 3_600_000;
+
+/** Discovery scenarios around "me" (see seed-data/discovery-scenarios.ts). Idempotent: skips rows that exist. */
+async function seedDiscoveryScenarios(
+  me: string,
+  createDemoUser: (d: DemoProfile, o?: { status?: "ACTIVE" | "ONBOARDING" | "SUSPENDED"; hideLocation?: boolean; hideAge?: boolean; invisibleMode?: boolean; ageMin?: number; ageMax?: number }) => Promise<string>,
+  minutesAgo: (m: number) => Date,
+) {
+  const now = new Date();
+  const plusFor = async (userId: string, from: Date, to: Date) => {
+    const has = await db.entitlementOverride.findFirst({ where: { userId, reason: "demo" } });
+    if (!has) await db.entitlementOverride.create({ data: { userId, tier: "PLUS", reason: "demo", startsAt: from, endsAt: to } });
+  };
+  const likeOnce = async (from: string, to: string, at: Date) =>
+    db.like.upsert({ where: { fromUserId_toUserId: { fromUserId: from, toUserId: to } }, create: { fromUserId: from, toUserId: to, createdAt: at }, update: {} });
+  const passOnce = async (from: string, to: string, at: Date) =>
+    db.pass.upsert({ where: { fromUserId_toUserId: { fromUserId: from, toUserId: to } }, create: { fromUserId: from, toUserId: to, createdAt: at, expiresAt: new Date(at.getTime() + 30 * DAY) }, update: {} });
+  const blockOnce = async (blocker: string, blocked: string) =>
+    db.block.upsert({ where: { blockerId_blockedId: { blockerId: blocker, blockedId: blocked } }, create: { blockerId: blocker, blockedId: blocked }, update: {} });
+
+  const plusUser = await createDemoUser(DEMO_PLUS_USER);
+  await plusFor(plusUser, new Date(now.getTime() - DAY), new Date(now.getTime() + 365 * DAY));
+
+  for (const { kind, profile } of DISCOVERY_SCENARIOS) {
+    switch (kind) {
+      case "BOOSTED": {
+        const id = await createDemoUser(profile);
+        await plusFor(id, new Date(now.getTime() - DAY), new Date(now.getTime() + 365 * DAY));
+        const active = await db.boost.findFirst({ where: { userId: id, endsAt: { gt: now } } });
+        // A long-running demo boost so the ranking effect is visible whenever the dev server is opened.
+        if (!active) await db.boost.create({ data: { userId: id, startsAt: minutesAgo(5), endsAt: new Date(now.getTime() + 365 * DAY) } });
+        break;
+      }
+      case "HIDDEN_LOCATION":
+        await createDemoUser(profile, { hideLocation: true });
+        break;
+      case "HIDDEN_AGE":
+        await createDemoUser(profile, { hideAge: true });
+        break;
+      case "INVISIBLE_LIKED_ME": {
+        const id = await createDemoUser(profile, { invisibleMode: true });
+        await plusFor(id, new Date(now.getTime() - DAY), new Date(now.getTime() + 365 * DAY));
+        await likeOnce(id, me, minutesAgo(90));
+        break;
+      }
+      case "INVISIBLE_STRANGER": {
+        const id = await createDemoUser(profile, { invisibleMode: true });
+        await plusFor(id, new Date(now.getTime() - DAY), new Date(now.getTime() + 365 * DAY));
+        break;
+      }
+      case "INVISIBLE_EXPIRED": {
+        const id = await createDemoUser(profile, { invisibleMode: true });
+        await plusFor(id, new Date(now.getTime() - 40 * DAY), new Date(now.getTime() - 2 * DAY));
+        await likeOnce(id, me, new Date(now.getTime() - 10 * DAY));
+        break;
+      }
+      case "DOES_NOT_WANT_MY_AGE":
+        await createDemoUser(profile, { ageMin: 30, ageMax: 40 });
+        break;
+      case "I_BLOCKED":
+        await blockOnce(me, await createDemoUser(profile));
+        break;
+      case "BLOCKED_ME":
+        await blockOnce(await createDemoUser(profile), me);
+        break;
+      case "PASSED_RECENTLY":
+        await passOnce(me, await createDemoUser(profile), new Date(now.getTime() - 2 * DAY));
+        break;
+      case "PASSED_LONG_AGO":
+        await passOnce(me, await createDemoUser(profile), new Date(now.getTime() - 40 * DAY));
+        break;
+      case "ALREADY_LIKED":
+        await likeOnce(me, await createDemoUser(profile), minutesAgo(200));
+        break;
+      case "LIKES_ME":
+        await likeOnce(await createDemoUser(profile), me, minutesAgo(30));
+        break;
+      case "SUSPENDED":
+        await createDemoUser(profile, { status: "SUSPENDED" });
+        break;
+      case "ONBOARDING":
+        await createDemoUser(profile, { status: "ONBOARDING" });
+        break;
+      default:
+        await createDemoUser(profile);
+    }
+  }
 }
 
 async function main() {

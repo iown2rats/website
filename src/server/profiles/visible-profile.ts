@@ -2,6 +2,7 @@
  * The public DTO for another user's profile (docs/ARCHITECTURE.md §7).
  * Contains no phone, DOB, email, coordinates, internal ids or privacy flags.
  */
+import { DISCOVERY } from "@/config/product";
 import type { DbLike } from "@/lib/db";
 import { ageFromDateOfBirth } from "@/lib/age";
 
@@ -65,7 +66,7 @@ export async function buildVisibleProfiles(db: DbLike, _viewerId: string, userId
           interests: { select: { interest: { select: { label: true } } } },
           prompts: { orderBy: { position: "asc" }, select: { answer: true, prompt: { select: { text: true } } } },
           photos: {
-            where: { moderation: { not: "REJECTED" } },
+            where: { moderation: { in: [...DISCOVERY.displayableModeration] } },
             orderBy: { position: "asc" },
             select: { id: true, blurhash: true, width: true, height: true, storageKey: true, thumbKey: true },
           },

@@ -1,18 +1,21 @@
 /**
  * The single visibility predicate (docs/ARCHITECTURE.md §7, §12.6).
  * Every list that shows one user to another goes through these fragments, so privacy rules
- * (blocks, contact hashes, visibility, Invisible Mode) are enforced in SQL, not in components.
+ * (blocks, contact hashes, visibility, Invisible Mode, photo moderation) are enforced in SQL, not in components.
  *
  * Fragments assume the candidate is aliased `u` (User), `p` (Profile), `ps` (PrivacySettings)
- * and, where preferences are applied, `cp` (candidate DiscoveryPreferences) and `loc` (Location).
+ * and, where preferences are applied, `cp` (candidate DiscoveryPreferences), `loc` (Location) and `ver` (Verification).
  */
 import { Prisma } from "@/generated/prisma/client";
+import { DISCOVERY } from "@/config/product";
 import { activePlusSql } from "@/server/entitlements";
 
 export interface ViewerContext {
   userId: string;
   phoneHash: Uint8Array;
   gender: "WOMAN" | "MAN" | "UNSPECIFIED" | null;
+  /** Viewer's own age, used for the candidate's age preference (mutual compatibility). */
+  age: number | null;
   interestedIn: "WOMEN" | "MEN" | "EVERYONE";
   ageMin: number;
   ageMax: number;
@@ -26,6 +29,11 @@ export interface ViewerContext {
   education: string | null;
 }
 
+/** `moderation IN ('APPROVED', 'PENDING')` per DISCOVERY.displayableModeration. */
+export function displayableModerationSql(): Prisma.Sql {
+  return Prisma.join(DISCOVERY.displayableModeration.map((m) => Prisma.sql`${m}::"PhotoModeration"`));
+}
+
 /**
  * Base visibility: may viewer V see candidate U at all? Independent of V's filters.
  * Used by discovery, Likes You, like(), profile views.
@@ -34,6 +42,7 @@ export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array, no
   return Prisma.sql`
     u.id <> ${viewerId}
     AND u.status = 'ACTIVE'
+    AND u."deletedAt" IS NULL
     AND u."onboardingCompletedAt" IS NOT NULL
     AND NOT EXISTS (
       SELECT 1 FROM "Block" b
@@ -56,28 +65,45 @@ export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array, no
   `;
 }
 
-/** Discovery-only: the candidate must be open to being discovered right now. */
+/** Discovery-only: the candidate must be open to being discovered right now and have enough displayable photos. */
 export function discoverableSql(): Prisma.Sql {
-  return Prisma.sql`ps.visibility = 'EVERYONE' AND ps."pausedAt" IS NULL`;
+  return Prisma.sql`
+    ps.visibility = 'EVERYONE' AND ps."pausedAt" IS NULL
+    AND (
+      SELECT count(*) FROM "ProfilePhoto" ph
+      WHERE ph."profileId" = p.id AND ph.moderation IN (${displayableModerationSql()})
+    ) >= ${DISCOVERY.minDisplayablePhotos}
+  `;
 }
 
-/** Mutual gender preference and the viewer's basic filters. */
-export function preferenceSql(v: ViewerContext, now: Date): Prisma.Sql {
+/**
+ * Mutual compatibility, independent of the viewer's optional filters (docs/ARCHITECTURE.md §7.1):
+ *  - the viewer's "Show me" must include the candidate's gender, AND the candidate's "Show me" must include the
+ *    viewer's gender ("Prefer not to say" is only shown to people who chose Everyone, in both directions);
+ *  - the candidate must have a date of birth, and the viewer's age must fall inside the candidate's age range.
+ */
+export function compatibilitySql(v: ViewerContext): Prisma.Sql {
   const viewerGender = v.gender ?? "UNSPECIFIED";
   const parts: Prisma.Sql[] = [
-    // Viewer wants candidate's gender
     Prisma.sql`(
       ${v.interestedIn} = 'EVERYONE'
       OR (u.gender = 'WOMAN' AND ${v.interestedIn} = 'WOMEN')
       OR (u.gender = 'MAN' AND ${v.interestedIn} = 'MEN')
     )`,
-    // Candidate wants viewer's gender
     Prisma.sql`(
       cp."interestedIn" = 'EVERYONE'
       OR (${viewerGender} = 'WOMAN' AND cp."interestedIn" = 'WOMEN')
       OR (${viewerGender} = 'MAN' AND cp."interestedIn" = 'MEN')
     )`,
     Prisma.sql`u."dateOfBirth" IS NOT NULL`,
+  ];
+  if (v.age != null) parts.push(Prisma.sql`${v.age} BETWEEN cp."ageMin" AND cp."ageMax"`);
+  return Prisma.join(parts, " AND ");
+}
+
+/** The viewer's own filters: age range, intent, location scope, and (Plus only) advanced filters. */
+export function viewerFilterSql(v: ViewerContext, now: Date): Prisma.Sql {
+  const parts: Prisma.Sql[] = [
     Prisma.sql`date_part('year', age(${now}::timestamp, u."dateOfBirth"::timestamp)) BETWEEN ${v.ageMin} AND ${v.ageMax}`,
   ];
   if (v.intent) parts.push(Prisma.sql`p.intent = ${v.intent}::"RelationshipIntent"`);
@@ -96,6 +122,7 @@ export function preferenceSql(v: ViewerContext, now: Date): Prisma.Sql {
       break;
   }
 
+  // Advanced filters are applied only when the viewer holds the entitlement; the stored values are otherwise inert.
   if (v.advancedFilters) {
     if (v.heightMinCm != null) parts.push(Prisma.sql`p."heightCm" >= ${v.heightMinCm}`);
     if (v.heightMaxCm != null) parts.push(Prisma.sql`p."heightCm" <= ${v.heightMaxCm}`);
@@ -105,7 +132,12 @@ export function preferenceSql(v: ViewerContext, now: Date): Prisma.Sql {
   return Prisma.join(parts, " AND ");
 }
 
-/** Exclude candidates the viewer has already acted on. */
+/** Backwards-compatible alias: compatibility plus the viewer's filters. */
+export function preferenceSql(v: ViewerContext, now: Date): Prisma.Sql {
+  return Prisma.sql`${compatibilitySql(v)} AND ${viewerFilterSql(v, now)}`;
+}
+
+/** Exclude candidates the viewer has already acted on (like, unexpired pass, any match row). */
 export function notSwipedSql(viewerId: string, now: Date): Prisma.Sql {
   return Prisma.sql`
     NOT EXISTS (SELECT 1 FROM "Like" l WHERE l."fromUserId" = ${viewerId} AND l."toUserId" = u.id)
@@ -116,17 +148,23 @@ export function notSwipedSql(viewerId: string, now: Date): Prisma.Sql {
     )
     AND NOT EXISTS (
       SELECT 1 FROM "Match" m
-      WHERE m."userAId" = LEAST(${viewerId}, u.id) AND m."userBId" = GREATEST(${viewerId}, u.id)
+      WHERE (m."userAId" = ${viewerId} AND m."userBId" = u.id)
+         OR (m."userAId" = u.id AND m."userBId" = ${viewerId})
     )
   `;
 }
 
-/** Ranking: active boost first, then verified, then recently active, then a per-viewer stable shuffle. */
+/**
+ * Ranking (docs/ARCHITECTURE.md §7.3): active boost, then verified, then most recently active, then a per-viewer
+ * stable shuffle, then id. Every key is deterministic for a given (viewer, now), so adjacent batches agree.
+ * Boosted profiles cannot starve others: once swiped they leave the deck (notSwipedSql), and a batch is bounded.
+ */
 export function orderSql(viewerId: string, now: Date): Prisma.Sql {
   return Prisma.sql`
     (EXISTS (SELECT 1 FROM "Boost" bo WHERE bo."userId" = u.id AND bo."startsAt" <= ${now} AND bo."endsAt" > ${now})) DESC,
     (COALESCE(ver.status::text, '') = 'VERIFIED') DESC,
     u."lastActiveAt" DESC NULLS LAST,
-    md5(u.id || ${viewerId})
+    md5(u.id || ${viewerId}),
+    u.id
   `;
 }

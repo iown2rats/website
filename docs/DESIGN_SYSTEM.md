@@ -203,3 +203,25 @@ Intentional differences from the prototype (documented for the owner):
 - The "Main photo" pill sits at the bottom-left of the tile instead of the top-left so it never overlaps the remove button at 375 px.
 - The privacy step's free "Only people I like" option is presented as the Plus-only Invisible Mode; the contact-blocking button records the preference and explains what the web can do instead of faking an address-book import.
 
+## 13. Phase 6 verification (2026-09-17): Discover, likes, passes, matching
+
+Method: Playwright against the dev server with the seeded discovery scenarios (21 profiles around the demo viewer, each exercising one rule) at 375×812, then the deck, filters sheet, full profile and match screen at 390×844, 430×932 and 1280×820, light and dark. 44 scripted assertions, all passing on the final run.
+
+Results:
+
+- Deck geometry unchanged from Phase 4 (radius 26 card, 3 px photo bars, LIKE/PASS stamps, 56/66/48 controls); the header gains a 44 px allowance pill ("28 likes left", or "Likes back in 22h 59m" when exhausted) beside the Filters button.
+- Drag right past 110 px likes, drag left passes, ← / → / ↑ work from the focused card, taps on the left/right 30 % step through photos, the centre tap and the View profile button open the full profile. The next card is rendered from the 400 px thumb; only the current card loads a full-size image.
+- Full profile follows the prototype: hero photo min(70vh, 560px) with white round Back button, 30/800 name + seal, ABOUT ME, aqua "Looking for" pill, prompt card, second photo, info rows, 38 px interest chips, ocean second-prompt card, remaining photos, floating Pass 60 / Like 66. Hidden location and hidden age are simply absent (the payload does not contain them).
+- Filters sheet: 22/800 title + Reset, age sliders with "22–34", Show me segments, Location chips (+ island/atoll select for a specific place), Looking for chips, Premium "Advanced filters" group (locked rows with a lock icon for Free; Height/Education controls for Plus), Apply. Applying persists to the database and reloads the deck.
+- Match overlay: ocean panel, two ripple rings, two tilted white-bordered photo cards, "It's a Match", "You and Yumna liked each other.", Say hello → conversation shell, Keep swiping → deck.
+- Empty states are distinct: "That's everyone for now." (exhausted), "Your filters are hiding everyone." (over-restrictive), "Couldn't load Discover" with Try again (load failure), and "You've used today's 30 likes." with the real countdown (allowance) as a dialog that leaves the deck browsable.
+- Plus: Undo control on the far left restores the passed card on top; a second undo is refused with the server's reason; advanced filter controls unlock. Free never sees the Undo control and the server refuses the action anyway.
+- Dark mode uses the same tokens throughout.
+
+Intentional differences from the prototype (documented for the owner):
+
+- "Reset demo deck" (a prototype-only control) is replaced by "Check again", which re-queries the server.
+- The Send intro control (Plus) is hidden from the deck and the full profile until intros ship in Phase 7; the Report/Block buttons at the foot of the full profile arrive with Safety in Phase 10.
+- The prototype's advanced filter list (Education, Occupation, Interests, Height) is reduced to the two the profile actually stores (Height, Education).
+- "Get Thundi Plus" on the like-limit dialog shows "Thundi Plus plans open soon." until the Plus screen ships in Phase 11; nothing pretends to be a purchase.
+

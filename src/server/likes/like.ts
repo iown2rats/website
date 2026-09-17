@@ -2,12 +2,14 @@
  * Like / Pass / Undo (docs/ARCHITECTURE.md §8, §12.3, §12.7).
  */
 import { PASS_TTL_MS, UNDO } from "@/config/product";
-import { getDb, type Db } from "@/lib/db";
+import { getDb, type Db, type Tx } from "@/lib/db";
 import { EntitlementRequiredError, LikeLimitReachedError, NotFoundError, UndoUnavailableError, ValidationError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { canView } from "@/server/discovery/query";
 import { getEntitlements } from "@/server/entitlements";
+import { lockPair } from "@/server/locks";
 import { createMatchIfMutual, type MatchOutcome } from "@/server/matching/match";
+import { isBlockedEitherWay } from "@/server/safety/block";
 import { consumeLocked, lockUsage } from "@/server/usage/usage-window";
 
 export interface LikeResult extends MatchOutcome {
@@ -24,8 +26,9 @@ export interface LikeOptions {
 
 /**
  * Likes `targetUserId` on behalf of the actor.
- * Transaction: lock usage row → lazy reset → resolve limit → reject if exhausted → insert like
- * (idempotent) → consume → match check. See §12.11 for why concurrent calls cannot exceed the limit.
+ * Transaction: lock usage row → lazy reset → resolve limit → pair lock → block re-check → insert like
+ * (idempotent) → consume → match check → LIKE_RECEIVED notification. See §12.11 for why concurrent calls
+ * cannot exceed the limit, and src/server/locks.ts for why a block cannot race a like into a match.
  */
 export async function likeUser(actor: Actor, targetUserId: string, options: LikeOptions = {}): Promise<LikeResult> {
   const db = options.db ?? getDb();
@@ -39,6 +42,10 @@ export async function likeUser(actor: Actor, targetUserId: string, options: Like
     const locked = await lockUsage(tx, actor.userId, "LIKES", now);
     const entitlements = await getEntitlements(tx, actor.userId, now);
     const limit = entitlements.rules.dailyLikeLimit;
+
+    // Serialise against blockUser() for this pair, then re-check: the pre-transaction visibility check may be stale.
+    await lockPair(tx, actor.userId, targetUserId);
+    if (await isBlockedEitherWay(tx, actor.userId, targetUserId)) throw new NotFoundError("Profile");
 
     const existing = await tx.like.findUnique({
       where: { fromUserId_toUserId: { fromUserId: actor.userId, toUserId: targetUserId } },
@@ -66,6 +73,7 @@ export async function likeUser(actor: Actor, targetUserId: string, options: Like
     });
 
     const outcome = await createMatchIfMutual(tx, actor.userId, targetUserId, now);
+    if (!outcome.matched) await notifyLikeReceived(tx, actor.userId, targetUserId, now);
     return {
       ...outcome,
       created: true,
@@ -73,6 +81,14 @@ export async function likeUser(actor: Actor, targetUserId: string, options: Like
       likesResetAt: consumed.windowEnd,
     };
   });
+}
+
+/** One LIKE_RECEIVED notification per liker, honouring the recipient's notification settings. */
+async function notifyLikeReceived(tx: Tx, fromUserId: string, toUserId: string, now: Date): Promise<void> {
+  const settings = await tx.notificationSettings.findUnique({ where: { userId: toUserId }, select: { likes: true } });
+  if (settings && !settings.likes) return;
+  const already = await tx.notification.findFirst({ where: { userId: toUserId, type: "LIKE_RECEIVED", actorId: fromUserId }, select: { id: true } });
+  if (!already) await tx.notification.create({ data: { userId: toUserId, type: "LIKE_RECEIVED", actorId: fromUserId, createdAt: now } });
 }
 
 /** Passes never consume the like allowance. Idempotent; re-passing refreshes the 30-day window. */

@@ -7,6 +7,8 @@ import type { CSSProperties } from "react";
 export interface PhotoRef {
   /** Signed URL when available. */
   url?: string | null;
+  /** Signed URL of the 400 px variant, for previews and avatars. */
+  thumbUrl?: string | null;
   /** Storage key. Demo keys look like `demo/<user>/<n>.hue-<h>` and render as lagoon gradients. */
   key?: string | null;
   blurhash?: string | null;
@@ -26,9 +28,10 @@ export function demoHue(key: string | null | undefined): number | null {
 }
 
 /** Background style for a photo surface: real image when a URL exists, demo gradient otherwise. */
-export function photoBackground(photo: PhotoRef | null, direction = 160): CSSProperties {
-  if (photo?.url) {
-    return { backgroundImage: `url(${photo.url})`, backgroundSize: "cover", backgroundPosition: "center" };
+export function photoBackground(photo: PhotoRef | null, direction = 160, variant: "full" | "thumb" = "full"): CSSProperties {
+  const url = variant === "thumb" ? (photo?.thumbUrl ?? photo?.url) : photo?.url;
+  if (url) {
+    return { backgroundImage: `url(${url})`, backgroundSize: "cover", backgroundPosition: "center" };
   }
   const hue = demoHue(photo?.key);
   if (hue != null) return { backgroundImage: demoGradient(hue, direction) };

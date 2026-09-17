@@ -192,31 +192,62 @@ Conventions: `cuid2` ids; `createdAt`/`updatedAt` on every table; foreign keys w
 - Read: DTOs carry signed URLs (1 h) generated per render; storage keys never reach the client. Reorder validates that the id set is exactly the actor's photos and renumbers in one transaction (position 0 is primary); delete removes the row and both objects and renumbers. Ownership is resolved through `profile.userId`, and a foreign id answers NotFound.
 - Community photos and verification selfies follow the same provider in later phases (separate buckets, verification never signed for display).
 
-## 7. Discovery and privacy filtering
+## 7. Discovery and privacy filtering (as built in Phase 6)
 
-One SQL predicate, built in `src/server/discovery/query.ts` and reused by Likes You, Matches and search, decides whether viewer V may see user U:
+One SQL predicate, built from fragments in `src/server/discovery/predicate.ts` and assembled in `query.ts`, decides whether viewer V may see candidate U. Every list that shows one user to another (deck, Likes You, like(), profile views) uses the same fragments, so privacy is enforced in the database, never by hiding fields in components.
 
-1. `U.status = ACTIVE` and `U.onboardingCompletedAt IS NOT NULL`.
-2. `U.privacy.visibility != HIDDEN` and `U.privacy.pausedAt IS NULL` (for deck only; existing matches still see each other in chat).
-3. No `Block` in either direction.
-4. No `ContactHash` intersection in either direction where the owner has `blockContacts` on.
-5. `U.gender` matches V's `interestedIn`, and V's gender matches U's `interestedIn`. "Prefer not to say" is shown to users who selected Everyone.
-6. Age within V's range (computed from DOB in SQL); location filter (`Anywhere`, `Greater Malé`, `My atoll`, specific city) by join on `Location`; intent filter.
-7. Not already liked, matched or passed within 30 days by V.
-8. Invisible Mode (Plus): if U has `invisibleMode` on, U appears to V only if U has liked V **and** U currently holds the `invisibleMode` entitlement. If U's Plus has lapsed the clause fails closed and U is not shown to anyone new (see section 12.6). The prototype's "Only people I like" visibility option and "Incognito mode" toggle both map to this single Plus feature.
-9. Advanced filters (island, atoll, age range, intention, height, education) are applied only when `can(V, "advancedFilters")`.
+### 7.1 Eligibility and compatibility rules
 
-Ordering: active boost first (section 12.8), then verified, then recently active, then by a per-user seeded random so refreshes do not reshuffle. Passed profiles do not reappear for 30 days unless the pass was undone.
+`baseVisibleSql` (applies everywhere):
 
-Public DTO (`VisibleProfile`) contains: id (public handle, not the database id), name, age (or null when `hideAge`), location label (or null when `hideLocation`), verified flag, job, education, languages, height, bio, intent, interests, prompts with answers, photo signed URLs with blurhashes, `isActiveNow` (or null when hidden). It never contains phone, DOB, email, coordinates, internal ids, privacy flags or moderation status. `hideAge` is honoured everywhere including cards and match screens.
+1. `U ≠ V`, `U.status = ACTIVE`, `U.deletedAt IS NULL`, `U.onboardingCompletedAt IS NOT NULL` (excludes onboarding, suspended, banned and deleted accounts).
+2. No `Block` in either direction.
+3. No `ContactHash` intersection in either direction where the owner has `blockContacts` on.
+4. Invisible Mode: if `U.privacy.invisibleMode` is on, U is visible to V only if U **currently holds Plus** (subscription or override, evaluated in SQL by `activePlusSql`) **and** U has liked V. A lapsed Plus fails closed: U is shown to nobody new, including people U liked after the lapse (§12.6, regression-tested).
 
-## 8. Likes, matching and intros
+`discoverableSql` (deck only): `visibility = EVERYONE`, not paused, and at least `DISCOVERY.minDisplayablePhotos` (2) photos whose moderation state is in `DISCOVERY.displayableModeration`. That list is `APPROVED, PENDING` until the moderation pipeline (Phase 12) starts approving uploads; switching it to `APPROVED` only is a one-line configuration change that applies to the deck, the DTO and the profile owner's own view at once. The onboarding minimum ("2 photos") counts the same displayable states.
 
-- `like(actor, targetHandle, intro?)`: resolves target, runs the visibility predicate (a like against someone you cannot see is rejected), then in one transaction: insert `Like` (unique violation → idempotent success), insert `Intro` if provided and permitted, check for the reverse `Like`, and if present `INSERT ... ON CONFLICT DO NOTHING` a `Match` keyed on the sorted pair, create the `Conversation` and both participants, convert any pending intro messages into the conversation, and create `NEW_MATCH` notifications for both users. The transaction returns `{ matched: boolean, conversationId? }`, which the client uses to show the match overlay. Two concurrent mutual likes cannot double-match because the unique index resolves the race and the second transaction sees `matched: true` via the conflict path.
-- `pass(actor, targetHandle)` inserts `Pass` with `expiresAt = now + 30d`, idempotent. Passes never consume the like allowance.
-- Like allowance: 30 likes per rolling 24-hour window for Free, 90 for Plus, enforced inside the like transaction by the usage-window mechanism in section 12.3. Undo (Plus) reverses only the most recent Pass, see section 12.7.
-- Likes You: free users get the count and anonymised tiles built from server-side blurhash placeholders only (no photo URL, no id, no name, no location leaves the server). Plus users get the full DTO. See section 12.5.
-- Intros: free users may send 1 per ISO week, Plus unlimited. An intro creates a `Message` of kind `INTRO` in a `PENDING` conversation visible only to the sender until a match; the recipient sees the intro text on the liker's tile and in the match screen. On match, the conversation becomes `ACTIVE` and the intro is the first message. Quota, length (140) and permission are all enforced in `src/server/intros`.
+`compatibilitySql` (mutual, independent of the viewer's optional filters):
+
+5. V's "Show me" includes U's gender **and** U's "Show me" includes V's gender. `WOMEN` matches `WOMAN`, `MEN` matches `MAN`, `EVERYONE` matches all three; "Prefer not to say" (`UNSPECIFIED`) is therefore shown only to, and can only see, people who chose Everyone. Nothing assumes heterosexual pairs.
+6. U has a date of birth, and V's age (derived from V's private DOB on the server) lies within U's `ageMin–ageMax`. Age preferences are mutual; location scope is not (it is V's own viewing filter, see below).
+
+`viewerFilterSql` (V's own filters, stored on `DiscoveryPreferences`):
+
+7. U's age (`date_part('year', age(now, dob))`) within V's `ageMin–ageMax`; optional intent; location scope `ANYWHERE` | `GREATER_MALE` (`Location.isGreaterMale`) | `MY_ATOLL` (V's own `atollCode`) | `SPECIFIC` (`locationId`). Island/atoll only: there are no coordinates or distances anywhere in the schema or the API.
+8. Advanced filters (height range, education substring) are applied **only when V holds `canUseAdvancedFilters`**; stored values are inert otherwise, and `saveDiscoveryFilters` refuses to store them for Free users in the first place.
+
+`notSwipedSql`: no Like from V to U, no unexpired un-undone Pass (30 days, `PASS_TTL_MS`), and no Match row between the pair in any status.
+
+### 7.2 Safe DTO
+
+The browser receives `DiscoveryCardDto` (`src/server/discovery/dto.ts`) built from `VisibleProfile`: `handle` (opaque public id), name, age or null (`hideAge`), location label or null (`hideLocation`), verified, occupation, education, languages, heightCm, bio, intent, interests, prompts, photos (signed full/thumb URLs, blurhash, width, height) and `isActiveNow` or null. `DISCOVERY_CARD_KEYS` is the exhaustive allow-list and the DTO test asserts a card has exactly those keys and that the serialised payload contains no database id, phone, DOB, storage key, moderation state, privacy flag, subscription or verification data. Hidden location and age are absent from the payload, not hidden in CSS. Actions accept handles only.
+
+### 7.3 Batches and ranking
+
+- A deck request returns at most `DISCOVERY.batchSize` (12, clamped to 30) cards. The client asks for the next batch when `refillThreshold` (4) cards remain and sends the handles it still holds as `excludeHandles`; combined with the persisted swipe history this guarantees adjacent batches never overlap without exposing a numeric or predictable cursor.
+- Order: active Boost first, then verified, then most recently active, then `md5(candidateId || viewerId)` (a per-viewer stable shuffle), then id. Every key is deterministic for a given viewer and time. Boosted profiles cannot starve the rest: a swiped profile leaves the deck, and a batch is bounded. Boost promises ordering priority only, never a multiplier.
+- `countRelaxedCandidates` (count only, no identities) distinguishes "filters too restrictive" from "nobody new" when a deck comes back empty.
+- The deck query was reviewed with `EXPLAIN (ANALYZE, BUFFERS)` against the seeded development data (41 users): every per-candidate lookup uses an existing index (`Block(blockerId, blockedId)`, `Like(fromUserId, toUserId)`, `Pass(fromUserId, toUserId)`, `Match(userAId, userBId)` via the OR form, `Boost(endsAt)`, `EntitlementOverride(userId, endsAt)`, `Subscription(status, currentPeriodEnd)`, `ProfilePhoto(profileId, position)`). Sequential scans appear only on tables small enough that the planner prefers them. No index was added; none was missing.
+
+### 7.4 Filters UI
+
+The prototype's Filters sheet (age range sliders, Show me, Location chips, Looking for chips, Premium "Advanced filters" group, Apply) is a `ResponsiveDialog` (sheet on phones, modal on desktop) and persists to `DiscoveryPreferences` through `saveFilters`. Advanced filters offered are Height and Education, the two the profile stores; the prototype also lists Occupation and Interests, which have no filterable data model yet and are not shown.
+
+### 7.5 Caching
+
+`/discover` is `force-dynamic` and every deck/like/pass/undo/filter operation is a server action (a POST scoped to the caller's session cookie). Nothing personalised is put in a shared cache; Next serves dynamic pages with `Cache-Control: private, no-store`. Signed photo URLs expire after one hour.
+
+## 8. Likes, matching and intros (as built in Phase 6)
+
+- `likeUser(actor, targetId)`: visibility check (`canView`), then one transaction: lock the `LIKES` usage row → lazy window reset → resolve the tier's limit → **pair advisory lock** (`pg_advisory_xact_lock` on the sorted pair, `src/server/locks.ts`) → block re-check → insert `Like` (idempotent; an existing like consumes nothing) → consume one unit → supersede any Pass on the target → `createMatchIfMutual` → `LIKE_RECEIVED` notification when no match resulted. Lock order is always usage row, then pair; `blockUser` takes only the pair lock, so a block and a like on the same pair serialise and a block can never race a mutual like into an ACTIVE match (tested six rounds).
+- `createMatchIfMutual`: refuses if a Block exists, then `INSERT ... ON CONFLICT DO NOTHING` on the unique sorted pair, creates or reactivates the Conversation and its participants, and writes `NEW_MATCH` notifications once per user. Two simultaneous mutual likes produce exactly one Match.
+- `passUser`: records the Pass with `expiresAt = now + 30 days` (idempotent; re-passing refreshes the window). Never consumes the like allowance.
+- `undoLastPass` (Plus, server-enforced): locks the actor's most recent Pass, refuses if it was already undone or a later Like exists, sets `undoneAt`. No time limit (`UNDO.maxAgeMs = null`). `undoAndRestore` returns the profile as a card only if it is still a valid deck candidate.
+- `blockUser` (domain function; UI in Phase 10): under the pair lock, inserts the Block, sets an ACTIVE Match to BLOCKED and its Conversation to LOCKED, and deletes the pair's likes in both directions.
+- Like allowance: 30 per rolling 24 hours for Free, 90 for Plus, enforced inside the like transaction (§12.3). The deck payload carries `limit, used, remaining, resetsAt` and `serverNow`; the client renders "You've used today's 30 likes." with a countdown from server time and refreshes the allowance when it reaches zero. Pass and browsing are never blocked by an exhausted allowance.
+- Match screen: the prototype's ocean overlay ("It's a Match", "You and {name} liked each other.", Say hello / Keep swiping). "Say hello" opens `/chats/<conversationId>`, an authorised conversation shell until messaging lands in Phase 8.
+- Intros (Free 1 per ISO week, Plus unlimited; `INTRO` message in a `PENDING` conversation) remain scheduled for Phase 7; the intro control is not shown on the deck until then.
 
 ## 9. Messaging
 
@@ -448,9 +479,9 @@ APP_URL=http://localhost:3000
 | --- | --- |
 | 3 Database (done) | `prisma/schema.prisma`, migration `20260917152844_init`, seed (reference + dev-only demo data), `src/lib/db.ts`, `prisma.config.ts`, plus the monetization domain layer (`src/config/product.ts`, `src/server/{entitlements,usage,discovery,likes,matching,conversations,boosts,privacy}`) and its database-backed tests. Not yet applied to the hosted Supabase project. |
 | 4 Design system (done) | `tokens.css`, Tailwind theme, `components/ui/*`, layout shell, preview route `/dev/design-system` in development only. |
+| 6 Discovery + likes + matching (done) | `src/server/discovery/{predicate,query,dto,deck,filters}.ts`, `src/server/locks.ts`, `src/server/safety/block.ts`, hardened `likes/like.ts` and `matching/match.ts`, `src/actions/discovery.ts`, Discover client (deck, filters sheet, full profile, match overlay, like-limit dialog, empty states), `/chats/[conversationId]` shell, development discovery scenarios in the seed, 23 new tests. No migration needed. |
 | 5 Auth + onboarding (done) | Migration `20260917170000_onboarding_stage_otp_phone`, `src/server/auth/*`, `src/server/onboarding/*`, `src/server/photos/*`, `src/lib/storage/*`, `src/lib/env.ts`, `proxy.ts`, server actions in `src/actions/*`, routes `/auth/*`, `/onboarding/[stage]`, `/api/photos`, `/api/media`, onboarding and auth components, tests. Hosted Supabase still untouched (migrations and the `profile-photos` bucket await approval). |
-| 6 Discovery | Deck query, cards, gestures, filters. |
-| 7 Matching + likes | Like/pass/match transaction, Likes tab, match overlay, intros. |
+| 7 Likes You + intros | Likes You grids (Free anonymised / Plus full), intros, Matches tab. |
 | 8 Messaging | Conversations, authorization, polling transport, read state. |
 | 9 Community | Feed, compose, comments, likes, report. |
 | 10 Profile + settings | Edit sections, completion, privacy, settings, safety actions. |

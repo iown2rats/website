@@ -3,6 +3,7 @@
  */
 import type { Tx } from "@/lib/db";
 import { sortPair } from "@/server/actor";
+import { isBlockedEitherWay } from "@/server/safety/block";
 
 export interface MatchOutcome {
   matched: boolean;
@@ -13,8 +14,11 @@ export interface MatchOutcome {
 /**
  * If `toUserId` has already liked `fromUserId`, creates the Match (idempotent via the unique sorted
  * pair) and its Conversation, converts any pending intro conversation, and notifies both users.
+ * Callers hold the pair advisory lock (see src/server/locks.ts); the block check below therefore cannot
+ * race a concurrent block, which takes the same lock before it writes.
  */
 export async function createMatchIfMutual(tx: Tx, fromUserId: string, toUserId: string, now: Date): Promise<MatchOutcome> {
+  if (await isBlockedEitherWay(tx, fromUserId, toUserId)) return { matched: false, matchId: null, conversationId: null };
   const reverse = await tx.like.findUnique({
     where: { fromUserId_toUserId: { fromUserId: toUserId, toUserId: fromUserId } },
     select: { id: true },

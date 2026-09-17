@@ -19,6 +19,13 @@ export interface UserOptions {
   invisibleMode?: boolean;
   visibility?: "EVERYONE" | "HIDDEN";
   locationId?: string | null;
+  /** Displayable photos to create (default 2, the discovery minimum). */
+  photos?: number;
+  photoModeration?: "APPROVED" | "PENDING" | "REJECTED";
+  hideLocation?: boolean;
+  hideAge?: boolean;
+  verified?: boolean;
+  lastActiveAt?: Date | null;
   now?: Date;
 }
 
@@ -46,7 +53,7 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
       status,
       onboardingStage: status === "ACTIVE" ? "COMPLETE" : "NAME",
       onboardingCompletedAt: status === "ACTIVE" ? now : null,
-      lastActiveAt: now,
+      lastActiveAt: o.lastActiveAt === undefined ? now : o.lastActiveAt,
       profile: {
         create: {
           handle,
@@ -55,24 +62,22 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
           intent: "SERIOUS_RELATIONSHIP",
           locationId: o.locationId ?? null,
           photos: {
-            create: [
-              {
-                position: 0,
-                storageKey: `test/${handle}/0.webp`,
-                thumbKey: `test/${handle}/0-thumb.webp`,
-                blurhash: "LKO2?U%2Tw=w]~RBVZRi};RPxuwH",
-                width: 1080,
-                height: 1440,
-                moderation: "APPROVED",
-              },
-            ],
+            create: Array.from({ length: o.photos ?? 2 }, (_, i) => ({
+              position: i,
+              storageKey: `test/${handle}/${i}.webp`,
+              thumbKey: `test/${handle}/${i}-thumb.webp`,
+              blurhash: "LKO2?U%2Tw=w]~RBVZRi};RPxuwH",
+              width: 1080,
+              height: 1440,
+              moderation: o.photoModeration ?? "APPROVED",
+            })),
           },
         },
       },
-      privacy: { create: { invisibleMode: o.invisibleMode ?? false, visibility: o.visibility ?? "EVERYONE" } },
+      privacy: { create: { invisibleMode: o.invisibleMode ?? false, visibility: o.visibility ?? "EVERYONE", hideLocation: o.hideLocation ?? false, hideAge: o.hideAge ?? false } },
       discoveryPreferences: { create: { interestedIn: o.interestedIn ?? "EVERYONE", ageMin: o.ageMin ?? 18, ageMax: o.ageMax ?? 99 } },
       notificationSettings: { create: {} },
-      verification: { create: { status: "PHONE_VERIFIED" } },
+      verification: { create: { status: o.verified ? "VERIFIED" : "PHONE_VERIFIED" } },
     },
     select: { id: true },
   });

@@ -21,9 +21,11 @@ cp .env.example .env              # fill in DATABASE_URL / DIRECT_DATABASE_URL /
 createdb thundi_dev               # or: psql -c 'CREATE DATABASE thundi_dev'
 npm run db:migrate                # applies prisma/migrations to DIRECT_DATABASE_URL
 npm run db:seed                   # reference data only (locations, interests, prompts, placeholder plans)
-THUNDI_SEED_DEMO=true npm run db:seed   # + prototype demo profiles (development only, refused in production)
+THUNDI_SEED_DEMO=true npm run db:seed   # + prototype demo profiles and discovery scenarios (development only, refused in production)
 npm run dev
 ```
+
+Demo logins (after the demo seed): `+960 700 0010` is the prototype's Ismail (Free), `+960 700 0011` is a Plus account (Undo, boosts, advanced filters). The other demo numbers are the profiles they discover; `prisma/seed-data/discovery-scenarios.ts` lists which rule each one exercises.
 
 Signing in locally: `SMS_PROVIDER=console` prints the code to the server log and `THUNDI_DEV_OTP_ECHO=true` shows it on the code screen. Photos are stored under `LOCAL_STORAGE_DIR` (`.storage`, git-ignored) and served through signed `/api/media` URLs. Both switches are refused when `NODE_ENV=production`.
 
@@ -52,8 +54,8 @@ Migrations are **not** applied to the hosted Supabase project automatically. See
 prisma/          schema, migrations, seed and seed data
 src/config/      product rules (single source of truth for limits and plans)
 src/lib/         db client, env validation, errors, hashing, age, cookies, storage providers, validation schemas
-src/server/      domain layer (auth, onboarding, photos, profiles, entitlements, usage windows, discovery, likes, matching, messages, boosts, privacy)
-src/actions/     server actions (auth, onboarding, photos)
+src/server/      domain layer (auth, onboarding, photos, profiles, entitlements, usage windows, discovery, likes, matching, safety, messages, boosts, privacy)
+src/actions/     server actions (auth, onboarding, photos, discovery)
 src/components/  ui primitives, layout shell, feature components (auth, onboarding, discovery)
 src/app/         Next.js routes: /, /auth/*, /onboarding/[stage], (app)/*, /api/photos, /api/media, /dev/design-system
 src/proxy.ts     cookie-presence route guard and security headers

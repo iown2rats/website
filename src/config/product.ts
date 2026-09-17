@@ -90,6 +90,29 @@ export const INTRO_LIMITS = { maxLength: 140 } as const;
 
 /** Photo limits from the prototype. */
 export const PHOTO_LIMITS = { min: 2, max: 6 } as const;
+
+/**
+ * Discovery rules (docs/ARCHITECTURE.md §7).
+ *  - A candidate needs `minDisplayablePhotos` photos in a displayable moderation state to appear.
+ *  - `displayableModeration`: which ProfilePhoto.moderation states may be shown to other users. Until the
+ *    moderation pipeline (Phase 12) starts approving photos, PENDING is displayable so freshly onboarded
+ *    people can be discovered; dropping it to ["APPROVED"] is a one-line change applied everywhere at once.
+ *  - Batches are bounded; the client asks for more before the deck runs dry and sends the handles it is
+ *    still holding so adjacent batches never overlap.
+ */
+export const DISCOVERY = {
+  batchSize: 12,
+  maxBatchSize: 30,
+  /** Fetch the next batch when this many or fewer cards remain. */
+  refillThreshold: 4,
+  minDisplayablePhotos: PHOTO_LIMITS.min,
+  displayableModeration: ["APPROVED", "PENDING"] as readonly ("APPROVED" | "PENDING")[],
+  /** Filter slider bounds from the prototype. */
+  filterAgeMin: 18,
+  filterAgeMax: 60,
+  /** Maximum handles a client may pass as "already in my deck". */
+  maxExcludeHandles: 60,
+} as const;
 export const INTEREST_LIMITS = { max: 6 } as const;
 export const PROMPT_LIMITS = { max: 3 } as const;
 

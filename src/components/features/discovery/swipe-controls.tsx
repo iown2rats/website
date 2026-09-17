@@ -15,15 +15,16 @@ export interface SwipeControlsProps {
   onIntro?: () => void;
   onOpen?: () => void;
   onUndo?: () => void;
+  undoDisabled?: boolean;
   disabled?: boolean;
   className?: string;
 }
 
-export function SwipeControls({ onPass, onLike, onIntro, onOpen, onUndo, disabled = false, className }: SwipeControlsProps) {
+export function SwipeControls({ onPass, onLike, onIntro, onOpen, onUndo, undoDisabled = false, disabled = false, className }: SwipeControlsProps) {
   return (
     <div className={cn("flex h-17 items-center justify-center gap-5", className)}>
       {onUndo ? (
-        <IconButton aria-label="Undo last pass" round elevated size={48} onClick={onUndo} disabled={disabled} className="text-text-secondary">
+        <IconButton aria-label="Undo last pass" round elevated size={48} onClick={onUndo} disabled={disabled || undoDisabled} className="text-text-secondary">
           <UndoIcon size={20} strokeWidth={2.2} />
         </IconButton>
       ) : null}

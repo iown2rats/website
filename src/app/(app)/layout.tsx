@@ -2,22 +2,23 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AsideSlot } from "@/components/layout/aside-slot";
 import { RightAside } from "@/components/layout/right-aside";
+import { relativeTime } from "@/lib/time";
 import { requireActiveUser } from "@/server/auth/current-user";
+import { getDiscoverAside } from "@/server/matching/aside";
 import { getNavBadges } from "@/server/notifications/badges";
-import { isDevelopment } from "@/lib/runtime";
-import { FIXTURE_ACTIVITY, FIXTURE_NEW_MATCHES } from "@/dev/fixtures";
 
 /**
- * Authenticated shell: only active users with completed onboarding get here (Phase 5 §21). Badges come from
- * real notifications; the Discover side panel still uses development fixtures until Phase 7.
+ * Authenticated shell: only active users with completed onboarding get here (Phase 5 §21). Badges and the Discover
+ * side panel (new matches, activity) come from the signed-in user's real rows.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const actor = await requireActiveUser();
-  const badges = await getNavBadges(actor);
+  const [badges, aside] = await Promise.all([getNavBadges(actor), getDiscoverAside(actor)]);
+  const now = new Date();
   const discoverAside = (
     <RightAside
-      matches={isDevelopment ? FIXTURE_NEW_MATCHES.map((m) => ({ name: m.name, photo: m.photos[0]! })) : []}
-      activity={isDevelopment ? FIXTURE_ACTIVITY : []}
+      matches={aside.matches.map((m) => ({ name: m.name, photo: { url: m.photo?.url ?? null, key: m.photo?.demoKey ?? null, blurhash: m.photo?.blurhash ?? null }, href: m.conversationId ? `/chats/${m.conversationId}` : "/chats" }))}
+      activity={aside.activity.map((a) => ({ name: a.name, text: a.text, time: relativeTime(a.at, now), photo: { url: a.photo?.url ?? null, key: a.photo?.demoKey ?? null, blurhash: a.photo?.blurhash ?? null } }))}
     />
   );
   return (

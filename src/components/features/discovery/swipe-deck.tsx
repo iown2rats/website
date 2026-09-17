@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { cn } from "@/lib/cn";
 import { photoBackground } from "@/lib/photos";
-import { Button } from "@/components/ui/button";
-import { WavesIcon } from "@/components/ui/icons";
-import { EmptyState } from "@/components/ui/states";
 import { ProfileCard } from "./profile-card";
 import { SwipeControls } from "./swipe-controls";
 import type { CardProfile } from "./types";
@@ -19,18 +16,25 @@ import type { CardProfile } from "./types";
  *  - exit: 600 px sideways, −40 px lift, 320 ms, then commit
  *  - keyboard: ← pass, → like, ↑ open (deck focused); buttons always available
  *  - reduced motion: no exit animation, instant commit
- * Phase 4: callbacks only; database mutations are wired in Phase 6/7.
+ * The deck is head-driven: `profiles[0]` is the current card. On commit it reports the decision and the owner
+ * removes the head (and reconciles with the server); the deck itself holds no swipe history.
  */
 export interface SwipeDeckProps {
   profiles: CardProfile[];
-  onLike?: (profile: CardProfile) => void;
-  onPass?: (profile: CardProfile) => void;
+  onLike: (profile: CardProfile) => void;
+  onPass: (profile: CardProfile) => void;
   onOpen?: (profile: CardProfile) => void;
   onIntro?: (profile: CardProfile) => void;
+  /** Rendered as the far-left control when provided (Plus). */
   onUndo?: () => void;
-  onAdjustFilters?: () => void;
-  onReset?: () => void;
+  undoDisabled?: boolean;
+  /** Shown when there is no current card. */
+  empty?: ReactNode;
   showPlaceholderLabels?: boolean;
+  /** Disables the controls (e.g. while a limit dialog is open). */
+  disabled?: boolean;
+  /** Announced to screen readers after the card summary. */
+  remainingHint?: string;
   className?: string;
 }
 
@@ -50,54 +54,50 @@ export function useReducedMotion(): boolean {
   return useSyncExternalStore(subscribeMotion, () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => false);
 }
 
-export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, onAdjustFilters, onReset, showPlaceholderLabels = false, className }: SwipeDeckProps) {
+export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, undoDisabled = false, empty, showPlaceholderLabels = false, disabled = false, remainingHint, className }: SwipeDeckProps) {
   const reducedMotion = useReducedMotion();
-  const [index, setIndex] = useState(0);
-  const [photoIdx, setPhotoIdx] = useState(0);
+  const [photo, setPhoto] = useState<{ id: string; idx: number } | null>(null);
   const [drag, setDrag] = useState({ dx: 0, dy: 0, dragging: false });
   const [exiting, setExiting] = useState<"like" | "pass" | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const current = profiles[index] ?? null;
-  const next = profiles[index + 1] ?? null;
+  const current = profiles[0] ?? null;
+  const next = profiles[1] ?? null;
+  const photoIdx = current && photo?.id === current.id ? photo.idx : 0;
 
   useEffect(() => () => { if (exitTimer.current) clearTimeout(exitTimer.current); }, []);
 
   const commit = useCallback(
-    (kind: "like" | "pass") => {
-      const profile = profiles[index];
-      if (!profile) return;
-      if (kind === "like") onLike?.(profile);
-      else onPass?.(profile);
-      setIndex((i) => i + 1);
-      setPhotoIdx(0);
+    (kind: "like" | "pass", profile: CardProfile) => {
       setExiting(null);
       setDrag({ dx: 0, dy: 0, dragging: false });
+      if (kind === "like") onLike(profile);
+      else onPass(profile);
     },
-    [index, onLike, onPass, profiles],
+    [onLike, onPass],
   );
 
   const swipe = useCallback(
     (kind: "like" | "pass") => {
-      if (!current || exiting) return;
+      if (!current || exiting || disabled) return;
       if (reducedMotion) {
-        commit(kind);
+        commit(kind, current);
         return;
       }
       setExiting(kind);
       setDrag({ dx: kind === "like" ? 600 : -600, dy: -40, dragging: false });
-      exitTimer.current = setTimeout(() => commit(kind), EXIT_MS);
+      exitTimer.current = setTimeout(() => commit(kind, current), EXIT_MS);
     },
-    [commit, current, exiting, reducedMotion],
+    [commit, current, disabled, exiting, reducedMotion],
   );
 
   const open = useCallback(() => {
-    if (current) onOpen?.(current);
-  }, [current, onOpen]);
+    if (current && !disabled) onOpen?.(current);
+  }, [current, disabled, onOpen]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (exiting) return;
+    if (exiting || disabled) return;
     start.current = { x: e.clientX, y: e.clientY };
     e.currentTarget.setPointerCapture(e.pointerId);
     setDrag((d) => ({ ...d, dragging: true }));
@@ -115,8 +115,8 @@ export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, o
       const r = e.currentTarget.getBoundingClientRect();
       const fx = (e.clientX - r.left) / r.width;
       setDrag({ dx: 0, dy: 0, dragging: false });
-      if (current && current.photos.length > 1 && fx < 0.3) setPhotoIdx((i) => (i - 1 + current.photos.length) % current.photos.length);
-      else if (current && current.photos.length > 1 && fx > 0.7) setPhotoIdx((i) => (i + 1) % current.photos.length);
+      if (current && current.photos.length > 1 && fx < 0.3) setPhoto({ id: current.id, idx: (photoIdx - 1 + current.photos.length) % current.photos.length });
+      else if (current && current.photos.length > 1 && fx > 0.7) setPhoto({ id: current.id, idx: (photoIdx + 1) % current.photos.length });
       else open();
       return;
     }
@@ -141,23 +141,7 @@ export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, o
   const cardTransition = dragging && !exiting ? "none" : `transform var(--duration-card) var(--ease-out-soft)`;
 
   if (!current) {
-    return (
-      <div className={cn("absolute inset-0 bottom-20", className)}>
-        <EmptyState
-          framed
-          className="h-full"
-          icon={<WavesIcon strokeWidth={2} />}
-          title="That's everyone for now."
-          description="Check back later or adjust your preferences."
-          actions={
-            <>
-              {onAdjustFilters ? <Button variant="secondary" size="md" onClick={onAdjustFilters}>Adjust filters</Button> : null}
-              {onReset ? <Button size="md" onClick={() => { onReset(); setIndex(0); }}>Reset demo deck</Button> : null}
-            </>
-          }
-        />
-      </div>
-    );
+    return <div className={cn("absolute inset-0 bottom-20", className)}>{empty}</div>;
   }
 
   return (
@@ -166,13 +150,14 @@ export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, o
         <div
           aria-hidden="true"
           className="absolute inset-0 bottom-20 overflow-hidden rounded-card bg-aqua-soft shadow-sm transition-transform duration-300 ease-soft"
-          style={{ transform: `scale(${nextScale})`, ...photoBackground(next.photos[0] ?? null, 160) }}
+          style={{ transform: `scale(${nextScale})`, ...photoBackground(next.photos[0] ?? null, 160, "thumb") }}
         >
           <div className="absolute inset-x-0 bottom-0 h-[45%] photo-scrim" />
         </div>
       ) : null}
 
       <div
+        key={current.id}
         role="group"
         aria-label={`Profile card: ${current.name}${current.age != null ? `, ${current.age}` : ""}. Right arrow to like, left arrow to pass, up arrow to view.`}
         aria-roledescription="swipeable card"
@@ -195,11 +180,12 @@ export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, o
           onOpen={onOpen ? open : undefined}
           onIntro={onIntro ? () => onIntro(current) : undefined}
           onUndo={onUndo}
-          disabled={Boolean(exiting)}
+          undoDisabled={undoDisabled}
+          disabled={Boolean(exiting) || disabled}
         />
       </div>
       <p className="sr-only" aria-live="polite">
-        {current.name}{current.age != null ? `, ${current.age}` : ""}. {profiles.length - index - 1} more profiles.
+        {current.name}{current.age != null ? `, ${current.age}` : ""}. {remainingHint ?? `${Math.max(0, profiles.length - 1)} more profiles loaded.`}
       </p>
     </div>
   );

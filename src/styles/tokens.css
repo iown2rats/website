@@ -1,0 +1,127 @@
+/*
+ * Thundi design tokens — values extracted from prototype/Thundi.dc.html (see docs/DESIGN_SYSTEM.md).
+ * Components consume these through Tailwind utilities mapped in globals.css; raw hex never appears in components.
+ */
+:root {
+  color-scheme: light;
+
+  /* Colour */
+  --background: #fcfdfc;
+  --surface: #ffffff;
+  --surface-muted: #f5f7f5;
+  --text: #101719;
+  --text-secondary: #667477;
+  --text-muted: color-mix(in srgb, #667477 70%, transparent);
+  --border: #dfebe9;
+  --primary: #18c7c8;
+  --primary-hover: #14b8b9;
+  --primary-pressed: #079a9f;
+  --on-primary: #063b4c;
+  --ocean: #063b4c;
+  --on-ocean: #ffffff;
+  --on-ocean-muted: rgba(255, 255, 255, 0.75);
+  --aqua: #8be3de;
+  --aqua-soft: #e6f7f6;
+  --on-aqua-soft: #063b4c;
+  --success: #20b87a;
+  --warning: #d9a441;
+  --danger: #c0392b;
+  --sand: #d9c7a3;
+  --glass: rgba(255, 255, 255, 0.78);
+  --scrim: rgba(6, 59, 76, 0.4);
+  --photo-scrim: rgba(6, 20, 26, 0.78);
+  --on-photo: #ffffff;
+  --on-photo-muted: rgba(255, 255, 255, 0.85);
+  --on-photo-glass: rgba(255, 255, 255, 0.16);
+
+  /* Elevation */
+  --shadow-sm: 0 8px 30px rgba(6, 59, 76, 0.08);
+  --shadow-lg: 0 20px 60px rgba(6, 59, 76, 0.16);
+  --shadow-like: 0 12px 30px rgba(24, 199, 200, 0.4);
+  --shadow-knob: 0 1px 4px rgba(0, 0, 0, 0.2);
+
+  /* Radius */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 14px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-card: 26px;
+  --radius-nav: 32px;
+  --radius-full: 999px;
+
+  /* Layout & navigation */
+  --gutter: 16px;
+  --header-height: 48px;
+  --page-header-height: 56px;
+  --nav-height: 64px;
+  --nav-offset: 10px;
+  --nav-max-width: 480px;
+  --nav-clearance: 96px; /* bottom padding for scroll areas under the floating nav */
+  --content-max: 640px;
+  --deck-max: 500px;
+  --sheet-max: 560px;
+  --onboarding-max: 520px;
+  --settings-max: 900px;
+  --sidebar-width: 232px;
+  --aside-width: 300px;
+  --chat-list-width: 360px;
+
+  /* Safe areas */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-press: 120ms;
+  --duration-fast: 200ms;
+  --duration-card: 320ms;
+  --duration-sheet: 450ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b1518;
+  --surface: #132329;
+  --surface-muted: #101d21;
+  --text: #f2f7f6;
+  --text-secondary: #8fa3a6;
+  --text-muted: color-mix(in srgb, #8fa3a6 70%, transparent);
+  --border: #1f343b;
+  --aqua-soft: #12333a;
+  --on-aqua-soft: #8be3de;
+  --glass: rgba(19, 35, 41, 0.82);
+  --shadow-sm: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #0b1518;
+    --surface: #132329;
+    --surface-muted: #101d21;
+    --text: #f2f7f6;
+    --text-secondary: #8fa3a6;
+    --text-muted: color-mix(in srgb, #8fa3a6 70%, transparent);
+    --border: #1f343b;
+    --aqua-soft: #12333a;
+    --on-aqua-soft: #8be3de;
+    --glass: rgba(19, 35, 41, 0.82);
+    --shadow-sm: 0 8px 30px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-press: 1ms;
+    --duration-fast: 1ms;
+    --duration-card: 1ms;
+    --duration-sheet: 1ms;
+  }
+}

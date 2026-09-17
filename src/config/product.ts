@@ -93,10 +93,8 @@ export const PHOTO_LIMITS = { min: 2, max: 6 } as const;
 
 /**
  * Discovery rules (docs/ARCHITECTURE.md §7).
- *  - A candidate needs `minDisplayablePhotos` photos in a displayable moderation state to appear.
- *  - `displayableModeration`: which ProfilePhoto.moderation states may be shown to other users. Until the
- *    moderation pipeline (Phase 12) starts approving photos, PENDING is displayable so freshly onboarded
- *    people can be discovered; dropping it to ["APPROVED"] is a one-line change applied everywhere at once.
+ *  - A candidate needs `minDisplayablePhotos` photos in a displayable moderation state to appear. Which states
+ *    are displayable is decided centrally by src/lib/photo-policy.ts (APPROVED only in production).
  *  - Batches are bounded; the client asks for more before the deck runs dry and sends the handles it is
  *    still holding so adjacent batches never overlap.
  */
@@ -106,7 +104,6 @@ export const DISCOVERY = {
   /** Fetch the next batch when this many or fewer cards remain. */
   refillThreshold: 4,
   minDisplayablePhotos: PHOTO_LIMITS.min,
-  displayableModeration: ["APPROVED", "PENDING"] as readonly ("APPROVED" | "PENDING")[],
   /** Filter slider bounds from the prototype. */
   filterAgeMin: 18,
   filterAgeMax: 60,

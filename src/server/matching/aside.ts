@@ -2,8 +2,8 @@
  * Desktop Discover side panel: the viewer's newest matches and recent activity, from real rows.
  * Photos are the other person's primary thumb through the storage provider; nothing private leaves.
  */
-import { DISCOVERY } from "@/config/product";
 import { getDb, type Db } from "@/lib/db";
+import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
@@ -28,7 +28,7 @@ export interface AsideActivityDto {
 
 async function primaryPhoto(db: Db, userId: string, storage: StorageProvider): Promise<AsidePhoto | null> {
   const ph = await db.profilePhoto.findFirst({
-    where: { profile: { userId }, moderation: { in: [...DISCOVERY.displayableModeration] } },
+    where: { profile: { userId }, ...displayablePhotoWhere() },
     orderBy: { position: "asc" },
     select: { thumbKey: true, blurhash: true },
   });

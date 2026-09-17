@@ -4,8 +4,8 @@ import { ChatIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/states";
 import { PageFrame } from "@/components/layout/page";
 import { PageHeader } from "@/components/layout/screen-header";
-import { DISCOVERY } from "@/config/product";
 import { getDb } from "@/lib/db";
+import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS } from "@/lib/storage/provider";
 import { requireActiveUser } from "@/server/auth/current-user";
@@ -26,7 +26,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ c
   if (!conversation) notFound();
   const other = await db.profile.findUnique({
     where: { userId: conversation.otherUserId },
-    select: { displayName: true, photos: { where: { moderation: { in: [...DISCOVERY.displayableModeration] } }, orderBy: { position: "asc" }, take: 1, select: { thumbKey: true, blurhash: true } } },
+    select: { displayName: true, photos: { where: displayablePhotoWhere(), orderBy: { position: "asc" }, take: 1, select: { thumbKey: true, blurhash: true } } },
   });
   const first = other?.photos[0];
   const photo = first ? (isDemoKey(first.thumbKey) ? { key: first.thumbKey, blurhash: first.blurhash } : { url: await getStorageProvider().getReadUrl(first.thumbKey, PHOTO_URL_TTL_SECONDS), blurhash: first.blurhash }) : null;

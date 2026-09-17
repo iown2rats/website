@@ -8,6 +8,7 @@
  */
 import { Prisma } from "@/generated/prisma/client";
 import { DISCOVERY } from "@/config/product";
+import { displayablePhotoStates } from "@/lib/photo-policy";
 import { activePlusSql } from "@/server/entitlements";
 
 export interface ViewerContext {
@@ -29,9 +30,9 @@ export interface ViewerContext {
   education: string | null;
 }
 
-/** `moderation IN ('APPROVED', 'PENDING')` per DISCOVERY.displayableModeration. */
+/** `moderation IN (...)` per the central photo visibility policy (APPROVED only in production). */
 export function displayableModerationSql(): Prisma.Sql {
-  return Prisma.join(DISCOVERY.displayableModeration.map((m) => Prisma.sql`${m}::"PhotoModeration"`));
+  return Prisma.join(displayablePhotoStates().map((m) => Prisma.sql`${m}::"PhotoModeration"`));
 }
 
 /**

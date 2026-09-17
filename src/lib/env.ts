@@ -20,9 +20,18 @@ const schema = z
     NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
     SUPABASE_SECRET_KEY: z.string().optional(),
     SUPABASE_STORAGE_BUCKET_PHOTOS: z.string().default("profile-photos"),
+    /** Which photo moderation states other users may see (src/lib/photo-policy.ts). Defaults per NODE_ENV. */
+    PHOTO_VISIBILITY_POLICY: z.enum(["approved-only", "approved-and-pending"]).optional(),
   })
+  .transform((env) => ({
+    ...env,
+    PHOTO_VISIBILITY_POLICY: env.PHOTO_VISIBILITY_POLICY ?? (env.NODE_ENV === "production" ? ("approved-only" as const) : ("approved-and-pending" as const)),
+  }))
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {
+      if (env.PHOTO_VISIBILITY_POLICY !== "approved-only") {
+        ctx.addIssue({ code: "custom", path: ["PHOTO_VISIBILITY_POLICY"], message: "Production may only display APPROVED photos; PENDING photos need a moderation workflow or an approved alternative policy" });
+      }
       if (env.THUNDI_DEV_OTP_ECHO === "true") {
         ctx.addIssue({ code: "custom", path: ["THUNDI_DEV_OTP_ECHO"], message: "THUNDI_DEV_OTP_ECHO must not be set in production" });
       }

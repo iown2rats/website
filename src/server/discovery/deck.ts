@@ -5,6 +5,7 @@
 import { DISCOVERY } from "@/config/product";
 import { getDb, type Db, type DbLike } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
+import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
@@ -67,7 +68,7 @@ export async function resolveHandle(db: DbLike, handle: string): Promise<string>
 async function loadMe(db: DbLike, actor: Actor, storage: StorageProvider): Promise<DeckPage["me"]> {
   const profile = await db.profile.findUnique({
     where: { userId: actor.userId },
-    select: { displayName: true, photos: { where: { moderation: { in: [...DISCOVERY.displayableModeration] } }, orderBy: { position: "asc" }, take: 1, select: { thumbKey: true, blurhash: true } } },
+    select: { displayName: true, photos: { where: displayablePhotoWhere(), orderBy: { position: "asc" }, take: 1, select: { thumbKey: true, blurhash: true } } },
   });
   const first = profile?.photos[0];
   if (!profile) return { name: "", photo: null };

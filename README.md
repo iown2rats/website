@@ -29,6 +29,8 @@ Demo logins (after the demo seed): `+960 700 0010` is the prototype's Ismail (Fr
 
 Signing in locally: `SMS_PROVIDER=console` prints the code to the server log and `THUNDI_DEV_OTP_ECHO=true` shows it on the code screen. Photos are stored under `LOCAL_STORAGE_DIR` (`.storage`, git-ignored) and served through signed `/api/media` URLs. Both switches are refused when `NODE_ENV=production`.
 
+Photo visibility: outside production, pending (unmoderated) photos are displayable so uploads can be tested; production shows approved photos only and refuses `PHOTO_VISIBILITY_POLICY=approved-and-pending`. See `src/lib/photo-policy.ts` and `docs/ARCHITECTURE.md` §7.1 for the launch requirement.
+
 Next 16 only serves dev assets to the origin it is bound to, so open `http://localhost:3000` (not `127.0.0.1`) when checking pages in a browser.
 
 If you have Docker: `docker run -d --name thundi-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 postgres:17` and use `postgresql://postgres@localhost:5432/thundi_dev`.

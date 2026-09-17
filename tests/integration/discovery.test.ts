@@ -1,5 +1,7 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { BOOST, DISCOVERY, PASS_TTL_MS } from "@/config/product";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { BOOST, PASS_TTL_MS } from "@/config/product";
+import { resetEnvCache } from "@/lib/env";
+import { displayablePhotoStates } from "@/lib/photo-policy";
 import { LocalDiskStorageProvider } from "@/lib/storage/local";
 import { activateBoost } from "@/server/boosts/boost";
 import { buildDiscoveryCards, DISCOVERY_CARD_KEYS } from "@/server/discovery/dto";
@@ -14,6 +16,10 @@ const T0 = new Date("2026-09-17T20:00:00Z");
 const storage = new LocalDiskStorageProvider("/tmp/thundi-test-storage", "x".repeat(32));
 
 beforeEach(() => resetDb(db));
+afterEach(() => {
+  delete process.env.PHOTO_VISIBILITY_POLICY;
+  resetEnvCache();
+});
 afterAll(() => disconnectDb());
 
 describe("discovery eligibility", () => {
@@ -36,8 +42,21 @@ describe("discovery eligibility", () => {
 
     const deck = await getDeckCandidateIds(db, viewer, { now: T0 });
     expect(deck).toContain(ok.userId);
-    expect(deck).toContain(pendingPhotos.userId); // PENDING is displayable until moderation lands (DISCOVERY.displayableModeration)
+    expect(deck).toContain(pendingPhotos.userId); // development/test policy: PENDING is displayable (no moderation pipeline yet)
     for (const u of [viewer, onboarding, suspended, banned, deleted, hidden, paused, onePhoto, rejectedPhotos]) expect(deck).not.toContain(u.userId);
+
+    // Production policy (approved-only) hides people whose photos are still pending, everywhere at once.
+    process.env.PHOTO_VISIBILITY_POLICY = "approved-only";
+    resetEnvCache();
+    expect(displayablePhotoStates()).toEqual(["APPROVED"]);
+    const strict = await getDeckCandidateIds(db, viewer, { now: T0 });
+    expect(strict).toContain(ok.userId);
+    expect(strict).not.toContain(pendingPhotos.userId);
+    const mixed = await createUser(db, { now: T0, photos: 3 });
+    const mixedProfile = await db.profile.findUniqueOrThrow({ where: { userId: mixed.userId } });
+    await db.profilePhoto.update({ where: { profileId_position: { profileId: mixedProfile.id, position: 2 } }, data: { moderation: "PENDING" } });
+    const [card] = await buildDiscoveryCards(db, viewer.userId, [mixed.userId], T0, storage);
+    expect(card!.photos).toHaveLength(2); // the pending third photo is not served
   });
 
   it("excludes blocks in both directions, existing matches, active likes and recent passes; resurfaces old passes", async () => {
@@ -207,6 +226,6 @@ describe("discovery card DTO", () => {
     const [card] = await buildDiscoveryCards(db, viewer.userId, [c.userId], T0, storage);
     expect(card!.photos).toHaveLength(2);
     expect(card!.photos.map((p) => p.url)).toEqual(card!.photos.map((p) => p.url).sort((a, b) => (a! < b! ? -1 : 1)));
-    expect(DISCOVERY.displayableModeration).not.toContain("REJECTED" as never);
+    expect(displayablePhotoStates()).not.toContain("REJECTED" as never);
   });
 });

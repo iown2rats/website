@@ -14,35 +14,53 @@ export function GoogleMark({ size = 20 }: { size?: number }) {
   );
 }
 
-/** Telegram's paper-plane mark on its blue disc (brand colour #2AABEE), same footprint as the Google mark. */
-export function TelegramMark({ size = 20 }: { size?: number }) {
+/** Telegram's brand blue. */
+export const TELEGRAM_BLUE = "#0AA0F4";
+
+const PLANE = "M10.9 23.4c7-3.1 11.7-5.1 14.1-6.1 6.7-2.8 8.1-3.3 9-3.3.2 0 .7 0 1 .3.3.2.3.5.4.8v1c-.4 3.8-1.9 13-2.7 17.3-.3 1.8-1 2.4-1.7 2.5-1.4.1-2.5-.9-3.9-1.8-2.1-1.4-3.4-2.3-5.4-3.6-2.4-1.6-.8-2.4.5-3.8.4-.4 6.4-5.9 6.5-6.4v-.3c-.1-.1-.2-.1-.3-.1-.2 0-2.9 1.8-8.3 5.4-.8.5-1.5.8-2.2.8-.7 0-2.1-.4-3.1-.7-1.3-.4-2.3-.6-2.2-1.3 0-.4.5-.7 1.5-1.1z";
+
+/**
+ * Telegram's paper-plane mark: on its blue disc (default, for white surfaces, same footprint as the Google mark) or
+ * as a plain white plane (`plain`, for the blue brand pill).
+ */
+export function TelegramMark({ size = 20, plain = false }: { size?: number; plain?: boolean }) {
+  if (plain) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#fff" transform="translate(24 24) scale(1.55) translate(-24 -24)" d={PLANE} />
+      </svg>
+    );
+  }
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
       <circle cx="24" cy="24" r="24" fill="#2AABEE" />
-      <path
-        fill="#fff"
-        d="M10.9 23.4c7-3.1 11.7-5.1 14.1-6.1 6.7-2.8 8.1-3.3 9-3.3.2 0 .7 0 1 .3.3.2.3.5.4.8v1c-.4 3.8-1.9 13-2.7 17.3-.3 1.8-1 2.4-1.7 2.5-1.4.1-2.5-.9-3.9-1.8-2.1-1.4-3.4-2.3-5.4-3.6-2.4-1.6-.8-2.4.5-3.8.4-.4 6.4-5.9 6.5-6.4v-.3c-.1-.1-.2-.1-.3-.1-.2 0-2.9 1.8-8.3 5.4-.8.5-1.5.8-2.2.8-.7 0-2.1-.4-3.1-.7-1.3-.4-2.3-.6-2.2-1.3 0-.4.5-.7 1.5-1.1z"
-      />
+      <path fill="#fff" d={PLANE} />
     </svg>
   );
 }
 
 export type SignInButtonProvider = "google" | "telegram";
+/** `white`: the shared white surface with the provider's mark. `brand`: the provider's own colour (Telegram blue pill with a white plane; Google stays white by its guidelines). */
+export type SignInButtonAppearance = "white" | "brand";
 
-const MARKS: Record<SignInButtonProvider, () => React.JSX.Element> = { google: () => <GoogleMark />, telegram: () => <TelegramMark /> };
 const LABELS: Record<SignInButtonProvider, string> = { google: "Continue with Google", telegram: "Continue with Telegram" };
 
 /**
- * "Continue with <provider>": a plain link to that provider's start endpoint (no JS needed). Both providers share
- * the white sign-in surface with the provider's own mark, so the two buttons read as one choice.
+ * "Continue with <provider>": a plain link to that provider's start endpoint (no JS needed). Surface classes are
+ * chosen per appearance (never stacked), so a caller's `className` only adds size, radius and shadow.
  */
-export function ContinueWith({ provider, className, label, purpose = "login", returnTo }: { provider: SignInButtonProvider; className?: string; label?: string; purpose?: "login" | "reauth"; returnTo?: string }) {
+export function ContinueWith({ provider, className, label, purpose = "login", returnTo, appearance = "white", markSize = 20, shape = "rounded" }: { provider: SignInButtonProvider; className?: string; label?: string; purpose?: "login" | "reauth"; returnTo?: string; appearance?: SignInButtonAppearance; markSize?: number; shape?: "rounded" | "pill" }) {
   const start = signInRoute(provider);
   const href = purpose === "reauth" ? `${start}?purpose=reauth${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}` : start;
-  const Mark = MARKS[provider];
+  const brandBlue = appearance === "brand" && provider === "telegram";
+  const surface = brandBlue ? "bg-[#0AA0F4] text-white" : "bg-white text-[#1f1f1f]";
+  const mark = provider === "google" ? <GoogleMark size={markSize} /> : <TelegramMark size={markSize} plain={brandBlue} />;
+  // Radius is a prop, not a class the caller appends: `cn` only joins, so two radius utilities would be settled by
+  // stylesheet order rather than by the caller's intent.
+  const radius = shape === "pill" ? "rounded-full" : "rounded-lg";
   return (
-    <Link href={href} prefetch={false} className={cn("flex h-13 items-center justify-center gap-3 rounded-lg bg-white text-cta-lg text-[#1f1f1f] shadow-sm pressable", className)}>
-      <Mark />
+    <Link href={href} prefetch={false} className={cn("flex h-13 items-center justify-center gap-3 text-cta-lg shadow-sm pressable", radius, surface, className)}>
+      {mark}
       {label ?? LABELS[provider]}
     </Link>
   );

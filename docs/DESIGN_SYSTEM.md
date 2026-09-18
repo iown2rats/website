@@ -364,3 +364,32 @@ Branding only: routes, screens, behaviour, styling and data are unchanged. The p
 ## 25. Continue with Telegram (2026-09-18)
 
 A second sign-in button under Continue with Google on the welcome screen, and the same button wherever the Google one appeared for a Telegram account (sign-in error, deletion confirmation). Both share one component (`ContinueWith`, `src/components/features/auth/google-button.tsx`): the white sign-in surface, 56 px tall and 12 px radius on the welcome screen, the provider's own mark at 20 px on the left, `text-cta-lg` label. The Telegram mark is the paper plane on Telegram's blue disc (#2AABEE) drawn inline, never a generic icon; the two buttons stack with a 12 px gap and identical width so they read as one choice. The Telegram button renders only when the Telegram client is configured, so the screen is unchanged where it is not. Copy is provider-aware: the error page names the provider that failed and offers its button; the deleted-account page shows "@username (Telegram)" or the name instead of an email; Settings → Account reads "Telegram account · @username"; the delete sheet says "sign in with Telegram again as @username"; admin user detail reads "Signs in with · Telegram · @username". Verified with Playwright at 375, 390, 430 and 1280 px (both buttons 56 px tall, full column width, no horizontal overflow, the Telegram button 24 px plus the safe-area inset above the bottom edge on phones), plus the full dev-stand-in Telegram flow (new account → onboarding step 2, returning sign-in → same account, Google callback with a Telegram pending cookie → "That sign-in link expired", re-authentication round trip from the delete sheet). Screenshots in `screenshots/telegram/` (gitignored).
+
+## 26. Welcome screen: the glass sign-in card (2026-09-18)
+
+Replaces §21's top-left composition with the owner's mockup: the same night-beach photograph, now with no scrims, and
+one centred frosted-glass card carrying everything.
+
+Card. Max width 400 px (440 px from `md`), radius 28 px, `background: rgba(255,255,255,0.12)`, a 1 px
+`rgba(255,255,255,0.2)` hairline, `backdrop-filter: blur(40px) saturate(1.5)` and a soft 0 24 px 64 px black shadow.
+It sits 15 dvh from the top on phones (plus the safe-area inset) and 11 vh on wide screens, so the couple on the sand
+is never covered. The photograph keeps its own colour; the card alone provides the contrast for the white type.
+
+Contents, in order: the wordmark in white at 38 px tall (`Wordmark tone="light"`, the supplied artwork with its cocoa
+lettering recoloured to white in `public/brand/mellocrush-logo-white*.png`; the coral "oo" and the gold star are
+untouched, and the proportions are the artwork's own); the tagline "Real people. Brighter days." in 13 px uppercase
+with 0.22 em tracking at 70 % white; the two sign-in pills; a rule with "or"; and the legal line linking to
+`/legal/terms` and `/legal/privacy`.
+
+Sign-in pills. 58 px tall, fully rounded, full width of the card's content column, 12 px apart. Google keeps the white
+surface with the four-colour G (its brand guidelines); Telegram is the Telegram-blue pill `#0AA0F4` with a white paper
+plane and white label. The shape is a prop on `ContinueWith` (`shape="pill"`), not a class the caller appends, because
+`cn` only joins strings: two radius utilities would otherwise be settled by stylesheet order instead of intent.
+
+Legal pages. `/legal/terms` and `/legal/privacy` are public, statically rendered pages on the warm-white surface. They
+state only what the product already enforces and say plainly that the final documents are still being finalised, so the
+welcome screen never links to a dead end.
+
+Verified with Playwright at 375, 390, 430 and 1280 px: no horizontal or vertical page scroll, the card is fully visible
+above the couple at every width, both pills are 58 px tall with a 999 px radius and the same width, and the white
+wordmark renders from the light artwork. Screenshots in `screenshots/welcome2/` (gitignored).

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ContinueWithGoogle, ContinueWithTelegram } from "@/components/features/auth/google-button";
 import { Wordmark } from "@/components/brand/logo";
@@ -7,9 +8,10 @@ import { telegramSignInAvailable } from "@/server/auth/telegram-availability";
 import { ROUTES } from "@/server/auth/route-access";
 
 /*
- * Mellocrush welcome screen: one full-screen photograph (a Maldivian beach at night under the Milky Way, a couple on the sand),
- * the wordmark, one headline and the sign-in buttons (Continue with Google, and Continue with Telegram when the
- * Telegram client is configured). Nothing else — the picture does the storytelling.
+ * Mellocrush welcome screen: one full-screen photograph (a Maldivian beach at night under the Milky Way, a couple on the sand)
+ * and one centred frosted-glass card: the white wordmark, the tagline "Real people. Brighter days.", Continue with
+ * Google (white pill) and Continue with Telegram (Telegram-blue pill, when configured), an "or" rule and the legal line
+ * linking to /legal/terms and /legal/privacy. Nothing else — the picture does the storytelling (design: DESIGN_SYSTEM §26).
  *
  * The hero is served as pre-rendered static files (public/hero, made by scripts/render-hero.mjs from the master in
  * docs/assets/hero): AVIF with a WebP fallback, four widths chosen by the browser from the viewport width, preloaded
@@ -33,8 +35,7 @@ export default async function WelcomePage() {
       {/* Hoisted into <head> by React during server rendering, so the AVIF is requested with the document. Browsers
           without AVIF ignore a preload whose type they cannot decode and fetch the WebP from the <picture> instead. */}
       <link rel="preload" as="image" type="image/avif" imageSrcSet={heroSrcSet("avif")} imageSizes={HERO_SIZES} fetchPriority="high" />
-      {/* Photograph. object-position keeps the Milky Way and the couple in frame on phones; on wide screens the band
-          around the horizon and the couple is shown, and the content sits top-left over the palms. */}
+      {/* Photograph, untouched: no scrims. The glass card carries its own contrast. */}
       <div aria-hidden="true" className="absolute inset-0 bg-cover bg-[50%_60%]" style={{ backgroundImage: `url("${HERO_PLACEHOLDER}")` }}>
         <picture>
           <source type="image/avif" srcSet={heroSrcSet("avif")} sizes={HERO_SIZES} />
@@ -53,31 +54,40 @@ export default async function WelcomePage() {
           />
         </picture>
       </div>
-      {/* Readability scrims: a whisper over the top-left where the wordmark sits, a firmer one behind the button on
-          the sand. The Milky Way (top right) and the water are left alone. */}
-      <div aria-hidden="true" className="absolute inset-x-0 top-0 h-[38%] bg-[linear-gradient(180deg,rgba(5,13,20,0.5)_0%,rgba(5,13,20,0.18)_55%,rgba(5,13,20,0)_100%)] md:hidden" />
-      <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[30%] bg-[linear-gradient(180deg,rgba(5,13,20,0)_0%,rgba(5,13,20,0.5)_55%,rgba(5,13,20,0.82)_100%)] md:hidden" />
-      <div aria-hidden="true" className="absolute inset-y-0 left-0 hidden w-[62%] bg-[linear-gradient(90deg,rgba(5,13,20,0.72)_0%,rgba(5,13,20,0.35)_55%,rgba(5,13,20,0)_100%)] md:block" />
 
-      {/* Phones: wordmark + headline top-left over the palms, the button at the bottom on the sand, the couple and the
-          sky untouched in between. Wide screens: everything grouped top-left, the couple and the Milky Way clear. */}
+      {/* One frosted-glass card, centred horizontally and set in the upper part of the frame so the couple on the
+          sand stays clear below it on phones; on wide screens it sits in the middle of the sky. */}
       <div
-        className="relative z-[1] flex min-h-0 flex-1 flex-col px-5 md:mt-[13vh] md:mb-auto md:ml-[7vw] md:max-w-[460px] md:flex-none md:px-0 md:pt-0"
-        style={{ paddingTop: "calc(28px + var(--safe-top))", paddingBottom: "calc(24px + var(--safe-bottom))" }}
+        className="relative z-[1] flex flex-1 flex-col items-center px-5 md:pt-[11vh]"
+        style={{ paddingTop: "calc(15dvh + var(--safe-top))", paddingBottom: "calc(24px + var(--safe-bottom))" }}
       >
-        <div className="flex w-full max-w-[var(--onboarding-max)] flex-col gap-3 self-center md:gap-4 md:self-start">
-          {/* The artwork is cocoa on transparent, so over the night photograph it sits on a small warm-white glass tile. */}
-          <div className="inline-flex self-start items-center rounded-lg px-3 py-2 glass-card">
-            <Wordmark height={22} priority />
+        <section
+          aria-labelledby="welcome-title"
+          className="flex w-full max-w-[400px] flex-col items-center rounded-[28px] border border-white/20 bg-white/12 px-6 pb-7 pt-10 text-center shadow-[0_24px_64px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150 md:max-w-[440px] md:px-8 md:pb-8 md:pt-12"
+        >
+          <h1 id="welcome-title" className="m-0 flex justify-center">
+            <Wordmark tone="light" height={38} priority />
+          </h1>
+          <p className="mt-3 text-[13px] font-medium uppercase tracking-[0.22em] text-white/70 md:text-sm">Real people. Brighter days.</p>
+
+          <div className="mt-8 flex w-full flex-col gap-3.5">
+            <ContinueWithGoogle shape="pill" className="h-[58px] text-[17px] shadow-[0_8px_24px_rgba(0,0,0,0.25)]" markSize={26} />
+            {telegram ? <ContinueWithTelegram shape="pill" appearance="brand" className="h-[58px] text-[17px] shadow-[0_8px_24px_rgba(0,0,0,0.25)]" markSize={28} /> : null}
           </div>
-          <h1 className="text-hero md:text-[44px] md:leading-[1.04]">Meet someone closer to home.</h1>
-        </div>
-        <div className="mt-auto w-full max-w-[var(--onboarding-max)] self-center md:mt-7 md:self-start">
-          <div className="flex flex-col gap-3">
-            <ContinueWithGoogle className="h-14 rounded-xl shadow-lg" />
-            {telegram ? <ContinueWithTelegram className="h-14 rounded-xl shadow-lg" /> : null}
+
+          <div className="mt-7 flex w-full items-center gap-4" aria-hidden="true">
+            <span className="h-px flex-1 bg-white/35" />
+            <span className="text-[13px] font-medium uppercase tracking-[0.18em] text-white/85">or</span>
+            <span className="h-px flex-1 bg-white/35" />
           </div>
-        </div>
+
+          <p className="mt-6 text-[15px] leading-relaxed text-white/90">
+            By continuing, you agree to our
+            <br />
+            <Link href="/legal/terms" className="font-medium text-white underline underline-offset-[3px] decoration-white/70">Terms of Service</Link> and{" "}
+            <Link href="/legal/privacy" className="font-medium text-white underline underline-offset-[3px] decoration-white/70">Privacy Policy</Link>.
+          </p>
+        </section>
       </div>
     </main>
   );

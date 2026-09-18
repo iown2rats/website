@@ -40,30 +40,30 @@ Long copy uses line-height 1.5 (24×) or 1.55 (5×); headings use `text-wrap: pr
 
 ## 2. Colour tokens
 
-Pastel Rose / Teal identity (2026-09-18). Values live in `src/styles/tokens.css` and are exposed as Tailwind colours in `src/app/globals.css`; components never use raw hex. Light mode is the Thundi experience and is what every visitor sees regardless of the phone's system setting; dark mode is a warm "berry night" that applies only when chosen from the appearance toggle (stored per viewer).
+Pastel Rose / Teal identity (2026-09-18). Values live in `src/styles/tokens.css` and are exposed as Tailwind colours in `src/app/globals.css`; components never use raw hex. Light mode is the Thundi experience and is what every visitor sees regardless of the phone's system setting; dark mode is black with near-black cards and the same rose, teal and gold accents, and applies only when chosen from the appearance toggle (stored per viewer).
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `--color-background` | `#FCEDEA` | `#32232A` | app background |
-| `--color-surface` | `#FFF9F7` | `#49323A` | cards, sheets, inputs, nav |
-| `--color-surface-muted` | `#F9D9D3` | `#3D2A32` | soft tinted surface: selected options, active nav, prompt cards, search field |
+| `--color-background` | `#FCEDEA` | `#000000` | app background |
+| `--color-surface` | `#FFF9F7` | `#151113` | cards, sheets, inputs, nav |
+| `--color-surface-muted` | `#F9D9D3` | `#221B1E` | soft tinted surface: selected options, active nav, prompt cards, search field |
 | `--color-text` | `#472B30` | `#FFF8F6` | main text, icons, focus ring |
 | `--color-text-secondary` | `#826B70` | `#D0BBC0` | secondary text (AA on surface) |
-| `--color-border` | `#EAD1CB` | `#5B4149` | borders, dividers, progress tracks |
+| `--color-border` | `#EAD1CB` | `#302729` | borders, dividers, progress tracks |
 | `--color-primary` | `#E88B86` | `#E99A9C` | primary CTAs (Continue, Like, Send, Save, Upgrade, Post, Approve), my chat bubbles, selected borders, counters |
 | `--color-primary-hover` / `-pressed` | `#D97875` | `#E3898B` | hover and pressed CTA |
-| `--color-on-primary` | `#472B30` | `#32232A` | text and icons on rose (white would fail contrast at 2.5:1; plum reads at 5.1:1) |
+| `--color-on-primary` | `#472B30` | `#1A1315` | text and icons on rose (white would fail contrast at 2.5:1; plum reads at 5.1:1) |
 | `--color-primary-ink` | `#AE5352` | `#F2B3B4` | rose as *text* (links, "Selected", prompt labels): the brand rose deepened until it reads at AA on the warm surfaces |
 | `--color-accent` (`--color-aqua`) | `#3BAEA8` | `#7AD7CE` | teal: verified seal, safety and location icons, active toggles, progress, completion ring, Boost countdown, logo detail |
-| `--color-on-accent` | `#472B30` | `#32232A` | check inside the seal, text on teal pills |
-| `--color-aqua-soft` / `--color-on-aqua-soft` | `#DDF0EE` / `#472B30` | `#2F4A48` / `#FFF8F6` | teal tint: trust cards, info and success callouts, their chat bubbles, icon discs, tags |
+| `--color-on-accent` | `#472B30` | `#1A1315` | check inside the seal, text on teal pills |
+| `--color-aqua-soft` / `--color-on-aqua-soft` | `#DDF0EE` / `#472B30` | `#17302E` / `#FFF8F6` | teal tint: trust cards, info and success callouts, their chat bubbles, icon discs, tags |
 | `--color-success` | `#17756F` | `#7AD7CE` | teal deepened for status words (Approved, Match) so they read on light surfaces |
 | `--color-warning` | `#B8791F` | `#E6B85C` | warning callouts and tags |
 | `--color-danger` | `#C85459` | `#E88A8E` | errors and destructive actions only; the pastel rose is never an error colour |
-| `--color-sand` / `--color-on-sand` | `#C79A59` / `#472B30` | `#F0C978` / `#32232A` | Thundi Plus gold: Plus tags, plan badges, the Plus hero edge and disc, the active-Plus card. Nothing else is gold |
-| `--color-ocean` / `--color-on-ocean` | `#472B30` / `#FFF8F6` | `#5C4149` / `#FFF8F6` | historic name, now the plum emphasis surface: toasts, status pills, the Admin marker. Buttons and cards no longer use it |
-| `--color-glass` | `rgba(255,249,247,.82)` | `rgba(73,50,58,.85)` | bottom nav, glass headers |
-| `--color-scrim` | `rgba(71,43,48,.4)` | `rgba(20,10,14,.5)` | dialog backdrop |
+| `--color-sand` / `--color-on-sand` | `#C79A59` / `#472B30` | `#F0C978` / `#1A1315` | Thundi Plus gold: Plus tags, plan badges, the Plus hero edge and disc, the active-Plus card. Nothing else is gold |
+| `--color-ocean` / `--color-on-ocean` | `#472B30` / `#FFF8F6` | `#2A2225` / `#FFF8F6` | historic name, now the plum emphasis surface: toasts, status pills, the Admin marker. Buttons and cards no longer use it |
+| `--color-glass` | `rgba(255,249,247,.82)` | `rgba(21,17,19,.88)` | bottom nav, glass headers |
+| `--color-scrim` | `rgba(71,43,48,.4)` | `rgba(0,0,0,.6)` | dialog backdrop |
 | `--color-on-photo*` | white / 85 % / 16 % | same | text and chips over photographs |
 
 Shadows are warm (`rgba(71,43,48,.08)` / `.16`), the Like shadow is rose (`rgba(232,139,134,.4)`). The `like-gradient` utility keeps its name but is the solid rose; the only remaining gradients are the photo scrim and the demo photo placeholders. Component mapping: high-emphasis `Button` variants (`primary`, the historic `ocean`, `plus`) are all rose with plum text; `PillTabs` active is rose; `OceanCard` is the teal-tint trust card (`premium` = warm surface with a gold edge for the Plus hero); the match overlay is rose with white ripple rings; `Switch` is teal with a white knob when on and border-coloured with a plum knob when off, `Progress` and the profile completion ring are teal; `PlusTag`, `PlusHeroTag` and plan badges are gold with plum text; `VerifiedBadge` and `ThundiLogo` read `var(--accent)`.
@@ -351,5 +351,5 @@ Verified with Playwright at 375×667, 390×844, 430×932, 768×1024, 1280×800 a
 
 ## 22. Pastel Rose / Teal identity (2026-09-18)
 
-A visual-system update only: screens, content, navigation and geometry are unchanged. Every colour now comes from the tokens in §2. What changed in components: rose replaces turquoise for CTAs, selection and my bubbles; teal is confined to trust (verified seal, safety icons, privacy card), toggles, progress and the logo detail; gold appears only on Plus; the dark-teal blocks (ocean buttons, pill tabs, the privacy card, the prompt card, the match screen, plan badges, the Plus lock) were replaced with rose, teal-tint or warm surfaces; toasts and status pills are the only dark (plum) surfaces left. Dark mode is the berry-night set. Verified with Playwright screenshots at 390 px (Discover, Likes, Chats, Community, Profile, Settings, Membership, Privacy & Safety, Verification, Safety Center, full profile, filters, onboarding), 390 px dark (Discover, Profile, Membership, Chats, Privacy) and 1280 px (Discover, Membership, admin dashboard, users, payments). Screenshots in `screenshots/theme/` (gitignored). Contrast: plum on rose 5.1:1, plum on gold 4.95:1, plum on teal 4.7:1, secondary text on surface 4.5:1, rose ink on surface 4.7:1.
+A visual-system update only: screens, content, navigation and geometry are unchanged. Every colour now comes from the tokens in §2. What changed in components: rose replaces turquoise for CTAs, selection and my bubbles; teal is confined to trust (verified seal, safety icons, privacy card), toggles, progress and the logo detail; gold appears only on Plus; the dark-teal blocks (ocean buttons, pill tabs, the privacy card, the prompt card, the match screen, plan badges, the Plus lock) were replaced with rose, teal-tint or warm surfaces; toasts and status pills are the only dark (plum) surfaces left. Dark mode is black (#000000) with near-black cards (#151113) and the same accents. Verified with Playwright screenshots at 390 px (Discover, Likes, Chats, Community, Profile, Settings, Membership, Privacy & Safety, Verification, Safety Center, full profile, filters, onboarding), 390 px dark (Discover, Profile, Membership, Chats, Privacy) and 1280 px (Discover, Membership, admin dashboard, users, payments). Screenshots in `screenshots/theme/` (gitignored). Contrast: plum on rose 5.1:1, plum on gold 4.95:1, plum on teal 4.7:1, secondary text on surface 4.5:1, rose ink on surface 4.7:1.
 

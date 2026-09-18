@@ -29,7 +29,7 @@ export function useTheme(): [Theme, () => void] {
   const toggle = useCallback(() => {
     const next: Theme = readTheme() === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", next === "dark" ? "#32232A" : "#FCEDEA");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", next === "dark" ? "#000000" : "#FCEDEA");
     try {
       localStorage.setItem(KEY, next);
     } catch {

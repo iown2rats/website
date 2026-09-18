@@ -59,7 +59,7 @@ prices) come from `prisma/seed-data/reference.ts` and were loaded with idempoten
 users, profiles, matches, chats and Community fixtures are development-only and must never be loaded
 here; the seed refuses them when `NODE_ENV=production`.
 
-**Row Level Security.** RLS is enabled on all 39 public tables with no policies. The application reaches
+**Row Level Security.** RLS is enabled on all 40 public tables with no policies. The application reaches
 Postgres only server-side through Prisma as the `postgres` role, which has `BYPASSRLS`, so it is unaffected;
 the anon and authenticated roles used by Supabase's Data API see no rows (verified with `SET ROLE`). Do not
 add permissive anon policies to silence the "RLS enabled, no policy" advisory: the tables are not meant to
@@ -72,14 +72,16 @@ be reachable through the Data API at all.
 3. `/admin/plans`: set the MVR price for each plan, switch on "Price approved" and "Enabled". Only then is anything for sale.
 4. Review transfers at `/admin/payments`; approving activates Plus, rejecting notifies the customer with your reason. Every decision is in `/admin/audit`.
 
-## 3b. Pending migration: receipt OCR
+## 3b. Receipt OCR migration (applied 2026-09-18)
 
-`prisma/migrations/20260918120000_receipt_ocr` (enum `ReceiptOutcome`, table `ReceiptVerification`; additive, touches no
-existing row) is committed but **not applied** to the hosted project. Apply it with the same procedure as §3 (exact
-repo SQL via the Supabase MCP, then the `_prisma_migrations` row with the file's sha256), then enable RLS on the new
-table like the others (`ALTER TABLE "ReceiptVerification" ENABLE ROW LEVEL SECURITY`, no policies). Only owner approval
-starts this. Until it is applied, no production request reaches the table because no order can exist while Plus is
-not for sale.
+`prisma/migrations/20260918120000_receipt_ocr` (enum `ReceiptOutcome`, table `ReceiptVerification`; additive, touched no
+existing row) was applied to the hosted project with owner approval using the §3 procedure: exact repo SQL via the
+Supabase MCP, then the `_prisma_migrations` row with the file's sha256
+(`715ccf147b036c6e2fe9a4f0abb5ff476efd6918c7594f4a2d9246387a39033b`), then
+`ALTER TABLE "ReceiptVerification" ENABLE ROW LEVEL SECURITY` with no policies. Post-checks: 40 public tables, all with
+RLS and zero policies; the `postgres` role (BYPASSRLS) reads and writes the table; `anon` and `authenticated` see no
+rows; existing data fingerprints unchanged; production healthy. No redeploy was needed: the deployed code already
+carried the schema.
 
 ## 4. Redeploying
 

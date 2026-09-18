@@ -222,6 +222,15 @@ the server log and is refused in production by `src/lib/env.ts`.
 affects a deployment already running, so a redeploy is always the last step after setting them — the symptom of
 forgetting is a correctly configured project whose live site behaves as though nothing was set.
 
+**A dashboard "Redeploy" does not always move the production domains.** On 2026-09-18 the redeploy of the latest
+production commit finished `READY` with target `production`, but its alias list held only
+`thundi-kingdom-trips.vercel.app` and the branch alias: `www.mellocrush.com`, `mellocrush.com` and `thundi.vercel.app`
+stayed on the earlier deployment, which had been built before the Resend variables existed. The live site therefore
+kept serving the old build (same Next.js `buildId`) and kept hiding email + password, with nothing wrong in the code,
+the database or the variables. Check the alias list of the deployment you expect to be live — `thundi.vercel.app` and
+both `mellocrush.com` hosts must appear on it — and if they do not, push a commit so a `source: git` deployment is
+created, or use Promote in the dashboard. A push to the production branch is the reliable path.
+
 ## 4. Redeploying
 
 A push to the production branch deploys production. A dashboard "Redeploy" of the latest production

@@ -4,6 +4,7 @@
  */
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getDb } from "@/lib/db";
 import { readSessionToken } from "@/lib/session-cookie";
 import type { Actor } from "@/server/actor";
@@ -20,7 +21,8 @@ export const getAuthState = cache(async (): Promise<AuthState> => {
   const token = await readSessionToken();
   if (!token) return { kind: "anonymous" };
   const db = getDb();
-  const resolved = await resolveSession(db, token);
+  // The sliding session refresh runs after the response is sent (Next `after`), never on the request's critical path.
+  const resolved = await resolveSession(db, token, new Date(), (work) => after(() => work().catch((e) => console.warn("[auth] session refresh failed:", e instanceof Error ? e.message : e))));
   if (!resolved) return { kind: "anonymous" };
   const { user } = resolved;
   const kind = authKindForUser(user);

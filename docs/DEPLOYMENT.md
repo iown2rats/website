@@ -7,7 +7,7 @@ names, hosts and procedures. Keep this file current whenever the hosted setup ch
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| Application | Vercel project `thundi`, team Kingdom Trips, Node 24, framework Next.js | Linked to `github.com/iown2rats/website`; production branch `claude/intelligent-cannon-0s0pnf` (the repository's default branch). Every push to it builds a production deployment. |
+| Application | Vercel project `thundi`, team Kingdom Trips, Node 24, framework Next.js, **functions in `bom1` (Mumbai)** via `vercel.json` | Linked to `github.com/iown2rats/website`; production branch `claude/intelligent-cannon-0s0pnf` (the repository's default branch). Every push to it builds a production deployment. Functions run in Mumbai because the database and storage are in `ap-south-1` and the members are in the Maldives; the default `iad1` (Virginia) added two ocean crossings per database round trip. |
 | Public origin | `https://www.mellocrush.com` (primary; `mellocrush.com` and the `*.vercel.app` names redirect to it, §8) | The only origin to use: `APP_URL`, the Google redirect URI and cookies are bound to this host. `thundi-kingdom-trips.vercel.app` and the git-branch alias also resolve but must not be used for sign-in. |
 | Deployment protection | Vercel Authentication on **preview deployments only** | Production is public. Previews stay behind a Vercel login. |
 | Database | Supabase project `Thundi` (`qkubuaicuyoaskzcabcu`, ap-south-1, Postgres 17) | Runtime through the Supavisor transaction pooler (6543, `pgbouncer=true&connection_limit=5`); tooling through the session pooler (5432). Both connect as the `postgres` role. |
@@ -178,3 +178,21 @@ Verification: `https://www.mellocrush.com/` serves the app (title Mellocrush, ma
 `/auth/google/start` on it redirects to Google with `redirect_uri=https://www.mellocrush.com/auth/google/callback`;
 `https://mellocrush.com/<path>` → 308 `https://www.mellocrush.com/<path>`; `https://thundi.vercel.app/<path>` → 308
 to the same path on `www.mellocrush.com`. Everyone signs in again once (session cookies are per host); data is untouched.
+
+## 9. Latency (2026-09-18)
+
+Every page was slow because the serverless functions ran in Vercel's default region, `iad1` (Virginia), while the
+database and storage live in Supabase `ap-south-1` (Mumbai) and the members are in the Maldives. A page made several
+sequential database round trips of roughly 200 ms each plus one Supabase Storage HTTP call per photo URL. Fixes:
+
+- `vercel.json` pins the functions to `bom1` (Mumbai): database round trips drop from ~200 ms to a few ms and the
+  function sits ~2,000 km from the Maldives instead of ~14,000 km. Check with the `x-vercel-id` response header, which
+  should start with `bom1`.
+- `SupabaseStorageProvider.getReadUrl` coalesces every signed-URL request made in the same tick into one
+  `createSignedUrls` call and remembers URLs for a quarter of their TTL, so a Discover deck signs its photos with one
+  HTTP call instead of dozens.
+- The hourly sliding session refresh runs after the response is sent (Next `after`) instead of before the page renders.
+- The desktop side panel loads the primary photo of every match and activity actor in one query instead of one per row.
+
+No environment variable or database change. Verification list after deploy: `x-vercel-id: bom1::…` on
+`https://www.mellocrush.com/`; Discover, Likes, Chats, Community, Profile and Settings render; sign-in unchanged.

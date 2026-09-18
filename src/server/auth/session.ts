@@ -81,7 +81,12 @@ export function authKindForUser(user: Pick<SessionUser, "status" | "onboardingCo
  * Validates a token: unknown, idle-expired or absolutely-expired sessions return null (and expired rows
  * are removed). Slides the idle expiry forward at most once per hour.
  */
-export async function resolveSession(db: DbLike, token: string | null | undefined, now: Date = new Date()): Promise<ResolvedSession | null> {
+/**
+ * Resolves a session token. The hourly sliding refresh is a write the response never needs to wait for; a caller in a
+ * request scope passes `defer` (Next's `after`) so the update runs once the response has been sent. Without `defer`
+ * the write is awaited, which is what tests and non-request callers want.
+ */
+export async function resolveSession(db: DbLike, token: string | null | undefined, now: Date = new Date(), defer?: (work: () => Promise<unknown>) => void): Promise<ResolvedSession | null> {
   if (!token || token.length < 32 || token.length > 128) return null;
   const tokenHash = hashSessionToken(token);
   const session = await db.session.findUnique({
@@ -102,7 +107,9 @@ export async function resolveSession(db: DbLike, token: string | null | undefine
   let expiresAt = session.expiresAt;
   if (now.getTime() - session.lastSeenAt.getTime() > SESSION_RULES.refreshEveryMs) {
     expiresAt = new Date(Math.min(now.getTime() + SESSION_RULES.idleMs, session.absoluteExpiresAt.getTime()));
-    await db.session.update({ where: { id: session.id }, data: { lastSeenAt: now, expiresAt } });
+    const refresh = () => db.session.updateMany({ where: { id: session.id }, data: { lastSeenAt: now, expiresAt } });
+    if (defer) defer(refresh);
+    else await refresh();
   }
   return { sessionId: session.id, user: session.user, expiresAt };
 }

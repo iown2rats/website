@@ -26,15 +26,25 @@ export interface AsideActivityDto {
   photo: AsidePhoto | null;
 }
 
-async function primaryPhoto(db: Db, userId: string, storage: StorageProvider): Promise<AsidePhoto | null> {
-  const ph = await db.profilePhoto.findFirst({
-    where: { profile: { userId }, ...displayablePhotoWhere() },
-    orderBy: { position: "asc" },
-    select: { thumbKey: true, blurhash: true },
+/** Primary (lowest position) displayable thumb for each user, in one query; signed URLs are requested together. */
+async function primaryPhotos(db: Db, userIds: string[], storage: StorageProvider): Promise<Map<string, AsidePhoto>> {
+  const out = new Map<string, AsidePhoto>();
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return out;
+  const rows = await db.profilePhoto.findMany({
+    where: { profile: { userId: { in: ids } }, ...displayablePhotoWhere() },
+    orderBy: [{ profileId: "asc" }, { position: "asc" }],
+    distinct: ["profileId"],
+    select: { thumbKey: true, blurhash: true, profile: { select: { userId: true } } },
   });
-  if (!ph) return null;
-  if (isDemoKey(ph.thumbKey)) return { url: null, demoKey: ph.thumbKey, blurhash: ph.blurhash };
-  return { url: await storage.getReadUrl(ph.thumbKey, PHOTO_URL_TTL_SECONDS), demoKey: null, blurhash: ph.blurhash };
+  await Promise.all(
+    rows.map(async (ph) => {
+      const userId = ph.profile.userId;
+      if (isDemoKey(ph.thumbKey)) out.set(userId, { url: null, demoKey: ph.thumbKey, blurhash: ph.blurhash });
+      else out.set(userId, { url: await storage.getReadUrl(ph.thumbKey, PHOTO_URL_TTL_SECONDS), demoKey: null, blurhash: ph.blurhash });
+    }),
+  );
+  return out;
 }
 
 export async function getDiscoverAside(actor: Actor, deps: { db?: Db; storage?: StorageProvider } = {}): Promise<{ matches: AsideMatchDto[]; activity: AsideActivityDto[] }> {
@@ -54,21 +64,18 @@ export async function getDiscoverAside(actor: Actor, deps: { db?: Db; storage?: 
       select: { type: true, createdAt: true, actorId: true, actor: { select: { profile: { select: { displayName: true } } } } },
     }),
   ]);
-  const matchDtos = await Promise.all(
-    matches.map(async (m) => {
-      const otherId = m.userAId === actor.userId ? m.userBId : m.userAId;
-      const other = m.userAId === actor.userId ? m.userB : m.userA;
-      return { name: other.profile?.displayName ?? "Match", conversationId: m.conversation?.id ?? null, photo: await primaryPhoto(db, otherId, storage) };
-    }),
-  );
+  const otherIds = matches.map((m) => (m.userAId === actor.userId ? m.userBId : m.userAId));
+  const photos = await primaryPhotos(db, [...otherIds, ...notifications.flatMap((n) => (n.actorId ? [n.actorId] : []))], storage);
+  const matchDtos = matches.map((m, i) => {
+    const other = m.userAId === actor.userId ? m.userB : m.userA;
+    return { name: other.profile?.displayName ?? "Match", conversationId: m.conversation?.id ?? null, photo: photos.get(otherIds[i]!) ?? null };
+  });
   const text = { LIKE_RECEIVED: "liked you", NEW_MATCH: "matched with you", MESSAGE: "sent a message" } as const;
-  const activity = await Promise.all(
-    notifications.map(async (n) => ({
-      name: n.actor?.profile?.displayName ?? "Someone",
-      text: text[n.type as keyof typeof text] ?? "",
-      at: n.createdAt.toISOString(),
-      photo: n.actorId ? await primaryPhoto(db, n.actorId, storage) : null,
-    })),
-  );
+  const activity = notifications.map((n) => ({
+    name: n.actor?.profile?.displayName ?? "Someone",
+    text: text[n.type as keyof typeof text] ?? "",
+    at: n.createdAt.toISOString(),
+    photo: n.actorId ? photos.get(n.actorId) ?? null : null,
+  }));
   return { matches: matchDtos, activity };
 }

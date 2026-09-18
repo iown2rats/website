@@ -12,12 +12,13 @@ import { FormError, SubmitButton } from "./submit-button";
  * Your face should be clearly visible in the first." and the Continue button, enabled once the minimum is met and
  * nothing is still uploading. The server re-checks the minimum in confirmPhotos().
  */
-export function PhotosForm({ initialPhotos }: { initialPhotos: PhotoDto[] }) {
+export function PhotosForm({ initialPhotos, reviewedBeforeVisible }: { initialPhotos: PhotoDto[]; reviewedBeforeVisible: boolean }) {
   const [state, action] = useActionState<StageFormState, FormData>(submitPhotos, {});
   return (
     <form action={action} className="flex flex-1 flex-col gap-3.5" noValidate>
       <PhotoManager
         initialPhotos={initialPhotos}
+        reviewedBeforeVisible={reviewedBeforeVisible}
         className="flex-1"
         note={`Add at least ${PHOTO_LIMITS.min}. Your face should be clearly visible in the first. JPG, PNG or WebP up to 8 MB.`}
         footer={({ activeCount, uploading, busy }) => (

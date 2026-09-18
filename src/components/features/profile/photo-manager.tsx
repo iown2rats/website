@@ -26,6 +26,12 @@ export interface PhotoManagerState {
 
 export interface PhotoManagerProps {
   initialPhotos: PhotoDto[];
+  /**
+   * True when a PENDING photo is hidden from other members until a reviewer approves it — the production policy
+   * (src/lib/photo-policy.ts). False in development, where pending photos are already displayable and telling
+   * someone they are waiting would be a lie.
+   */
+  reviewedBeforeVisible?: boolean;
   layout?: "uniform" | "featured";
   note?: ReactNode;
   /** Rendered below the grid with the live state (onboarding uses it for the Continue button). */
@@ -65,7 +71,7 @@ function uploadWithProgress(file: File, onProgress: (pct: number) => void): Prom
   });
 }
 
-export function PhotoManager({ initialPhotos, layout = "uniform", note, footer, className }: PhotoManagerProps) {
+export function PhotoManager({ initialPhotos, reviewedBeforeVisible = false, layout = "uniform", note, footer, className }: PhotoManagerProps) {
   const [photos, setPhotos] = useState<PhotoDto[]>(initialPhotos);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -209,9 +215,43 @@ export function PhotoManager({ initialPhotos, layout = "uniform", note, footer, 
     <div className={cn("flex flex-col gap-3.5", className)}>
       <input ref={inputRef} type="file" accept={ACCEPT} multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => onFiles(e.target.files)} />
       <ul className={cn("m-0 grid list-none grid-cols-3 gap-2.5 p-0", featured && "auto-rows-fr")}>{tiles}</ul>
+      {reviewedBeforeVisible ? <ReviewNotice photos={photos} /> : null}
       {note ? <p className="text-caption text-text-secondary">{note}</p> : null}
       {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
       {footer ? footer({ photos, activeCount, uploading, busy }) : null}
+    </div>
+  );
+}
+
+/**
+ * What is actually true of these photos right now, said plainly: how many are waiting, and whether the profile is
+ * visible in Discover yet. Without it an uploaded photo looks published the moment it appears in the grid, which is
+ * the opposite of what happens — it is hidden until a reviewer approves it.
+ */
+function ReviewNotice({ photos }: { photos: PhotoDto[] }) {
+  const pending = photos.filter((p) => p.moderation === "PENDING").length;
+  const approved = photos.filter((p) => p.moderation === "APPROVED").length;
+  const rejected = photos.filter((p) => p.moderation === "REJECTED").length;
+  if (pending === 0 && rejected === 0) return null;
+
+  const lines: string[] = [];
+  if (pending > 0) {
+    lines.push(
+      pending === 1
+        ? "1 photo is being reviewed. Nobody else can see it yet."
+        : `${pending} photos are being reviewed. Nobody else can see them yet.`,
+    );
+  }
+  if (rejected > 0) lines.push(rejected === 1 ? "1 photo wasn't allowed. Remove it and add another." : `${rejected} photos weren't allowed. Remove them and add others.`);
+  if (approved < PHOTO_LIMITS.min) {
+    lines.push(`Your profile appears in Discover once ${PHOTO_LIMITS.min} of your photos are approved (${approved} so far).`);
+  }
+
+  return (
+    <div role="status" className="flex flex-col gap-1 rounded-xl bg-surface-muted px-3.5 py-3 text-caption text-text-secondary">
+      {lines.map((line) => (
+        <p key={line} className="m-0">{line}</p>
+      ))}
     </div>
   );
 }

@@ -96,15 +96,37 @@ export function noBlockOrContactSql(viewerId: string, viewerPhoneHash: Uint8Arra
   `;
 }
 
-/** Discovery-only: the candidate must be open to being discovered right now and have enough displayable photos. */
-export function discoverableSql(): Prisma.Sql {
+/** The candidate's own choice to be discovered: visible to everyone and not paused. Says nothing about photos. */
+export function openToDiscoverySql(): Prisma.Sql {
+  return Prisma.sql`ps.visibility = 'EVERYONE' AND ps."pausedAt" IS NULL`;
+}
+
+/** Enough photos in a state other users may see under the active policy (APPROVED only in production). */
+export function enoughDisplayablePhotosSql(): Prisma.Sql {
+  return Prisma.sql`(
+    SELECT count(*) FROM "ProfilePhoto" ph
+    WHERE ph."profileId" = p.id AND ph.moderation IN (${displayableModerationSql()})
+  ) >= ${DISCOVERY.minDisplayablePhotos}`;
+}
+
+/**
+ * The candidate uploaded enough photos but not enough of them are displayable yet: they are waiting on moderation,
+ * not missing. Used only to count such candidates, never to show them — a profile in this state stays out of every
+ * deck. Under a policy where PENDING is displayable this is always false, because the two counts coincide.
+ */
+export function awaitingPhotoReviewSql(): Prisma.Sql {
   return Prisma.sql`
-    ps.visibility = 'EVERYONE' AND ps."pausedAt" IS NULL
+    NOT (${enoughDisplayablePhotosSql()})
     AND (
       SELECT count(*) FROM "ProfilePhoto" ph
-      WHERE ph."profileId" = p.id AND ph.moderation IN (${displayableModerationSql()})
+      WHERE ph."profileId" = p.id AND ph.moderation <> 'REJECTED'
     ) >= ${DISCOVERY.minDisplayablePhotos}
   `;
+}
+
+/** Discovery-only: the candidate must be open to being discovered right now and have enough displayable photos. */
+export function discoverableSql(): Prisma.Sql {
+  return Prisma.sql`${openToDiscoverySql()} AND ${enoughDisplayablePhotosSql()}`;
 }
 
 /**

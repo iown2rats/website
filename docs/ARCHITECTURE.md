@@ -270,7 +270,7 @@ Conventions: `cuid2` ids; `createdAt`/`updatedAt` on every table; foreign keys w
 
 ### 6.1 Editing photos (Phase 9)
 
-Edit profile → Photos reuses the Phase 5 pipeline and grid (`features/profile/photo-manager.tsx`, shared with onboarding): upload with progress and retry, remove, drag or button reorder, "Make main". `assertCanRemovePhoto` (in `photos.ts`) is the one place that enforces the minimum: once onboarding is complete a profile keeps at least `PHOTO_LIMITS.min` (2) non-rejected photos, so a removal that would drop below it is refused with an explanation; rejected photos can always be removed; onboarding accounts are governed by the completion gate instead. Pending photos are labelled "Under review" for the owner; other users see them only where the photo visibility policy allows (§7.1).
+Edit profile → Photos reuses the Phase 5 pipeline and grid (`features/profile/photo-manager.tsx`, shared with onboarding): upload with progress and retry, remove, drag or button reorder, "Make main". `assertCanRemovePhoto` (in `photos.ts`) is the one place that enforces the minimum: once onboarding is complete a profile keeps at least `PHOTO_LIMITS.min` (2) non-rejected photos, so a removal that would drop below it is refused with an explanation; rejected photos can always be removed; onboarding accounts are governed by the completion gate instead. Pending photos are labelled "Under review" for the owner; other users see them only where the photo visibility policy allows (§7.1). Where a pending photo really is hidden (production), the grid also carries a status block under it — how many photos are waiting, how many were not allowed, and that the profile appears in Discover once `PHOTO_LIMITS.min` of them are approved — so an upload never looks published the moment it appears in the grid. The flag comes from `pendingPhotosAwaitReview()` and is threaded from the server page, so in development, where pending photos are already displayable, the copy does not claim a review that is not happening.
 
 ## 7. Discovery and privacy filtering (as built in Phase 6)
 
@@ -307,7 +307,7 @@ The browser receives `DiscoveryCardDto` (`src/server/discovery/dto.ts`) built fr
 
 - A deck request returns at most `DISCOVERY.batchSize` (12, clamped to 30) cards. The client asks for the next batch when `refillThreshold` (4) cards remain and sends the handles it still holds as `excludeHandles`; combined with the persisted swipe history this guarantees adjacent batches never overlap without exposing a numeric or predictable cursor.
 - Order: active Boost first, then verified, then most recently active, then `md5(candidateId || viewerId)` (a per-viewer stable shuffle), then id. Every key is deterministic for a given viewer and time. Boosted profiles cannot starve the rest: a swiped profile leaves the deck, and a batch is bounded. Boost promises ordering priority only, never a multiplier.
-- `countRelaxedCandidates` (count only, no identities) distinguishes "filters too restrictive" from "nobody new" when a deck comes back empty.
+- `countRelaxedCandidates` (count only, no identities) distinguishes "filters too restrictive" from "nobody new" when a deck comes back empty. It applies the photo rule, so on its own it cannot tell "nobody new" from "everybody is still waiting for moderation" — both look like zero. `countAwaitingPhotoReview` (also a count only) asks the complementary question: how many otherwise-eligible people have enough photos but not enough *displayable* ones. `getDeck` resolves an empty deck in that order — `FILTERS` first because the viewer's filters are the only thing the viewer can act on, then `REVIEW`, then `EXHAUSTED` — and the client shows "New profiles are being checked" rather than "that's everyone for now". The signal reaching the member is the reason alone: no count, no handle, no photo, and a profile counted this way is still in nobody's deck. Under a policy where PENDING is displayable the two counts coincide and `REVIEW` can never occur.
 - The deck query was reviewed with `EXPLAIN (ANALYZE, BUFFERS)` against the seeded development data (41 users): every per-candidate lookup uses an existing index (`Block(blockerId, blockedId)`, `Like(fromUserId, toUserId)`, `Pass(fromUserId, toUserId)`, `Match(userAId, userBId)` via the OR form, `Boost(endsAt)`, `EntitlementOverride(userId, endsAt)`, `Subscription(status, currentPeriodEnd)`, `ProfilePhoto(profileId, position)`). Sequential scans appear only on tables small enough that the planner prefers them. No index was added; none was missing.
 
 ### 7.4 Filters UI
@@ -619,9 +619,30 @@ Search by public name, handle or internal id with account-state, onboarding, ver
 
 Reports reuse the §10 rows and evidence (reason, note, message snapshot). Decisions `OPEN → UNDER_REVIEW | RESOLVED | DISMISSED`, `UNDER_REVIEW → RESOLVED | DISMISSED`; resolving requires a resolution note; every decision is audited; account actions are taken from the target's page. The verification queue lists `SELFIE_SUBMITTED`/`UNDER_REVIEW` rows; a decision requires a submitted selfie (`selfieStorageKey`), so nobody can be marked VERIFIED without evidence; the selfie upload step itself is still pending (§11) and the UI says so. Google sign-in is never evidence.
 
+### 21.5a Photo moderation queue (Phase 13)
+
+`/admin/photos` is where an uploaded photo becomes visible to anyone. Every `ProfilePhoto` row is inserted `PENDING`
+(§6), production displays `APPROVED` only (`src/lib/photo-policy.ts`), and the discovery predicate counts *displayable*
+photos — so until a human approves two of someone's photos that person is in no deck at all. Before this queue existed
+there was no code path in the product that set `APPROVED`, which made every production profile permanently invisible.
+
+- Domain: `src/server/admin/photo-moderation.ts`. `listPendingPhotos` returns the waiting photos newest upload first
+  with the member's name, handle, account status, position (0 = their main photo), upload time and how many of their
+  photos are already approved, plus a signed one-hour thumbnail URL. `countPendingPhotos` feeds the navigation badge.
+- Permission: `photos.moderate`, held by ADMIN and MODERATOR. Reads and writes both call `assertPermission`; the page
+  calls `requireAdminPage`, the server action `requireAdmin`. Navigation filtering is cosmetic.
+- Decision: `decidePhoto` moves `PENDING → APPROVED | REJECTED` inside a transaction that first locks the row
+  (`SELECT id … FOR UPDATE`) and re-reads its state. A photo that is no longer pending is refused with a message
+  naming the decision that already stands, so a stale queue in a second tab cannot silently overwrite somebody else's
+  call; two simultaneous decisions leave exactly one audit row. Rejection requires a reason. Nobody moderates their
+  own photo. Rejected photos are never displayable, never primary and never count towards the minimum of two.
+- Audit: `photo.moderated`, target type `ProfilePhoto`, carrying the owner's id, the position, the reason and
+  before/after moderation states.
+- No schema change: `PhotoModeration` already had all three states and the permission is a TypeScript union.
+
 ### 21.6 Audit log
 
-`src/server/admin/audit.ts` is the single writer. Actions: `admin.role.changed`, `admin.bootstrapped`, `user.suspended`, `user.unsuspended`, `user.banned`, `report.decided`, `verification.decided`, `payment.approved`, `payment.rejected`, `subscription.adjusted`, `payment_method.created/updated`, `plan.created/updated` (plus the existing user-initiated `account.deleted` / `account.recreated`). Payloads are sanitised: keys that look like secrets (token, hash, secret, providerSubject, …) are dropped before writing; account numbers are logged as last four digits. `/admin/audit` is read-only and no admin surface can edit or delete rows.
+`src/server/admin/audit.ts` is the single writer. Actions: `admin.role.changed`, `admin.bootstrapped`, `user.suspended`, `user.unsuspended`, `user.banned`, `report.decided`, `verification.decided`, `photo.moderated`, `payment.approved`, `payment.rejected`, `subscription.adjusted`, `payment_method.created/updated`, `plan.created/updated` (plus the existing user-initiated `account.deleted` / `account.recreated`). Payloads are sanitised: keys that look like secrets (token, hash, secret, providerSubject, …) are dropped before writing; account numbers are logged as last four digits. `/admin/audit` is read-only and no admin surface can edit or delete rows.
 
 ## 15. Security controls summary
 

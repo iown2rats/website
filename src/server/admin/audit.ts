@@ -13,6 +13,7 @@ export const AUDIT_ACTIONS = {
   userBanned: "user.banned",
   reportDecided: "report.decided",
   verificationDecided: "verification.decided",
+  photoModerated: "photo.moderated",
   paymentApproved: "payment.approved",
   paymentRejected: "payment.rejected",
   receiptReprocessed: "receipt.reprocessed",

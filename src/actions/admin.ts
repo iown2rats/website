@@ -7,6 +7,7 @@ import { AdminAccessError, requireAdmin } from "@/server/admin/authz";
 import { bootstrapFirstAdmin, changeUserRole, type Role } from "@/server/admin/bootstrap";
 import { decideReport, type ReportDetailDto } from "@/server/admin/moderation";
 import { setAccountStatus, type AccountAction, type AccountStatus } from "@/server/admin/users";
+import { decidePhoto, type PhotoDecision } from "@/server/admin/photo-moderation";
 import { decideVerification } from "@/server/admin/verification";
 import { requireActor } from "@/server/auth/current-user";
 import { approveOrder, rejectOrder, type AdminOrderDto } from "@/server/billing/approval";
@@ -132,6 +133,18 @@ export async function adminDecideVerification(userId: string, input: unknown): P
     revalidatePath("/admin/verifications");
     revalidatePath(`/admin/users/${r.userId}`);
     return { ok: true, data: { status: r.status } };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+export async function adminDecidePhoto(photoId: string, input: unknown): Promise<AdminResult<{ moderation: PhotoDecision }>> {
+  try {
+    const admin = await requireAdmin("photos.moderate");
+    const r = await decidePhoto(admin, String(photoId), input);
+    revalidatePath("/admin/photos");
+    revalidatePath(`/admin/users/${r.userId}`);
+    return { ok: true, data: { moderation: r.moderation } };
   } catch (e) {
     return failure(e);
   }

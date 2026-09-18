@@ -12,7 +12,7 @@ import type { Actor } from "@/server/actor";
 import { getBoostAllowance, getEntitlements, getLikeAllowance, type LikeAllowance } from "@/server/entitlements";
 import { likeUser, passUser, undoLastPass, type LikeResult } from "@/server/likes/like";
 import { buildDiscoveryCards, isDemoKey, type DiscoveryCardDto } from "./dto";
-import { countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate } from "./query";
+import { countAwaitingPhotoReview, countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate } from "./query";
 
 export interface DeckDeps {
   db?: Db;
@@ -45,7 +45,7 @@ export interface BoostDto {
   resetsAt: string | null;
 }
 
-export type EmptyReason = "NONE" | "FILTERS" | "EXHAUSTED" | "PAUSED";
+export type EmptyReason = "NONE" | "FILTERS" | "REVIEW" | "EXHAUSTED" | "PAUSED";
 
 export interface DeckPage {
   cards: DiscoveryCardDto[];
@@ -54,7 +54,11 @@ export interface DeckPage {
   boost: BoostDto;
   /** Authoritative server time; the client renders countdowns relative to this, never to its own clock alone. */
   serverNow: string;
-  /** Only meaningful when `cards` is empty: FILTERS = relaxing your filters would show people, EXHAUSTED = nobody new, PAUSED = the viewer paused dating. */
+  /**
+   * Only meaningful when `cards` is empty. FILTERS = relaxing your filters would show people; REVIEW = people are
+   * waiting on photo moderation, so the deck will refill without the viewer changing anything; EXHAUSTED = nobody
+   * new; PAUSED = the viewer paused dating. REVIEW carries no count and no identities.
+   */
   emptyReason: EmptyReason;
   /** The viewer's own primary photo for the match screen. */
   me: { name: string; photo: { url: string | null; demoKey: string | null; blurhash: string } | null };
@@ -107,7 +111,11 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
   let emptyReason: EmptyReason = "NONE";
   if (paused) emptyReason = "PAUSED";
   else if (cards.length === 0 && excludeIds.length === 0) {
-    emptyReason = (await countRelaxedCandidates(db, actor, now)) > 0 ? "FILTERS" : "EXHAUSTED";
+    // Order matters: the viewer's own filters come first because they are the only thing the viewer can act on.
+    // "Awaiting moderation" is asked only when relaxing the filters would not help, so a moderation backlog is
+    // never reported as "you have seen everyone".
+    if ((await countRelaxedCandidates(db, actor, now)) > 0) emptyReason = "FILTERS";
+    else emptyReason = (await countAwaitingPhotoReview(db, actor, now)) > 0 ? "REVIEW" : "EXHAUSTED";
   }
   return {
     cards,

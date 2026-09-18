@@ -42,6 +42,8 @@ export interface EditProfileProps {
   locations: LocationOption[];
   interests: { id: string; label: string }[];
   prompts: { id: string; text: string }[];
+  /** Production hides a photo until a reviewer approves it; the grid says so (src/lib/photo-policy.ts). */
+  reviewedBeforeVisible: boolean;
 }
 
 interface InfoDraft {
@@ -57,7 +59,7 @@ function infoDraft(p: EditProfileData): InfoDraft {
   return { gender: p.gender ?? "", locationId: p.locationId, homeLocationId: p.homeLocationId, occupation: p.occupation, education: p.education, heightCm: p.heightCm ? String(p.heightCm) : "" };
 }
 
-export function EditProfile({ initial, section: initialSection, locations, interests, prompts }: EditProfileProps) {
+export function EditProfile({ initial, section: initialSection, locations, interests, prompts, reviewedBeforeVisible }: EditProfileProps) {
   const router = useRouter();
   const toast = useToast();
   const [section, setSection] = useState<EditSection>(initialSection);
@@ -112,7 +114,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
       {section === "photos" ? (
         <>
           <p className="text-body-sm leading-relaxed text-text-secondary">Up to 6 photos. Drag to reorder — the first is your main photo. Changes to photos save automatically.</p>
-          <PhotoManager initialPhotos={profile.photos} layout="featured" note="Keep at least 2 photos. New photos are reviewed before other members see them. JPG, PNG or WebP up to 8 MB." />
+          <PhotoManager initialPhotos={profile.photos} reviewedBeforeVisible={reviewedBeforeVisible} layout="featured" note="Keep at least 2 photos. New photos are reviewed before other members see them. JPG, PNG or WebP up to 8 MB." />
         </>
       ) : null}
 

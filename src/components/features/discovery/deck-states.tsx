@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { EyeOffIcon, FilterIcon, HeartIcon, WavesIcon } from "@/components/ui/icons";
+import { EyeOffIcon, FilterIcon, HeartIcon, ImageIcon, WavesIcon } from "@/components/ui/icons";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { formatDuration } from "@/lib/time";
 
 /*
- * The four intentional deck states (Phase 6 §24). They are different situations and say different things:
+ * The intentional deck states (Phase 6 §24). They are different situations and say different things:
  *  - exhausted: nobody new right now (prototype copy)
  *  - filters: relaxing the viewer's own filters would show people
+ *  - review: people are waiting on photo moderation, so the deck refills on its own — never a count, never a name
  *  - error: the load failed (network / server), retryable
  *  - limit: likes used up — the deck stays browsable, this is only shown when there is also nothing to browse
  */
@@ -40,6 +41,23 @@ export function DeckFiltered({ onAdjustFilters }: { onAdjustFilters: () => void 
       title="Your filters are hiding everyone."
       description="There are people who match you. Widen your age range or location to see them."
       actions={<Button size="md" onClick={onAdjustFilters}>Adjust filters</Button>}
+    />
+  );
+}
+
+/**
+ * Empty only because profiles are waiting for photo moderation. It says the deck will refill without the viewer
+ * doing anything, and deliberately carries no number and nothing about who is waiting.
+ */
+export function DeckAwaitingReview({ onRefresh }: { onRefresh: () => void }) {
+  return (
+    <EmptyState
+      framed
+      className="h-full"
+      icon={<ImageIcon strokeWidth={2} />}
+      title="New profiles are being checked."
+      description="Every photo is reviewed before it goes live. More people will appear here shortly."
+      actions={<Button size="md" onClick={onRefresh}>Check again</Button>}
     />
   );
 }

@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import { CounterBadge } from "@/components/ui/badge";
 import { BottomSheet, DialogTitle } from "@/components/ui/dialog";
 import { BrandMark, Wordmark } from "@/components/brand/logo";
-import { BoltIcon, CheckIcon, InfoIcon, LockIcon, MoreIcon, PeopleIcon, PinIcon, SendIcon, ShieldIcon, WavesIcon, type IconProps } from "@/components/ui/icons";
+import { BoltIcon, CheckIcon, ImageIcon, InfoIcon, LockIcon, MoreIcon, PeopleIcon, PinIcon, SendIcon, ShieldIcon, WavesIcon, type IconProps } from "@/components/ui/icons";
 import { ThemeToggleButton } from "@/components/layout/theme-toggle";
 import { hasPermission, type AdminRole, type Permission } from "@/server/admin/permissions";
 
@@ -21,6 +21,7 @@ export interface AdminNavBadges {
   payments?: number;
   reports?: number;
   verifications?: number;
+  photos?: number;
 }
 
 interface NavItem {
@@ -40,6 +41,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { key: "users", label: "Users", href: "/admin/users", Icon: PeopleIcon, permission: "users.view" },
       { key: "reports", label: "Reports", href: "/admin/reports", Icon: ShieldIcon, permission: "reports.act" },
       { key: "verifications", label: "Verifications", href: "/admin/verifications", Icon: CheckIcon, permission: "verification.act" },
+      { key: "photos", label: "Photos", href: "/admin/photos", Icon: ImageIcon, permission: "photos.moderate" },
     ],
   },
   {

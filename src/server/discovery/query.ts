@@ -8,7 +8,7 @@ import type { DbLike } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { getEntitlements } from "@/server/entitlements";
-import { baseVisibleSql, compatibilitySql, discoverableSql, notSwipedSql, orderSql, viewerFilterSql, type ViewerContext } from "./predicate";
+import { awaitingPhotoReviewSql, baseVisibleSql, compatibilitySql, discoverableSql, notSwipedSql, openToDiscoverySql, orderSql, viewerFilterSql, type ViewerContext } from "./predicate";
 
 /** Loads everything the predicate needs to know about the viewer. */
 export async function loadViewerContext(db: DbLike, userId: string, now: Date): Promise<ViewerContext> {
@@ -93,6 +93,28 @@ export async function countRelaxedCandidates(db: DbLike, actor: Actor, now: Date
     ${FROM_CLAUSE}
     WHERE ${baseVisibleSql(v.userId, v.phoneHash, now)}
       AND ${discoverableSql()}
+      AND ${compatibilitySql(v)}
+      AND ${notSwipedSql(v.userId, now)}
+  `);
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * How many otherwise-eligible people are held back only because their photos have not been moderated yet
+ * (docs/ARCHITECTURE.md §7.4). Without this an empty deck caused by a moderation backlog is indistinguishable from
+ * one caused by having seen everybody, because the photo rule sits inside `discoverableSql`.
+ *
+ * Returns a count and nothing else: no identity, no handle, no photo, and the deck itself is unaffected — a profile
+ * counted here is still not shown to anyone.
+ */
+export async function countAwaitingPhotoReview(db: DbLike, actor: Actor, now: Date = new Date()): Promise<number> {
+  const v = await loadViewerContext(db, actor.userId, now);
+  const rows = await db.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+    SELECT count(*)::bigint AS n
+    ${FROM_CLAUSE}
+    WHERE ${baseVisibleSql(v.userId, v.phoneHash, now)}
+      AND ${openToDiscoverySql()}
+      AND ${awaitingPhotoReviewSql()}
       AND ${compatibilitySql(v)}
       AND ${notSwipedSql(v.userId, now)}
   `);

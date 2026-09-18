@@ -11,6 +11,7 @@ export type Permission =
   | "users.role"
   | "reports.act"
   | "verification.act"
+  | "photos.moderate"
   | "payments.review"
   | "plans.manage"
   | "payment-methods.manage"
@@ -25,6 +26,7 @@ const ALL_PERMISSIONS: readonly Permission[] = [
   "users.role",
   "reports.act",
   "verification.act",
+  "photos.moderate",
   "payments.review",
   "plans.manage",
   "payment-methods.manage",
@@ -35,13 +37,14 @@ const ALL_PERMISSIONS: readonly Permission[] = [
 
 export const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
   ADMIN: ALL_PERMISSIONS,
-  MODERATOR: ["dashboard.view", "users.view", "users.moderate", "reports.act", "verification.act"],
+  MODERATOR: ["dashboard.view", "users.view", "users.moderate", "reports.act", "verification.act", "photos.moderate"],
 };
 
 export function isAdminRole(role: string): role is AdminRole {
   return role === "ADMIN" || role === "MODERATOR";
 }
 
+/** Fails closed: a role this build does not know grants nothing, rather than throwing on the lookup. */
 export function hasPermission(role: AdminRole, permission: Permission): boolean {
-  return ROLE_PERMISSIONS[role].includes(permission);
+  return (ROLE_PERMISSIONS[role] ?? []).includes(permission);
 }

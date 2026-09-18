@@ -31,6 +31,14 @@ export function displayablePhotoStates(): readonly DisplayablePhotoState[] {
   return STATES[getPhotoVisibilityPolicy()];
 }
 
+/**
+ * True when an uploaded photo is hidden from other members until a reviewer approves it (production). False under a
+ * policy where PENDING is already displayable, so member-facing copy never claims a review that is not happening.
+ */
+export function pendingPhotosAwaitReview(): boolean {
+  return !displayablePhotoStates().includes("PENDING");
+}
+
 /** Prisma `where` fragment for photos other users may see. */
 export function displayablePhotoWhere(): { moderation: { in: DisplayablePhotoState[] } } {
   return { moderation: { in: [...displayablePhotoStates()] } };

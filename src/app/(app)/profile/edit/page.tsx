@@ -1,6 +1,7 @@
 import { EditProfile, type EditSection } from "@/components/features/profile/edit-profile";
 import { getDb } from "@/lib/db";
 import { requireActiveUser } from "@/server/auth/current-user";
+import { pendingPhotosAwaitReview } from "@/lib/photo-policy";
 import { getEditProfileData } from "@/server/profiles/edit";
 
 export const metadata = { title: "Edit profile" };
@@ -19,5 +20,5 @@ export default async function EditProfilePage({ searchParams }: { searchParams: 
     db.prompt.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" }, select: { id: true, text: true } }),
   ]);
   const initialSection = SECTIONS.has(section as EditSection) ? (section as EditSection) : "photos";
-  return <EditProfile initial={profile} section={initialSection} locations={locations} interests={interests} prompts={prompts} />;
+  return <EditProfile initial={profile} section={initialSection} locations={locations} interests={interests} prompts={prompts} reviewedBeforeVisible={pendingPhotosAwaitReview()} />;
 }

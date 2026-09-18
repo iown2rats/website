@@ -10,6 +10,7 @@ import { PrivacyForm } from "@/components/features/onboarding/privacy-form";
 import { StepFrame } from "@/components/features/onboarding/step-frame";
 import { submitGender, submitIntent, submitMeet } from "@/actions/onboarding";
 import { getDb } from "@/lib/db";
+import { pendingPhotosAwaitReview } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { requireOnboardingUser } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
@@ -74,7 +75,7 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
     }
     case "PHOTOS": {
       const photos = await listPhotos(actor, { storage: getStorageProvider() });
-      return <StepFrame {...frame}><PhotosForm initialPhotos={photos} /></StepFrame>;
+      return <StepFrame {...frame}><PhotosForm initialPhotos={photos} reviewedBeforeVisible={pendingPhotosAwaitReview()} /></StepFrame>;
     }
     case "ABOUT": {
       const db = getDb();

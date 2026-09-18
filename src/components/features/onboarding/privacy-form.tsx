@@ -49,7 +49,7 @@ export function PrivacyForm({ initial }: { initial: { hideLocation: boolean; hid
         Hide my location shows nothing instead of your island. Hide my age means others see only your name.
       </div>
 
-      <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface px-4.5 py-3.5">
+      <div className="flex items-center gap-3.5 rounded-2xl glass-card px-4.5 py-3.5">
         <span className="grid size-9 shrink-0 place-items-center rounded-sm bg-aqua-soft text-on-aqua-soft"><EyeOffIcon size={18} /></span>
         <div className="min-w-0 flex-1">
           <div className="text-body font-bold">Invisible Mode</div>

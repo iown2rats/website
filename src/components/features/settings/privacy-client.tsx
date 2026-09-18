@@ -106,13 +106,13 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
                 aria-checked={on}
                 disabled={busy === "visibility"}
                 onClick={() => void chooseVisibility(o.value)}
-                className={cn("flex min-h-14.5 items-center justify-between gap-3 rounded-lg border-[1.5px] px-4.5 py-2.5 text-left text-text", on ? "border-primary bg-surface-muted" : "border-border bg-surface")}
+                className={cn("flex min-h-14.5 items-center justify-between gap-3 rounded-lg px-4.5 py-2.5 text-left text-text", on ? "bg-primary-soft" : "bg-surface-muted")}
               >
                 <span className="min-w-0">
                   <span className="flex items-center gap-2 text-body font-semibold">{o.label}{o.plus ? <PlusTag size="xs" /> : null}</span>
                   <span className="block text-caption-sm text-text-secondary">{o.sub}</span>
                 </span>
-                <span aria-hidden="true" className={cn("size-5 shrink-0 rounded-full border-2", on ? "border-primary bg-primary" : "border-border")} />
+                <span aria-hidden="true" className={cn("size-5 shrink-0 rounded-full border-2", on ? "border-primary bg-primary" : "border-text-secondary/40")} />
               </button>
             );
           })}
@@ -145,7 +145,7 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
         ))}
       </ListGroup>
 
-      <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5">
+      <div className="flex flex-col gap-3 rounded-card glass-card p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-[17px] font-extrabold tracking-[-.01em] text-text">Block my contacts</h2>
           <span className={cn("inline-flex h-6 items-center rounded-xs px-2.5 text-[11px] font-extrabold", privacy.blockContacts ? "bg-aqua-soft text-accent" : "bg-surface-muted text-text-secondary")} role="status">{privacy.blockContacts ? "ON" : "OFF"}</span>

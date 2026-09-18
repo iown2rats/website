@@ -320,7 +320,7 @@ function AllowancePill({ allowance, msUntilReset, onClick }: { allowance: Allowa
       onClick={onClick}
       aria-label={exhausted ? `You've used today's ${allowance.limit} likes. ${label}.` : `${allowance.remaining} of ${allowance.limit} likes left today`}
       data-testid="allowance-pill"
-      className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-surface px-3 text-caption font-bold text-text tabular-nums"
+      className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-muted px-3 text-caption font-bold text-text tabular-nums"
     >
       <HeartIcon size={14} filled strokeWidth={0} className={exhausted ? "text-text-muted" : "text-primary-ink"} />
       {label}

@@ -8,8 +8,8 @@ import { ChevronDownIcon } from "./icons";
  */
 
 const fieldBase =
-  "w-full bg-surface text-text border border-border rounded-lg outline-none placeholder:text-text-muted " +
-  "focus:border-primary focus-visible:outline-none disabled:opacity-55 aria-[invalid=true]:border-danger";
+  "w-full bg-surface-muted text-text border-0 rounded-lg outline-none placeholder:text-text-muted " +
+  "focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-55 aria-[invalid=true]:outline-2 aria-[invalid=true]:outline-danger";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Larger 18 px / 700 text for phone and name entry. */
@@ -20,7 +20,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ className, emphasis, leading, ...rest }, ref) {
   if (leading) {
     return (
-      <div className={cn("flex items-center gap-2.5 h-13 px-4 bg-surface border border-border rounded-lg focus-within:border-primary", className)}>
+      <div className={cn("flex items-center gap-2.5 h-13 px-4 bg-surface-muted rounded-lg focus-within:outline-2 focus-within:outline-primary", className)}>
         <span className="text-text-secondary shrink-0 inline-flex">{leading}</span>
         <input ref={ref} className={cn("flex-1 min-w-0 bg-transparent border-0 outline-none text-body-lg text-text placeholder:text-text-muted")} {...rest} />
       </div>

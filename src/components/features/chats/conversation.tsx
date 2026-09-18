@@ -236,7 +236,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background animate-fade-in">
-      <header className="flex shrink-0 items-center gap-2.5 border-b border-border glass px-1.5" style={{ height: "calc(var(--page-header-height) + var(--safe-top))", paddingTop: "var(--safe-top)" }}>
+      <header className="flex shrink-0 items-center gap-2.5 glass px-1.5" style={{ height: "calc(var(--page-header-height) + var(--safe-top))", paddingTop: "var(--safe-top)" }}>
         <Link href="/chats" aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-md text-text hover:bg-surface-muted desktop:hidden">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </Link>
@@ -257,7 +257,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
 
       <div ref={scroller} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden px-4 py-5" aria-live="polite" aria-label="Messages">
         {olderCursor ? (
-          <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className="mx-auto mb-2 h-9 rounded-full border border-border bg-surface px-4 text-caption font-semibold text-text-secondary">
+          <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className="mx-auto mb-2 h-9 rounded-full bg-surface-muted px-4 text-caption font-semibold text-text-secondary">
             {loadingOlder ? "Loading…" : "Load earlier messages"}
           </button>
         ) : (
@@ -310,7 +310,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
               rows={1}
               maxLength={MESSAGE_LIMITS.maxLength}
               enterKeyHint="send"
-              className="max-h-30 min-h-11 flex-1 resize-none rounded-[22px] border border-border bg-surface px-4 py-2.75 text-body leading-[1.4] text-text outline-none placeholder:text-text-muted focus:border-primary field-sizing-content"
+              className="max-h-30 min-h-11 flex-1 resize-none rounded-[22px] bg-surface-muted px-4 py-2.75 text-body leading-[1.4] text-text outline-none placeholder:text-text-muted focus-visible:outline-2 focus-visible:outline-primary field-sizing-content"
             />
             <button type="submit" aria-label="Send" disabled={!canSend} className="grid size-11 shrink-0 place-items-center rounded-full border-0 bg-primary text-on-primary pressable-round disabled:opacity-45">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
@@ -358,7 +358,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
             <DialogDescription>Reports are anonymous. We&apos;ll review within 24 hours. Submitting also blocks {header.other.name}.</DialogDescription>
             <div className="flex flex-col gap-2" role="radiogroup" aria-label="Reason">
               {REASONS.map(([value, label]) => (
-                <button key={value} type="button" role="radio" aria-checked={reportReason === value} onClick={() => setReportReason(value)} className={cn("h-12.5 rounded-lg border-[1.5px] px-4.5 text-left text-body font-semibold text-text", reportReason === value ? "border-primary bg-surface-muted" : "border-border bg-surface")}>
+                <button key={value} type="button" role="radio" aria-checked={reportReason === value} onClick={() => setReportReason(value)} className={cn("h-12.5 rounded-lg px-4.5 text-left text-body font-semibold text-text", reportReason === value ? "bg-primary-soft" : "bg-surface-muted")}>
                   {label}
                 </button>
               ))}

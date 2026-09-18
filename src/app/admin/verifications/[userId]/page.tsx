@@ -35,7 +35,7 @@ export default async function AdminVerificationDetailPage({ params }: { params: 
       <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
         <Panel title="Verification selfie" description="Taken by the member for this check. Private; the link expires in a few minutes.">
           {d.selfieUrl ? (
-            <a href={d.selfieUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-border bg-surface-muted">
+            <a href={d.selfieUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl bg-surface-muted">
               {/* Signed, short-lived URL to private storage; a plain img keeps it that way. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={d.selfieUrl} alt={`Verification selfie submitted by ${d.displayName ?? "the member"}`} className="mx-auto max-h-[60vh] w-auto max-w-full object-contain" />
@@ -50,7 +50,7 @@ export default async function AdminVerificationDetailPage({ params }: { params: 
           ) : (
             <ul className="grid grid-cols-3 gap-2" aria-label="Profile photos">
               {d.profilePhotos.map((p) => (
-                <li key={p.id} className="relative aspect-[3/4] overflow-hidden rounded-lg border border-border bg-surface-muted">
+                <li key={p.id} className="relative aspect-[3/4] overflow-hidden rounded-lg bg-surface-muted">
                   {p.url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.url} alt={`Profile photo ${p.position + 1}`} className="size-full object-cover" />

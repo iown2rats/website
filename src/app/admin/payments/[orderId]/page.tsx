@@ -53,7 +53,7 @@ export default async function AdminPaymentDetailPage({ params }: { params: Promi
       <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
         <Panel title="Receipt" description={o.hasReceipt ? "Uploaded by the customer. The link expires in a few minutes. Always compare the image with the check." : undefined}>
         {o.receiptUrl ? (
-          <a href={o.receiptUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-border bg-surface-muted">
+          <a href={o.receiptUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl bg-surface-muted">
             {/* Signed, short-lived URL to private storage; a plain img keeps it that way. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={o.receiptUrl} alt={`Receipt for ${o.reference}`} className="mx-auto max-h-[70vh] w-auto max-w-full object-contain" />

@@ -20,9 +20,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-pressed border-0",
-  secondary: "bg-surface text-text border border-border hover:bg-surface-muted",
+  secondary: "bg-surface-muted text-text border-0 hover:bg-border",
   ghost: "bg-transparent text-text-secondary hover:text-text border-0",
-  destructive: "bg-transparent text-danger border border-border hover:bg-surface-muted",
+  destructive: "bg-surface-muted text-danger border-0 hover:bg-border",
   ocean: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-pressed border-0",
   plus: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-pressed border-0",
   white: "bg-white text-text border-0",
@@ -88,7 +88,7 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 const iconVariant: Record<IconButtonVariant, string> = {
-  bordered: "bg-surface text-text border border-border",
+  bordered: "bg-surface-muted text-text border-0",
   ghost: "bg-transparent text-text border-0",
   onPhoto: "bg-white/90 text-text border-0",
   muted: "bg-surface-muted text-text-secondary border-0",

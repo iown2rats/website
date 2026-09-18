@@ -49,7 +49,7 @@ export function PageHeader({
   const back = onBack || backHref;
   return (
     <header
-      className={cn("flex shrink-0 items-center gap-2 px-2", glass && "glass border-b border-border", className)}
+      className={cn("flex shrink-0 items-center gap-2 px-2", glass && "glass", className)}
       style={{ height: "calc(var(--page-header-height) + var(--safe-top))", paddingTop: "var(--safe-top)" }}
     >
       {back ? (

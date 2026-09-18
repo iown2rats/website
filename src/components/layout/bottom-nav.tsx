@@ -21,7 +21,7 @@ export function BottomNav({ badges = {}, hidden = false }: { badges?: NavBadges;
     <nav
       aria-label="Primary"
       className={cn(
-        "desktop:hidden absolute inset-x-4 z-20 mx-auto flex h-16 max-w-[var(--nav-max-width)] items-center justify-around rounded-nav border border-border px-2 glass shadow-lg",
+        "desktop:hidden absolute inset-x-4 z-20 mx-auto flex h-16 max-w-[var(--nav-max-width)] items-center justify-around rounded-nav px-2 glass shadow-lg",
         (hidden || inConversation) && "hidden",
       )}
       style={{ bottom: "calc(var(--nav-offset) + var(--safe-bottom))" }}

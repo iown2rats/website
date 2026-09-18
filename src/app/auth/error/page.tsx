@@ -25,7 +25,7 @@ export default async function AuthErrorPage({ searchParams }: { searchParams: Pr
         <div className="flex items-center gap-2 text-h3"><ThundiLogo size={24} /> thundi</div>
         <h1 className="text-h2">{r.title}</h1>
         <p className="text-body text-text-secondary">{r.body}</p>
-        {reason !== "unavailable" ? <ContinueWithGoogle className="mt-2 border border-border" /> : null}
+        {reason !== "unavailable" ? <ContinueWithGoogle className="mt-2 shadow-sm" /> : null}
         <Link href={ROUTES.welcome} className="flex h-11 items-center justify-center text-body-sm font-semibold text-text-secondary">Back to start</Link>
       </div>
     </main>

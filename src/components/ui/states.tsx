@@ -23,7 +23,7 @@ export function EmptyState({ icon, title, description, actions, className, frame
     <div
       className={cn(
         "flex flex-col items-center justify-center text-center gap-3",
-        framed ? "rounded-card border-[1.5px] border-dashed border-border p-8" : "px-6 py-12",
+        framed ? "rounded-card glass-card p-8" : "px-6 py-12",
         className,
       )}
     >

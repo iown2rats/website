@@ -29,7 +29,7 @@ export function AdminPage({ title, description, actions, children, backHref }: {
 
 export function Panel({ title, description, children, className, actions }: { title?: string; description?: string; children: ReactNode; className?: string; actions?: ReactNode }) {
   return (
-    <section className={cn("rounded-2xl border border-border bg-surface", className)}>
+    <section className={cn("rounded-2xl glass-card", className)}>
       {title ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <div className="min-w-0">
@@ -46,7 +46,7 @@ export function Panel({ title, description, children, className, actions }: { ti
 
 export function StatCard({ label, value, hint, tone = "default" }: { label: string; value: string | number; hint?: string; tone?: "default" | "attention" }) {
   return (
-    <div className={cn("flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4", tone === "attention" && "border-warning/50 bg-warning/5")} title={hint}>
+    <div className={cn("flex flex-col gap-1 rounded-2xl glass-card p-4", tone === "attention" && "border-warning/50 bg-warning/5")} title={hint}>
       <span className="text-label uppercase text-text-secondary">{label}</span>
       <span className="text-h2 text-text tabular-nums">{value}</span>
       {hint ? <span className="text-caption-sm leading-snug text-text-secondary">{hint}</span> : null}
@@ -79,7 +79,7 @@ export function FilterLinks({ items, current, label = "Filter" }: { items: { val
       {items.map((it) => {
         const active = it.value === current;
         return (
-          <Link key={it.value} href={it.href} aria-current={active ? "page" : undefined} className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-caption font-bold", active ? "border-primary bg-primary text-on-primary" : "border-border bg-surface text-text-secondary hover:bg-surface-muted")}>
+          <Link key={it.value} href={it.href} aria-current={active ? "page" : undefined} className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-caption font-bold", active ? "bg-primary text-on-primary" : "bg-surface-muted text-text-secondary hover:bg-border")}>
             {it.label}
             {it.count !== undefined ? <span className={cn("rounded-full px-1.5 text-[11px] tabular-nums", active ? "bg-white/40" : "bg-surface-muted")}>{it.count}</span> : null}
           </Link>
@@ -105,7 +105,7 @@ export function RowLink({ href, primary, secondary, trailing, badges }: { href: 
 
 export function RowList({ children, empty }: { children: ReactNode[]; empty: string }) {
   if (children.length === 0) return <p className="px-4 py-10 text-center text-body-sm text-text-secondary">{empty}</p>;
-  return <div className="rounded-2xl border border-border bg-surface">{children}</div>;
+  return <div className="rounded-2xl glass-card">{children}</div>;
 }
 
 export function Pagination({ page, pageSize, total, hrefFor }: { page: number; pageSize: number; total: number; hrefFor: (page: number) => string }) {
@@ -117,8 +117,8 @@ export function Pagination({ page, pageSize, total, hrefFor }: { page: number; p
         Page {page} of {pages} · {total} total
       </span>
       <div className="flex gap-2">
-        {page > 1 ? <Link href={hrefFor(page - 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold hover:bg-surface-muted">Previous</Link> : null}
-        {page < pages ? <Link href={hrefFor(page + 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold hover:bg-surface-muted">Next</Link> : null}
+        {page > 1 ? <Link href={hrefFor(page - 1)} className="rounded-lg bg-surface-muted px-3 py-1.5 font-semibold hover:bg-border">Previous</Link> : null}
+        {page < pages ? <Link href={hrefFor(page + 1)} className="rounded-lg bg-surface-muted px-3 py-1.5 font-semibold hover:bg-border">Next</Link> : null}
       </div>
     </div>
   );
@@ -169,7 +169,7 @@ export function Mono({ children, className, ...rest }: HTMLAttributes<HTMLSpanEl
 
 export function DefinitionList({ definitions }: { definitions: Record<string, string> }) {
   return (
-    <details className="rounded-2xl border border-border bg-surface px-4 py-3 text-body-sm">
+    <details className="rounded-2xl glass-card px-4 py-3 text-body-sm">
       <summary className="cursor-pointer font-bold text-text">What each number means</summary>
       <dl className="mt-3 flex flex-col gap-2">
         {Object.entries(definitions).map(([k, v]) => (

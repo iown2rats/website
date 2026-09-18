@@ -32,7 +32,7 @@ export function LocationForm({ locations, initialId }: { locations: LocationOpti
   return (
     <form action={action} className="flex flex-1 flex-col gap-3.5" noValidate>
       <input type="hidden" name="locationId" value={selected ?? ""} />
-      <div className="flex h-14 items-center gap-2.5 rounded-xl border border-border bg-surface px-4 focus-within:border-primary">
+      <div className="flex h-14 items-center gap-2.5 rounded-xl bg-surface-muted px-4 focus-within:outline-2 focus-within:outline-primary">
         <SearchIcon size={20} className="shrink-0 text-text-secondary" />
         <label htmlFor="location-search" className="sr-only">Search island or atoll</label>
         <input
@@ -44,7 +44,7 @@ export function LocationForm({ locations, initialId }: { locations: LocationOpti
           className="min-w-0 flex-1 border-0 bg-transparent text-body-lg text-text outline-none placeholder:text-text-muted"
         />
       </div>
-      <div role="listbox" aria-label="Locations" className="flex shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface [&>*+*]:border-t [&>*+*]:border-border">
+      <div role="listbox" aria-label="Locations" className="flex shrink-0 flex-col overflow-hidden rounded-2xl glass-card [&>*+*]:border-t [&>*+*]:border-border">
         {results.map((l) => {
           const isSelected = l.id === selected;
           return (

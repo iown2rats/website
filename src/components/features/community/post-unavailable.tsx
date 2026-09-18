@@ -22,7 +22,7 @@ export function PostUnavailable() {
         title="This post isn't available."
         description="It may have been removed by its author, or it isn't visible to you."
         actions={
-          <Link href="/community" className="inline-flex h-11 items-center rounded-lg border-[1.5px] border-border bg-surface px-5 text-body-sm font-bold text-text">
+          <Link href="/community" className="inline-flex h-11 items-center rounded-lg bg-surface-muted px-5 text-body-sm font-bold text-text">
             Back to Community
           </Link>
         }

@@ -84,7 +84,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
                 </div>
               ))}
             </div>
-            <div className="flex flex-col items-center gap-3 rounded-3xl border border-border bg-surface p-5 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-3xl glass-card p-5 text-center">
               <span className="grid size-12 place-items-center rounded-full bg-aqua-soft text-accent" aria-hidden="true"><LockIcon size={22} /></span>
               <div>
                 <h2 className="text-h4 text-text">{data.count === 1 ? "1 person likes you" : `${data.count} people like you`}</h2>
@@ -117,7 +117,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
         data.matches.length === 0 ? (
           <EmptyState icon={<HeartIcon />} title="Your next match could be one swipe away." actions={<Button size="md" onClick={() => router.push("/discover")}>Start swiping</Button>} />
         ) : (
-          <ul className="flex flex-col divide-y divide-border rounded-3xl border border-border bg-surface" aria-label="Your matches">
+          <ul className="flex flex-col divide-y divide-border rounded-3xl glass-card" aria-label="Your matches">
             {data.matches.map((m) => (
               <li key={m.handle} className="flex items-center gap-3 px-4 py-3">
                 <span className="size-12 shrink-0 overflow-hidden rounded-full bg-surface-muted" style={photoBackground(m.photo ? { url: m.photo.url, key: m.photo.demoKey, blurhash: m.photo.blurhash } : null, 160, "thumb")} aria-hidden="true" />

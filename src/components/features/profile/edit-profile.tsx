@@ -118,7 +118,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
 
       {section === "info" ? (
         <>
-          <div className="flex shrink-0 flex-col overflow-hidden rounded-card border border-border bg-surface [&>*+*]:border-t [&>*+*]:border-border">
+          <div className="flex shrink-0 flex-col overflow-hidden rounded-card glass-card [&>*+*]:border-t [&>*+*]:border-border">
             <div className={rowClass}>
               <span className="shrink-0 text-text-secondary">Name</span>
               <span className="truncate text-right font-semibold text-text opacity-55" aria-readonly="true">{profile.name}</span>
@@ -199,7 +199,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
               const isOpen = openPrompt === p.id;
               const canOpen = has || answered.length < PROMPT_LIMITS.max;
               return (
-                <div key={p.id} className={cn("shrink-0 overflow-hidden rounded-2xl border-[1.5px] bg-surface", has ? "border-primary" : "border-border")}>
+                <div key={p.id} className={cn("shrink-0 overflow-hidden rounded-2xl", has ? "bg-primary-soft" : "bg-surface-muted")}>
                   <button type="button" aria-expanded={isOpen} onClick={() => (isOpen ? setOpenPrompt(null) : canOpen ? setOpenPrompt(p.id) : undefined)} className="flex h-13.5 w-full items-center justify-between border-0 bg-transparent px-4.5 text-left text-body font-bold text-text">
                     <span>{p.text}</span>
                     <span className="text-micro text-primary-ink">{has ? "Answered" : canOpen ? "Add" : ""}</span>

@@ -31,7 +31,7 @@ export function StepFrame({ step, title, subtitle, backHref, children, footer, c
       >
         <div className="flex h-11 shrink-0 items-center gap-3.5">
           {backHref ? (
-            <Link href={backHref} aria-label="Back" className="-ml-2 grid size-11 shrink-0 place-items-center rounded-md border border-border bg-surface text-text hover:bg-surface-muted">
+            <Link href={backHref} aria-label="Back" className="-ml-2 grid size-11 shrink-0 place-items-center rounded-md bg-surface-muted text-text hover:bg-border">
               <ChevronLeftIcon size={20} />
             </Link>
           ) : (

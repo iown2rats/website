@@ -22,6 +22,7 @@
   --color-primary-pressed: var(--primary-pressed);
   --color-on-primary: var(--on-primary);
   --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
   --color-ocean: var(--ocean);
   --color-on-ocean: var(--on-ocean);
   --color-on-ocean-muted: var(--on-ocean-muted);
@@ -36,6 +37,7 @@
   --color-sand: var(--sand);
   --color-on-sand: var(--on-sand);
   --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
   --color-scrim: var(--scrim);
   --color-on-photo: var(--on-photo);
   --color-on-photo-muted: var(--on-photo-muted);
@@ -220,10 +222,19 @@
   }
 }
 
+/* Translucent warm-white surface with a 16 px blur: floating nav, glass headers. */
 @utility glass {
   background: var(--glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Stronger glass with the soft shadow: cards, grouped lists, sheets, dialogs, key panels. Never an outline. */
+@utility glass-card {
+  background: var(--glass-strong);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-sm);
 }
 
 @utility photo-scrim {

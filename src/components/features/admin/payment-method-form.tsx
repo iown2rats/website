@@ -42,7 +42,7 @@ export function PaymentMethodForm({ method, onDone }: { method?: PaymentMethodAd
       <Field label="Account number">{(p) => <Input {...p} value={d.accountNumber} onChange={(e) => set("accountNumber", e.target.value)} inputMode="numeric" maxLength={40} required className="h-11 font-mono text-body-sm" />}</Field>
       <Field label="Instructions shown to customers (optional)" className="desktop:col-span-2">{(p) => <Textarea {...p} value={d.instructions} onChange={(e) => set("instructions", e.target.value)} maxLength={500} rows={3} placeholder="e.g. Use the payment reference as the transfer remark." />}</Field>
       <Field label="Sort order" hint="Lower shows first. The lowest enabled method is used at checkout.">{(p) => <Input {...p} type="number" min={0} max={1000} value={d.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value))} className="h-11 text-body-sm" />}</Field>
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>
           <div className="text-body-sm font-semibold text-text" id={`enabled-${method?.id ?? "new"}`}>Enabled</div>
           <div className="text-caption text-text-secondary">Customers can pay to this account.</div>

@@ -132,7 +132,7 @@ export function VerificationClient({ initial }: { initial: VerificationStateDto 
         <div className="flex flex-col gap-3">
           <Callout tone="info" title={`Submitted ${formatDateTime(state.submittedAt)}`}>We&apos;ll let you know here and on your profile once it has been reviewed. Your selfie is never shown to other members.</Callout>
           {state.selfieUrl ? (
-            <figure className="mx-auto w-40 overflow-hidden rounded-2xl border border-border bg-surface-muted">
+            <figure className="mx-auto w-40 overflow-hidden rounded-2xl bg-surface-muted">
               {/* Short-lived signed URL to the member's own private selfie. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={state.selfieUrl} alt="The selfie you submitted" className="aspect-[3/4] w-full object-cover" />
@@ -167,7 +167,7 @@ export function VerificationClient({ initial }: { initial: VerificationStateDto 
           <input ref={libraryRef} type="file" accept={ACCEPT} className="sr-only" aria-label="Choose a selfie from your photos" onChange={(e) => pick(e.target.files?.[0])} />
 
           {preview ? (
-            <figure className="mx-auto w-44 overflow-hidden rounded-2xl border border-border bg-surface-muted">
+            <figure className="mx-auto w-44 overflow-hidden rounded-2xl bg-surface-muted">
               {/* Local object URL of the file the member just chose; nothing has been uploaded yet. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt="Preview of the selfie you chose" className="aspect-[3/4] w-full object-cover" />

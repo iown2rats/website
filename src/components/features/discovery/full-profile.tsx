@@ -96,14 +96,14 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
               </span>
             ) : null}
             {firstPrompt ? (
-              <div className="flex flex-col gap-2.5 rounded-3xl border border-border bg-surface p-5.5 shadow-sm">
+              <div className="flex flex-col gap-2.5 rounded-3xl glass-card p-5.5">
                 <div className="text-[13px] font-semibold text-text-secondary">{firstPrompt.prompt}</div>
                 <div className="text-prompt font-bold leading-[1.35] tracking-[-.015em] text-pretty">{firstPrompt.answer}</div>
               </div>
             ) : null}
             <Photo photo={profile.photos[1]} alt={profile.photos[1]?.alt ?? ""} className="h-80 rounded-[22px]" />
             {rows.length > 0 ? (
-              <dl className="m-0 overflow-hidden rounded-3xl border border-border bg-surface [&>div+div]:border-t [&>div+div]:border-border">
+              <dl className="m-0 overflow-hidden rounded-3xl glass-card [&>div+div]:border-t [&>div+div]:border-border">
                 {rows.map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-4 px-5 py-3.75 text-body">
                     <dt className="text-text-secondary">{k}</dt>
@@ -117,7 +117,7 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
                 <h3 className="text-tag font-bold uppercase tracking-[.08em] text-text-secondary">Interests</h3>
                 <div className="flex flex-wrap gap-2">
                   {profile.interests.map((t) => (
-                    <span key={t} className="inline-flex h-9.5 items-center rounded-full border border-border bg-surface px-4 text-body-sm font-semibold">{t}</span>
+                    <span key={t} className="inline-flex h-9.5 items-center rounded-full bg-surface-muted px-4 text-body-sm font-semibold">{t}</span>
                   ))}
                 </div>
               </section>
@@ -135,7 +135,7 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
 
         {onPass && onLike ? (
           <div className="pointer-events-none absolute inset-x-0 flex justify-center gap-5.5" style={{ bottom: "calc(18px + var(--safe-bottom))" }}>
-            <button type="button" onClick={onPass} aria-label="Pass" className="pointer-events-auto grid size-15 place-items-center rounded-full border border-border bg-surface text-text shadow-lg pressable-round">
+            <button type="button" onClick={onPass} aria-label="Pass" className="pointer-events-auto grid size-15 place-items-center rounded-full glass-card text-text pressable-round">
               <CloseIcon size={24} strokeWidth={2.4} />
             </button>
             <button type="button" onClick={onLike} aria-label="Like" className="pointer-events-auto grid size-16.5 place-items-center rounded-full border-0 like-gradient text-on-primary shadow-like pressable-round">

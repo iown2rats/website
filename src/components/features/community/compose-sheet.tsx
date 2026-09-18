@@ -125,7 +125,7 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
             aria-checked={kind === k.value}
             disabled={busy}
             onClick={() => { setKind(k.value); setError(null); }}
-            className={cn("h-11 flex-1 rounded-[14px] border-[1.5px] text-body-sm font-bold text-text", kind === k.value ? "border-primary bg-surface-muted" : "border-border bg-surface")}
+            className={cn("h-11 flex-1 rounded-[14px] text-body-sm font-bold text-text", kind === k.value ? "bg-primary text-on-primary" : "bg-surface-muted")}
           >
             {k.label}
           </button>
@@ -166,7 +166,7 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
               ) : null}
             </div>
           ) : (
-            <button type="button" onClick={() => fileInput.current?.click()} disabled={busy} className="flex h-30 flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-border bg-surface text-text-secondary hover:bg-surface-muted">
+            <button type="button" onClick={() => fileInput.current?.click()} disabled={busy} className="flex h-30 flex-col items-center justify-center gap-1.5 rounded-xl bg-surface-muted text-text-secondary hover:bg-surface-muted">
               <ImageIcon size={24} />
               <span className="text-body-sm font-semibold text-text">Add a photo</span>
               <span className="text-micro">JPEG, PNG or WebP · up to 8 MB</span>

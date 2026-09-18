@@ -70,7 +70,7 @@ export function BottomSheet({ open, onClose, label, labelledBy, children, classN
       onCancel={onCancel}
       onClick={onBackdropClick}
       className={cn(
-        "m-0 mt-auto mx-auto w-full max-w-[var(--sheet-max)] max-h-[88dvh] bg-surface text-text border-0 p-0",
+        "m-0 mt-auto mx-auto w-full max-w-[var(--sheet-max)] max-h-[88dvh] glass-card text-text border-0 p-0",
         "rounded-t-card rounded-b-none open:animate-sheet-in overflow-visible",
         className,
       )}
@@ -92,7 +92,7 @@ export function Modal({ open, onClose, label, labelledBy, children, className, d
       aria-labelledby={labelledBy}
       onCancel={onCancel}
       onClick={onBackdropClick}
-      className={cn("m-auto w-[calc(100%-32px)] max-w-105 bg-surface text-text border-0 p-0 rounded-card open:animate-fade-in", className)}
+      className={cn("m-auto w-[calc(100%-32px)] max-w-105 glass-card text-text border-0 p-0 rounded-card open:animate-fade-in", className)}
     >
       <div className="flex flex-col gap-4 p-5 max-h-[85dvh] overflow-auto">{children}</div>
     </dialog>
@@ -177,7 +177,7 @@ export interface ActionSheetItem {
 export function ActionSheet({ open, onClose, label, items, cancelLabel = "Cancel" }: { open: boolean; onClose: () => void; label: string; items: ActionSheetItem[]; cancelLabel?: string }) {
   return (
     <BottomSheet open={open} onClose={onClose} label={label}>
-      <div className="flex flex-col rounded-2xl border border-border overflow-hidden [&>*+*]:border-t [&>*+*]:border-border">
+      <div className="flex flex-col rounded-2xl bg-surface-muted overflow-hidden [&>*+*]:border-t [&>*+*]:border-border">
         {items.map((item) => (
           <button
             key={item.label}

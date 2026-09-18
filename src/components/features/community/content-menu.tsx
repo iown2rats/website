@@ -126,7 +126,7 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
                   role="radio"
                   aria-checked={reason === value}
                   onClick={() => setReason(value)}
-                  className={cn("h-12.5 rounded-lg border-[1.5px] px-4.5 text-left text-body font-semibold text-text", reason === value ? "border-primary bg-surface-muted" : "border-border bg-surface")}
+                  className={cn("h-12.5 rounded-lg px-4.5 text-left text-body font-semibold text-text", reason === value ? "bg-primary-soft" : "bg-surface-muted")}
                 >
                   {label}
                 </button>

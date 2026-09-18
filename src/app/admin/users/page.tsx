@@ -22,7 +22,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const hrefFor = (p: number) => `/admin/users?${new URLSearchParams({ ...Object.fromEntries(query), page: String(p) }).toString()}`;
   return (
     <AdminPage title="Users" description="Search by public name, handle or internal id. Filters combine.">
-      <form method="get" action="/admin/users" className="grid grid-cols-1 gap-3 rounded-2xl border border-border bg-surface p-4 desktop:grid-cols-4">
+      <form method="get" action="/admin/users" className="grid grid-cols-1 gap-3 rounded-2xl glass-card p-4 desktop:grid-cols-4">
         <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary desktop:col-span-2">
           Search
           <Input name="q" defaultValue={sp.q ?? ""} placeholder="Name, handle or user id" className="h-11 text-body-sm" />

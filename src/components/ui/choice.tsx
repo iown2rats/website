@@ -31,8 +31,8 @@ export const RadioCard = forwardRef<HTMLButtonElement, RadioCardProps>(function 
       aria-checked={selected}
       onClick={onSelect}
       className={cn(
-        "w-full min-h-13 px-4.5 py-2.5 rounded-lg border-[1.5px] text-left flex items-center justify-between gap-3 text-text",
-        selected ? "border-primary bg-surface-muted" : "border-border bg-surface",
+        "w-full min-h-13 px-4.5 py-2.5 rounded-lg text-left flex items-center justify-between gap-3 text-text",
+        selected ? "bg-primary-soft" : "bg-surface-muted",
         className,
       )}
       {...rest}
@@ -43,7 +43,7 @@ export const RadioCard = forwardRef<HTMLButtonElement, RadioCardProps>(function 
       </span>
       <span
         aria-hidden="true"
-        className={cn("size-5.5 shrink-0 rounded-full border-2", selected ? "border-primary bg-primary" : "border-border bg-transparent")}
+        className={cn("size-5.5 shrink-0 rounded-full border-2", selected ? "border-primary bg-primary" : "border-text-secondary/40 bg-transparent")}
       />
     </button>
   );
@@ -104,7 +104,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
         <input ref={ref} id={id} type="checkbox" className="peer absolute inset-0 opacity-0 m-0 cursor-pointer" {...rest} />
         <span
           aria-hidden="true"
-          className="size-5.5 rounded-[7px] border-2 border-border bg-surface transition-colors peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:outline-2 peer-focus-visible:outline-primary peer-focus-visible:outline-offset-2"
+          className="size-5.5 rounded-[7px] border-2 border-text-secondary/40 bg-transparent transition-colors peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:outline-2 peer-focus-visible:outline-primary peer-focus-visible:outline-offset-2"
         />
         <CheckIcon size={14} strokeWidth={3} className="absolute text-on-primary opacity-0 peer-checked:opacity-100 pointer-events-none" />
       </span>
@@ -119,7 +119,7 @@ export const Radio = forwardRef<HTMLInputElement, CheckboxProps>(function Radio(
     <label className={cn("inline-flex items-center gap-3 cursor-pointer select-none text-body text-text", className)}>
       <span className="relative inline-grid place-items-center size-5.5">
         <input ref={ref} type="radio" className="peer absolute inset-0 opacity-0 m-0 cursor-pointer" {...rest} />
-        <span aria-hidden="true" className="size-5.5 rounded-full border-2 border-border bg-surface transition-colors peer-checked:border-primary peer-focus-visible:outline-2 peer-focus-visible:outline-primary peer-focus-visible:outline-offset-2" />
+        <span aria-hidden="true" className="size-5.5 rounded-full border-2 border-text-secondary/40 bg-transparent transition-colors peer-checked:border-primary peer-focus-visible:outline-2 peer-focus-visible:outline-primary peer-focus-visible:outline-offset-2" />
         <span aria-hidden="true" className="absolute size-2.5 rounded-full bg-primary opacity-0 peer-checked:opacity-100" />
       </span>
       {label ? <span>{label}</span> : null}
@@ -127,7 +127,7 @@ export const Radio = forwardRef<HTMLInputElement, CheckboxProps>(function Radio(
   );
 });
 
-/** Selectable chip (interests, filters): 40 px pill, 1.5 px border; selected = soft rose fill + rose border + plum text. */
+/** Selectable chip (interests, filters): 40 px pill, no outline; quiet warm tint, selected = solid coral with dark text. */
 export interface ChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   selected?: boolean;
   size?: "sm" | "md";
@@ -140,9 +140,9 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip({ sel
       type={type}
       aria-pressed={selected}
       className={cn(
-        "inline-flex items-center rounded-full border-[1.5px] font-semibold whitespace-nowrap",
+        "inline-flex items-center rounded-full font-semibold whitespace-nowrap",
         size === "md" ? "h-10 px-4 text-body-sm" : "h-9.5 px-4 text-body-sm",
-        selected ? "border-primary bg-surface-muted text-text" : "border-border bg-surface text-text",
+        selected ? "bg-primary text-on-primary" : "bg-surface-muted text-text",
         className,
       )}
       {...rest}

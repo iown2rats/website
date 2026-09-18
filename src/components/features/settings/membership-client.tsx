@@ -49,7 +49,7 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
                   aria-checked={selected}
                   disabled={!p.forSale || !m.paymentsAvailable}
                   onClick={() => setChosen(p.id)}
-                  className={cn("relative flex flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-4 text-center transition-colors disabled:opacity-60", selected ? "border-primary bg-surface-muted" : "border-border bg-surface")}
+                  className={cn("relative flex flex-col items-center gap-1 rounded-2xl px-3 py-4 text-center transition-colors disabled:opacity-60", selected ? "bg-primary-soft" : "bg-surface-muted")}
                 >
                   {p.badge ? <span className="absolute -top-2.5 rounded-full bg-sand px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.05em] text-on-sand">{p.badge}</span> : null}
                   <span className="text-micro font-bold text-text-secondary">{p.name}</span>
@@ -81,7 +81,7 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
             <div className="flex flex-col gap-2.5">
               <div className={cn("grid gap-2.5", m.plans.length >= 3 ? "grid-cols-3" : "grid-cols-2")} role="radiogroup" aria-label="Renewal plans">
                 {sellable.map((p) => (
-                  <button key={p.id} type="button" role="radio" aria-checked={chosen === p.id} onClick={() => setChosen(p.id)} className={cn("flex flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-3.5 text-center", chosen === p.id ? "border-primary bg-surface-muted" : "border-border bg-surface")}>
+                  <button key={p.id} type="button" role="radio" aria-checked={chosen === p.id} onClick={() => setChosen(p.id)} className={cn("flex flex-col items-center gap-1 rounded-2xl px-3 py-3.5 text-center", chosen === p.id ? "bg-primary-soft" : "bg-surface-muted")}>
                     <span className="text-micro font-bold text-text-secondary">{p.name}</span>
                     <span className="text-body font-extrabold text-text">{p.price}</span>
                   </button>

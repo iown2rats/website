@@ -46,7 +46,7 @@ export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, on
   const actionClass = "flex h-9.5 items-center gap-1.5 rounded-md border-0 bg-transparent px-3 text-[13.5px] font-semibold hover:bg-surface-muted";
 
   return (
-    <article className={cn("flex shrink-0 flex-col gap-3.5 rounded-card border border-border bg-surface p-4.5", className)} aria-label={`Post by ${post.author.name}`}>
+    <article className={cn("flex shrink-0 flex-col gap-3.5 rounded-card glass-card p-4.5", className)} aria-label={`Post by ${post.author.name}`}>
       <div className="flex items-center gap-3">
         <button type="button" onClick={() => onOpenAuthor(post.author)} aria-label={post.isMine ? "Your profile" : `View ${post.author.name}'s profile`} className="shrink-0 rounded-full border-0 bg-transparent p-0">
           <Avatar name="" aria-hidden="true" photo={authorPhotoRef(post.author)} size={44} />
@@ -74,7 +74,7 @@ export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, on
           {photo.url ? <Image src={photo.url} alt={`Photo posted by ${post.author.name}`} fill unoptimized sizes="(min-width: 900px) 640px, 100vw" className="object-cover" loading="lazy" /> : <span className="sr-only">Photo</span>}
         </div>
       ) : post.photoUnderReview ? (
-        <div className="flex h-30 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-surface-muted text-text-secondary" role="status">
+        <div className="flex h-30 flex-col items-center justify-center gap-1.5 rounded-xl bg-surface-muted text-text-secondary" role="status">
           <ImageIcon size={22} />
           <span className="text-caption font-semibold">Photo under review</span>
           <span className="text-micro">Only you can see this post until it&apos;s approved.</span>

@@ -13,7 +13,7 @@ const tones: Record<CalloutTone, string> = {
   success: "bg-aqua-soft text-on-aqua-soft [&_svg]:text-success",
   warning: "bg-warning/15 text-warning",
   danger: "bg-danger/10 text-danger",
-  ocean: "bg-surface text-text border border-sand/60 [&_svg]:text-sand rounded-3xl p-5",
+  ocean: "glass-card text-text [&_svg]:text-sand rounded-3xl p-5",
 };
 
 export interface CalloutProps extends HTMLAttributes<HTMLDivElement> {

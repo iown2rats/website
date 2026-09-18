@@ -59,7 +59,7 @@ export function AboutForm({ interests, prompts, initialBio, initialInterestIds, 
           const isOpen = open === p.id;
           const canOpen = has || answered.length < PROMPT_LIMITS.max;
           return (
-            <div key={p.id} className={cn("shrink-0 overflow-hidden rounded-2xl border-[1.5px] bg-surface", has ? "border-primary" : "border-border")}>
+            <div key={p.id} className={cn("shrink-0 overflow-hidden rounded-2xl", has ? "bg-primary-soft" : "bg-surface-muted")}>
               <button
                 type="button"
                 aria-expanded={isOpen}

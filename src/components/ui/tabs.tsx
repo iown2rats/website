@@ -71,8 +71,8 @@ export function PillTabs<T extends string>({ items, value, onChange, label, clas
             onClick={() => onChange(item.value)}
             onKeyDown={(e) => handleArrowKeys(e, items, value, onChange)}
             className={cn(
-              "shrink-0 h-9.5 px-4 rounded-full border-[1.5px] text-body-sm font-bold whitespace-nowrap",
-              active ? "bg-primary text-on-primary border-primary" : "bg-surface text-text border-border",
+              "shrink-0 h-9.5 px-4 rounded-full text-body-sm font-bold whitespace-nowrap",
+              active ? "bg-primary text-on-primary" : "bg-surface-muted text-text",
             )}
           >
             {item.label}

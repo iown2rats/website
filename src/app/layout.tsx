@@ -26,7 +26,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#FCEDEA",
+  themeColor: "#FFFBF1",
 };
 
 // Applies the stored appearance before first paint to avoid a theme flash. Per-viewer convenience only.

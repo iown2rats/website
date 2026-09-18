@@ -45,7 +45,7 @@ export default async function MembershipPage() {
 
       <section aria-labelledby="compare-heading" className="flex flex-col gap-2">
         <SectionLabel id="compare-heading">Thundi Free and Thundi Plus</SectionLabel>
-        <div className="overflow-hidden rounded-3xl border border-border bg-surface">
+        <div className="overflow-hidden rounded-3xl glass-card">
           <table className="w-full table-fixed border-collapse text-caption">
             <thead>
               <tr className="border-b border-border text-left">

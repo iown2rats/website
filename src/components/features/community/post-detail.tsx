@@ -200,7 +200,7 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
           rows={1}
           maxLength={COMMUNITY.commentMaxLength}
           enterKeyHint="send"
-          className="max-h-30 min-h-11 flex-1 resize-none rounded-[22px] border border-border bg-background px-4 py-2.75 text-body leading-[1.4] text-text outline-none placeholder:text-text-muted focus:border-primary field-sizing-content"
+          className="max-h-30 min-h-11 flex-1 resize-none rounded-[22px] bg-surface-muted px-4 py-2.75 text-body leading-[1.4] text-text outline-none placeholder:text-text-muted focus-visible:outline-2 focus-visible:outline-primary field-sizing-content"
         />
         <button type="submit" aria-label="Post comment" disabled={!canSend} className="grid size-11 shrink-0 place-items-center rounded-full border-0 bg-primary text-on-primary pressable-round disabled:opacity-45">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>

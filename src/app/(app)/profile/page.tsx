@@ -52,7 +52,7 @@ export default async function ProfilePage() {
               <Link href="/profile/edit" className="flex h-12.5 flex-1 items-center justify-center rounded-lg bg-primary text-body font-bold text-on-primary pressable">
                 Edit profile
               </Link>
-              <Link href="/profile/preview" className="flex h-12.5 flex-1 items-center justify-center rounded-lg border border-border bg-surface text-body font-bold text-text pressable">
+              <Link href="/profile/preview" className="flex h-12.5 flex-1 items-center justify-center rounded-lg bg-surface-muted text-body font-bold text-text pressable">
                 Preview
               </Link>
             </div>

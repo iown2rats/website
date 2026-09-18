@@ -65,7 +65,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
     setDraft({ interestedIn: draft.interestedIn, ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: null, heightMaxCm: null, education: null });
     setShowPicker(false);
   };
-  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md border-[1.5px] text-body-sm font-semibold text-text", on ? "border-primary bg-surface-muted" : "border-border bg-surface");
+  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md text-body-sm font-semibold text-text", on ? "bg-primary text-on-primary" : "bg-surface-muted");
   const specificName = locations.find((l) => l.id === draft.locationId)?.name;
 
   return (
@@ -123,7 +123,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-border">
+      <section className="overflow-hidden rounded-2xl glass-card">
         <div className="flex items-center gap-2 bg-surface-muted px-4.5 py-3.5 text-tag font-bold uppercase tracking-[.08em] text-ocean">
           <PlusTag size="sm" label="Premium" />
           Advanced filters

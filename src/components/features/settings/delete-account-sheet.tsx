@@ -59,7 +59,7 @@ export function DeleteAccountSheet({ open, onClose, email, recentAuth }: { open:
           </p>
           {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
           <div className="flex flex-col gap-2.5 pt-1">
-            <ContinueWithGoogle purpose="reauth" returnTo="/settings?confirmDelete=1" label="Continue with Google to confirm" className="border border-border" />
+            <ContinueWithGoogle purpose="reauth" returnTo="/settings?confirmDelete=1" label="Continue with Google to confirm" className="shadow-sm" />
             <Button variant="muted" size="md" onClick={onClose} disabled={busy} fullWidth>Cancel</Button>
           </div>
         </>

@@ -28,7 +28,7 @@ export function SafetyClient() {
         {CARDS.map(([label, body], i) => {
           const isOpen = open === i;
           return (
-            <div key={label} className="shrink-0 overflow-hidden rounded-[22px] border-[1.5px] border-border bg-surface">
+            <div key={label} className="shrink-0 overflow-hidden rounded-[22px] glass-card">
               <button type="button" aria-expanded={isOpen} aria-controls={`safety-${i}`} onClick={() => setOpen(isOpen ? null : i)} className="flex w-full items-center gap-3.5 border-0 bg-transparent px-4.5 py-4 text-left text-text">
                 <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-aqua-soft text-body-sm font-extrabold text-ocean">{i + 1}</span>
                 <span className="flex-1 text-body-lg font-bold">{label}</span>

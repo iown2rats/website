@@ -49,14 +49,14 @@ export function PlanForm({ plan, onDone }: { plan?: PlanAdminDto; onDone?: () =>
       <Field label="Badge (optional)" hint="e.g. Most popular">{(p) => <Input {...p} value={d.badge} onChange={(e) => set("badge", e.target.value)} maxLength={24} className="h-11 text-body-sm" />}</Field>
       <Field label="Sort order">{(p) => <Input {...p} type="number" min={0} max={1000} value={d.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value))} className="h-11 text-body-sm" />}</Field>
       <Field label="Description (optional)" className="desktop:col-span-2">{(p) => <Textarea {...p} value={d.description} onChange={(e) => set("description", e.target.value)} maxLength={200} rows={2} />}</Field>
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>
           <div className="text-body-sm font-semibold text-text" id={`active-${plan?.id ?? "new"}`}>Enabled</div>
           <div className="text-caption text-text-secondary">Shown on the Membership screen.</div>
         </div>
         <Switch compact checked={d.active} onCheckedChange={(v) => set("active", v)} aria-labelledby={`active-${plan?.id ?? "new"}`} />
       </div>
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>
           <div className="text-body-sm font-semibold text-text" id={`final-${plan?.id ?? "new"}`}>Price approved</div>
           <div className="text-caption text-text-secondary">Off = placeholder price, shown as &ldquo;Price TBA&rdquo;, cannot be bought.</div>

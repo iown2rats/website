@@ -1,54 +1,58 @@
 /*
- * Thundi design tokens (see docs/DESIGN_SYSTEM.md §2). Colours follow the Pastel Rose / Teal identity; geometry,
+ * Thundi design tokens (see docs/DESIGN_SYSTEM.md §2). Colours follow the warm-white glass identity; geometry,
  * spacing and motion still follow prototype/Thundi.dc.html.
  * Components consume these through Tailwind utilities mapped in globals.css; raw hex never appears in components.
  */
 :root {
   color-scheme: light;
 
-  /* Colour — Pastel Rose / Teal identity (2026-09-18). Rose carries emotion and actions; teal marks privacy,
-     verification, toggles and progress; gold is reserved for Thundi Plus. Raw hex lives only here. */
-  --background: #fcedea;
-  --surface: #fff9f7;
-  --surface-muted: #f9d9d3;
-  --text: #472b30;
-  --text-secondary: #826b70;
-  --text-muted: color-mix(in srgb, #826b70 70%, transparent);
-  --border: #ead1cb;
-  --primary: #e88b86;
-  --primary-hover: #d97875;
-  --primary-pressed: #d97875;
-  --on-primary: #472b30;
-  /* Rose as text (links, "Selected", counts): deepened until it reads at AA on the warm surfaces. */
-  --primary-ink: #ae5352;
-  /* Dark emphasis surface (toasts, status pills, admin marker): warm plum, never teal. */
-  --ocean: #472b30;
-  --on-ocean: #fff8f6;
-  --on-ocean-muted: rgba(255, 248, 246, 0.75);
-  /* Teal accent: privacy, trust, verification, toggles, progress, logo detail. */
-  --accent: #3baea8;
-  --on-accent: #472b30;
-  --aqua: #3baea8;
-  --aqua-soft: #ddf0ee;
-  --on-aqua-soft: #472b30;
-  /* Teal deepened for text so status words stay legible on light surfaces. */
-  --success: #17756f;
-  --warning: #b8791f;
-  --danger: #c85459;
+  /* Colour — warm-white glass identity (2026-09-18). One warm page colour, translucent warm-white surfaces with a
+     16 px blur and a soft shadow instead of outlines, coral only for high-emphasis interaction, gold only for Plus.
+     Raw hex lives only here. */
+  --background: #fffbf1;
+  --surface: rgba(255, 251, 241, 0.86);
+  --surface-muted: rgba(59, 47, 42, 0.06);
+  --text: #3b2f2a;
+  --text-secondary: #806c67;
+  --text-muted: color-mix(in srgb, #806c67 70%, transparent);
+  /* Faint internal divider between rows of one grouped surface. Never an outline. */
+  --border: rgba(59, 47, 42, 0.08);
+  --primary: #fd7979;
+  --primary-hover: #f26a6a;
+  --primary-pressed: #e85f5f;
+  --on-primary: #3b2f2a;
+  /* Coral as text (links, "Selected", counts): deepened until it reads at AA on the warm page. */
+  --primary-ink: #bf4747;
+  /* Coral tint for a selected option or plan card. */
+  --primary-soft: rgba(253, 121, 121, 0.14);
+  /* Dark emphasis surface (toasts, status pills): the text colour. */
+  --ocean: #3b2f2a;
+  --on-ocean: #fffbf1;
+  --on-ocean-muted: rgba(255, 251, 241, 0.75);
+  /* Small key accents (verified seal, toggles, progress) are coral too; there is no second hue. */
+  --accent: #fd7979;
+  --on-accent: #3b2f2a;
+  --aqua: #fd7979;
+  --aqua-soft: rgba(59, 47, 42, 0.06);
+  --on-aqua-soft: #3b2f2a;
+  --success: #237a4b;
+  --warning: #a86d17;
+  --danger: #b3393f;
   /* Thundi Plus gold. */
-  --sand: #c79a59;
-  --on-sand: #472b30;
-  --glass: rgba(255, 249, 247, 0.82);
-  --scrim: rgba(71, 43, 48, 0.4);
-  --photo-scrim: rgba(40, 20, 26, 0.78);
+  --sand: #c6a962;
+  --on-sand: #3b2f2a;
+  --glass: rgba(255, 251, 241, 0.68);
+  --glass-strong: rgba(255, 251, 241, 0.86);
+  --scrim: rgba(59, 47, 42, 0.35);
+  --photo-scrim: rgba(40, 28, 24, 0.78);
   --on-photo: #ffffff;
   --on-photo-muted: rgba(255, 255, 255, 0.85);
   --on-photo-glass: rgba(255, 255, 255, 0.16);
 
-  /* Elevation */
-  --shadow-sm: 0 8px 30px rgba(71, 43, 48, 0.08);
-  --shadow-lg: 0 20px 60px rgba(71, 43, 48, 0.16);
-  --shadow-like: 0 12px 30px rgba(232, 139, 134, 0.4);
+  /* Elevation — soft and diffuse only */
+  --shadow-sm: 0 12px 32px rgba(88, 59, 45, 0.1);
+  --shadow-lg: 0 20px 48px rgba(88, 59, 45, 0.16);
+  --shadow-like: 0 12px 30px rgba(253, 121, 121, 0.4);
   --shadow-knob: 0 1px 4px rgba(0, 0, 0, 0.2);
 
   /* Radius */
@@ -94,39 +98,41 @@
   --duration-sheet: 450ms;
 }
 
-/* Dark mode is opt-in (Profile → appearance): black with near-black cards, the same rose, teal and gold accents.
+/* Dark mode is opt-in (Profile → appearance): black with near-black glass, the same coral and gold accents.
    Light is the Thundi experience and never follows the system setting. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --background: #000000;
-  --surface: #151113;
-  --surface-muted: #221b1e;
-  --text: #fff8f6;
-  --text-secondary: #d0bbc0;
-  --text-muted: color-mix(in srgb, #d0bbc0 70%, transparent);
-  --border: #302729;
-  --primary: #e99a9c;
-  --primary-hover: #e3898b;
-  --primary-pressed: #e3898b;
-  --on-primary: #1a1315;
-  --primary-ink: #f2b3b4;
-  --ocean: #2a2225;
-  --on-ocean: #fff8f6;
-  --on-ocean-muted: rgba(255, 248, 246, 0.75);
-  --accent: #7ad7ce;
-  --on-accent: #1a1315;
-  --aqua: #7ad7ce;
-  --aqua-soft: #17302e;
-  --on-aqua-soft: #fff8f6;
-  --success: #7ad7ce;
+  --surface: rgba(24, 20, 18, 0.86);
+  --surface-muted: rgba(255, 251, 241, 0.07);
+  --text: #fffbf1;
+  --text-secondary: #c9bdb6;
+  --text-muted: color-mix(in srgb, #c9bdb6 70%, transparent);
+  --border: rgba(255, 251, 241, 0.1);
+  --primary: #fd8585;
+  --primary-hover: #fa7676;
+  --primary-pressed: #f26a6a;
+  --on-primary: #1a1412;
+  --primary-ink: #ffb0b0;
+  --primary-soft: rgba(253, 121, 121, 0.18);
+  --ocean: #2a2422;
+  --on-ocean: #fffbf1;
+  --on-ocean-muted: rgba(255, 251, 241, 0.75);
+  --accent: #fd8585;
+  --on-accent: #1a1412;
+  --aqua: #fd8585;
+  --aqua-soft: rgba(255, 251, 241, 0.07);
+  --on-aqua-soft: #fffbf1;
+  --success: #7fd39a;
   --warning: #e6b85c;
-  --danger: #e88a8e;
-  --sand: #f0c978;
-  --on-sand: #1a1315;
-  --glass: rgba(21, 17, 19, 0.88);
+  --danger: #ee8a8e;
+  --sand: #e0c27a;
+  --on-sand: #1a1412;
+  --glass: rgba(24, 20, 18, 0.72);
+  --glass-strong: rgba(24, 20, 18, 0.88);
   --scrim: rgba(0, 0, 0, 0.6);
-  --shadow-sm: 0 8px 30px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.75);
+  --shadow-sm: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.7);
 }
 
 

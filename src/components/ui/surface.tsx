@@ -5,7 +5,7 @@ import { ChevronRightIcon } from "./icons";
 
 /*
  * Surfaces from the prototype:
- *  - Card: surface, 1 px border, radius 24, padding 18 (post cards) / 22 (prompt cards, with shadow-sm).
+ *  - Card: warm-white glass with the soft shadow, no outline, radius 24, padding 18 (post cards) / 22 (prompt cards, with shadow-sm).
  *  - Surface (inset): surface-muted, radius 18, padding 14–16 (intro prompt preview, support card radius 24 padding 20).
  *  - OceanCard (historic name): the trust card — teal-tint background, plum text, radius 24, padding 20–22 (privacy
  *    notice, contact blocking); `premium` = the Plus hero on a warm surface with a faint gold disc.
@@ -24,7 +24,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card({ paddin
   return (
     <div
       ref={ref}
-      className={cn("bg-surface border border-border", radius === "3xl" ? "rounded-3xl" : "rounded-2xl", elevated && "shadow-sm", cardPadding[padding], className)}
+      className={cn("glass-card", radius === "3xl" ? "rounded-3xl" : "rounded-2xl", elevated && "shadow-lg", cardPadding[padding], className)}
       {...rest}
     />
   );
@@ -41,7 +41,7 @@ export interface OceanCardProps extends HTMLAttributes<HTMLDivElement> {
 
 export function OceanCard({ className, premium = false, children, ...rest }: OceanCardProps) {
   return (
-    <div className={cn("relative overflow-hidden rounded-3xl p-5.5 flex flex-col gap-3.5", premium ? "bg-surface border border-sand/50 text-text" : "bg-aqua-soft text-on-aqua-soft", className)} {...rest}>
+    <div className={cn("relative overflow-hidden rounded-3xl p-5.5 flex flex-col gap-3.5", "glass-card text-text", className)} {...rest}>
       {premium ? <span aria-hidden="true" className="absolute -right-15 -top-15 size-55 rounded-full bg-sand/15" /> : null}
       <div className="relative flex flex-col gap-3.5">{children}</div>
     </div>
@@ -54,7 +54,7 @@ export function Divider({ className, ...rest }: HTMLAttributes<HTMLHRElement>) {
 
 export function ListGroup({ className, children, radius = "3xl", ...rest }: HTMLAttributes<HTMLDivElement> & { radius?: "2xl" | "3xl" }) {
   return (
-    <div className={cn("bg-surface border border-border overflow-hidden flex flex-col", radius === "3xl" ? "rounded-3xl" : "rounded-2xl", "[&>*+*]:border-t [&>*+*]:border-border", className)} {...rest}>
+    <div className={cn("glass-card overflow-hidden flex flex-col", radius === "3xl" ? "rounded-3xl" : "rounded-2xl", "[&>*+*]:border-t [&>*+*]:border-border", className)} {...rest}>
       {children}
     </div>
   );

@@ -144,7 +144,7 @@ export function PhotoManager({ initialPhotos, layout = "uniform", note, footer, 
         onDragStart={() => { dragFrom.current = i; }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); if (dragFrom.current != null) move(dragFrom.current, i); dragFrom.current = null; }}
-        className={cn("group relative aspect-[3/4] overflow-hidden rounded-xl border-[1.5px] border-border bg-surface-muted", p.moderation === "REJECTED" && "opacity-60", tileClass(i))}
+        className={cn("group relative aspect-[3/4] overflow-hidden rounded-xl bg-surface-muted", p.moderation === "REJECTED" && "opacity-60", tileClass(i))}
         style={photoBackground({ url: null, key: p.demoKey })}
       >
         {p.thumbUrl ? <Image src={p.thumbUrl} alt={`Photo ${i + 1}${i === 0 ? " (main photo)" : ""}`} fill unoptimized sizes="33vw" className="object-cover" draggable={false} /> : <span role="img" aria-label={`Photo ${i + 1}${i === 0 ? " (main photo)" : ""}`} className="absolute inset-0" />}
@@ -166,7 +166,7 @@ export function PhotoManager({ initialPhotos, layout = "uniform", note, footer, 
   });
   uploads.forEach((u, j) => {
     tiles.push(
-      <li key={u.localId} className={cn("relative aspect-[3/4] overflow-hidden rounded-xl border-[1.5px] border-border bg-surface-muted", tileClass(photos.length + j))} aria-live="polite">
+      <li key={u.localId} className={cn("relative aspect-[3/4] overflow-hidden rounded-xl bg-surface-muted", tileClass(photos.length + j))} aria-live="polite">
         {u.previewBroken ? null : (
           <Image src={u.previewUrl} alt="" fill unoptimized sizes="33vw" className={cn("object-cover", !u.error && "opacity-60")} onError={() => setUploads((list) => list.map((x) => (x.localId === u.localId ? { ...x, previewBroken: true } : x)))} />
         )}
@@ -197,7 +197,7 @@ export function PhotoManager({ initialPhotos, layout = "uniform", note, footer, 
           type="button"
           onClick={() => inputRef.current?.click()}
           aria-label={total === 0 && first ? "Add main photo" : "Add photo"}
-          className="grid aspect-[3/4] size-full place-items-center rounded-xl border-[1.5px] border-dashed border-border bg-surface-muted text-micro text-text-secondary"
+          className="grid aspect-[3/4] size-full place-items-center rounded-xl bg-surface-muted text-micro text-text-secondary"
         >
           {total === 0 && first ? "Main photo" : first ? "Add photo" : <PlusIcon size={16} />}
         </button>

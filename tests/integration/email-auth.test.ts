@@ -147,6 +147,41 @@ describe("registration", () => {
   });
 });
 
+describe("registration validation, as the card submits it", () => {
+  it("rejects a mismatched confirmation, an invalid address and a weak password before anything is created", async () => {
+    const mismatch = registerSchema.safeParse({ email: "a@b.co", password: "coral lagoon 42", confirmPassword: "coral lagoon 43" });
+    expect(mismatch.success).toBe(false);
+    expect(!mismatch.success && mismatch.error.issues[0]).toMatchObject({ path: ["confirmPassword"] });
+
+    const badEmail = registerSchema.safeParse({ email: "not-an-email", password: PASSWORD, confirmPassword: PASSWORD });
+    expect(badEmail.success).toBe(false);
+    expect(!badEmail.success && badEmail.error.issues[0]?.path).toEqual(["email"]);
+
+    const weak = registerSchema.safeParse({ email: "a@b.co", password: "short", confirmPassword: "short" });
+    // The length rule that matters is the domain's, so the schema accepts the shape and registerWithEmail refuses it.
+    expect(weak.success).toBe(true);
+    expect(await registerWithEmail({ email: "a@b.co", password: "short" }, { db, email: mailbox(), now: T0 })).toMatchObject({ ok: false, code: "WEAK_PASSWORD", field: "password" });
+    expect(await db.user.count()).toBe(0);
+  });
+
+  it("an account created from the card cannot use Mellocrush until the address is confirmed", async () => {
+    const { token } = await register("card@example.com");
+    const identity = await db.authIdentity.findFirstOrThrow({ where: { email: "card@example.com" } });
+    const session = await createSession(db, identity.userId, {}, at(T0, minutes(1)));
+
+    const before = await resolveSession(db, session.token, at(T0, minutes(2)));
+    expect(authKindForUser(before!.user)).toBe("unverified");
+    for (const path of ["/discover", "/likes", "/chats", "/community", "/profile", "/settings", "/onboarding"]) {
+      expect(resolveAccess("unverified", path), path).toEqual({ allow: false, redirectTo: ROUTES.verifyEmail });
+    }
+
+    expect(await verifyEmailToken(token!, { db, now: at(T0, minutes(3)) })).toMatchObject({ ok: true });
+    const after = await resolveSession(db, session.token, at(T0, minutes(4)));
+    expect(authKindForUser(after!.user)).toBe("onboarding");
+    expect(resolveAccess("onboarding", "/onboarding/name")).toEqual({ allow: true });
+  });
+});
+
 describe("email verification", () => {
   it("verifies once server-side, and a reused or expired token never verifies", async () => {
     const { token } = await register("verify@example.com");

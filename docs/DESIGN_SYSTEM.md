@@ -396,10 +396,27 @@ wordmark renders from the light artwork. Screenshots in `screenshots/welcome2/` 
 
 ## 27. Email + password on the glass card (2026-09-18)
 
-The welcome card gains a third way in below the "or" rule: an email field, a password field with a show/hide toggle,
-a coral Continue pill, then "Create account" and "Forgot password?" on one row. Registration, "verify your email",
-"forgot password" and "reset password" are separate screens rendered by the same `AuthShell`, so the whole flow is
-one place: the same photograph, the same 28 px glass card, the same white wordmark.
+The welcome card gains a third way in below the "or" rule, and it has two modes in one container:
+
+- **Sign in**: email, password with a show/hide toggle, the coral Continue pill, "Forgot password?", then
+  "New to Mellocrush? **Create account**".
+- **Create account**: email, create password, confirm password, the length hint, the coral Create account pill, then
+  "Already have an account? **Sign in**".
+
+In both, the switch is the coral word at the end of the line — the only other coral on the card besides the primary
+pill, so the eye goes to the action. Switching is local state: the same card, the same provider buttons above it, the
+same photograph, no navigation and no reload. The rules live in a reducer (`auth-card-state.ts`) rather than in the
+component, so they are unit-tested directly: which fields each mode shows, which copy it uses, that switching clears
+a failed attempt and any busy state, that switching to the mode already on screen is a no-op so a stray click cannot
+wipe an error someone is still reading, and that an accepted registration shows the check-your-email state.
+
+After a successful registration the server action redirects to the existing "Verify your email" screen, which is the
+same `AuthShell` card. An address that already has an account stays on the card and shows the identical
+check-your-inbox message, because telling the two apart would reveal who has an account.
+
+"Verify your email", "forgot password" and "reset password" are separate screens rendered by the same `AuthShell`, so
+the whole flow is one place: the same photograph, the same glass card, the same white wordmark. `/auth/register` is a
+deep link into the card's register mode for anyone who arrives there directly.
 
 Every control on the card shares one surface: 52 px tall, fully rounded, the card's content width, a translucent
 white surface (10 % white) with a 25 %-white hairline, white text and a 55 %-white placeholder. That includes the two
@@ -417,7 +434,7 @@ touch target. Button height and label size are **props** on `ContinueWith` (`hei
 caller appends: `cn` only joins strings, so two competing utilities would be settled by stylesheet order rather than
 by intent — the same trap that first shipped a 16 px radius where a pill was asked for.
 
-The card is 531 px tall at every phone width with all three methods on it, so it clears the viewport at
+The card is 573 px tall signing in and 631 px creating an account at 375 px, so both clear the viewport at
 375 × 812 with the couple visible below; each method is hidden when it cannot complete, which shortens it further.
 Verified with Playwright at 375, 390, 430 and 1280 px: no horizontal or vertical page scroll, every control 48 px tall
 and the same width within a card, the registration flow reaching "Verify your email", and that screen offering only Resend, Change

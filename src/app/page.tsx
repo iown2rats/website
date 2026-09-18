@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AuthDivider, AuthHeading, AuthLegalLine, AuthShell, AuthTagline } from "@/components/features/auth/auth-shell";
-import { EmailSignInForm } from "@/components/features/auth/email-sign-in-form";
+import { EmailAuthForm } from "@/components/features/auth/email-auth-form";
 import { ContinueWithGoogle, ContinueWithTelegram } from "@/components/features/auth/google-button";
 import { getDb } from "@/lib/db";
 import { getAuthState } from "@/server/auth/current-user";
@@ -38,7 +38,7 @@ export default async function WelcomePage() {
       {emailAuth ? (
         <>
           <AuthDivider />
-          <EmailSignInForm />
+          <EmailAuthForm />
         </>
       ) : null}
       <AuthLegalLine />

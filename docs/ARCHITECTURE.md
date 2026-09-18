@@ -167,7 +167,9 @@ onboarding, deletion and re-authentication are the existing ones.
   the identity's outstanding tokens of that purpose so only the newest link works. A verification token records the
   address it confirms, so a link sent to a previous address cannot confirm a new one.
 - **Registration** → an account in ONBOARDING whose address is unverified, plus the verification email. The account is
-  signed in immediately so it lands on the verification screen rather than a dead end.
+  signed in immediately so it lands on the verification screen rather than a dead end. The entry point is the welcome
+  card itself, which switches between signing in and creating an account in place (DESIGN_SYSTEM §27); `/auth/register`
+  opens the same card already in register mode.
 - **The unverified restriction** is enforced in one place, not in the UI. `resolveSession` selects whether the user has
   an unverified EMAIL identity, `authKindForUser` returns `"unverified"` for it, and from there: `resolveAccess` allows
   only `/auth/verify-email` (everything else, including onboarding and `/admin`, redirects there or 404s), and

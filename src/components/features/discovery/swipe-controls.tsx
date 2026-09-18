@@ -36,7 +36,7 @@ export function SwipeControls({ onPass, onLike, onIntro, onOpen, onUndo, undoDis
         aria-label="Like"
         onClick={onLike}
         disabled={disabled}
-        className="grid size-16.5 place-items-center rounded-full border-0 like-gradient text-white shadow-like pressable-round disabled:opacity-45"
+        className="grid size-16.5 place-items-center rounded-full border-0 like-gradient text-on-primary shadow-like pressable-round disabled:opacity-45"
       >
         <HeartIcon size={30} filled strokeWidth={0} />
       </button>

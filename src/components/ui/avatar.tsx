@@ -44,7 +44,7 @@ export interface ProfileAvatarProps {
   className?: string;
 }
 
-/** Profile-tab avatar: optional completion ring (prototype 104 px, r 49, 4 px stroke) and ocean "n% complete" pill. */
+/** Profile-tab avatar: optional completion ring (prototype 104 px, r 49, 4 px stroke) and teal "n% complete" pill. */
 export function ProfileAvatar({ photo, name, size = 104, verified = false, completion, completionLabel, className }: ProfileAvatarProps) {
   const r = size / 2 - 3;
   const c = 2 * Math.PI * r;
@@ -59,7 +59,7 @@ export function ProfileAvatar({ photo, name, size = 104, verified = false, compl
             cy={size / 2}
             r={r}
             fill="none"
-            stroke="var(--primary)"
+            stroke="var(--accent)"
             strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray={`${(pct / 100) * c} ${c}`}
@@ -70,7 +70,7 @@ export function ProfileAvatar({ photo, name, size = 104, verified = false, compl
       <span role="img" aria-label={name} className="absolute inset-2 rounded-full bg-aqua-soft" style={photoBackground(photo ?? null)} />
       {verified ? <VerifiedBadge size={22} className="absolute right-1 top-1" /> : null}
       {pct != null ? (
-        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-5.5 px-2.25 rounded-full bg-ocean text-on-ocean text-[11px] font-extrabold flex items-center whitespace-nowrap">
+        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-5.5 px-2.25 rounded-full bg-accent text-on-accent text-[11px] font-extrabold flex items-center whitespace-nowrap">
           {completionLabel ?? `${pct}% complete`}
         </span>
       ) : null}

@@ -37,10 +37,10 @@ export function BottomNav({ badges = {}, hidden = false }: { badges?: NavBadges;
             aria-label={count > 0 ? `${label}, ${count} new` : label}
             className={cn(
               "relative flex h-12 min-w-14 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-micro transition-colors duration-200",
-              isActive ? "bg-aqua-soft text-text font-bold" : "text-text-secondary font-semibold",
+              isActive ? "bg-surface-muted text-text font-bold" : "text-text-secondary font-semibold",
             )}
           >
-            <Icon size={22} className={isActive ? "text-ocean" : "text-text-secondary"} />
+            <Icon size={22} className={isActive ? "text-text" : "text-text-secondary"} />
             <span>{label}</span>
             {count > 0 ? <CounterBadge compact count={count} className="absolute right-2 top-1.5" aria-hidden="true" /> : null}
           </Link>

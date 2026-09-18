@@ -202,7 +202,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
                 <div key={p.id} className={cn("shrink-0 overflow-hidden rounded-2xl border-[1.5px] bg-surface", has ? "border-primary" : "border-border")}>
                   <button type="button" aria-expanded={isOpen} onClick={() => (isOpen ? setOpenPrompt(null) : canOpen ? setOpenPrompt(p.id) : undefined)} className="flex h-13.5 w-full items-center justify-between border-0 bg-transparent px-4.5 text-left text-body font-bold text-text">
                     <span>{p.text}</span>
-                    <span className="text-micro text-primary-pressed">{has ? "Answered" : canOpen ? "Add" : ""}</span>
+                    <span className="text-micro text-primary-ink">{has ? "Answered" : canOpen ? "Add" : ""}</span>
                   </button>
                   {isOpen ? (
                     <textarea aria-label={p.text} value={answer} maxLength={200} rows={2} autoFocus onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} placeholder="Your answer" className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-4.5 py-3.5 text-body leading-normal text-text outline-none placeholder:text-text-muted" />

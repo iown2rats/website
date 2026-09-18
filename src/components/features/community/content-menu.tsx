@@ -126,7 +126,7 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
                   role="radio"
                   aria-checked={reason === value}
                   onClick={() => setReason(value)}
-                  className={cn("h-12.5 rounded-lg border-[1.5px] px-4.5 text-left text-body font-semibold text-text", reason === value ? "border-primary bg-aqua-soft" : "border-border bg-surface")}
+                  className={cn("h-12.5 rounded-lg border-[1.5px] px-4.5 text-left text-body font-semibold text-text", reason === value ? "border-primary bg-surface-muted" : "border-border bg-surface")}
                 >
                   {label}
                 </button>
@@ -139,7 +139,7 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
         ) : (
           <>
             <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-pressed" aria-hidden="true">
+              <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-ink" aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
               </span>
               <DialogTitle id={titleId} className="text-[22px]">Thanks for looking out</DialogTitle>

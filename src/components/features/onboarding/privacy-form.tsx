@@ -28,15 +28,15 @@ export function PrivacyForm({ initial }: { initial: { hideLocation: boolean; hid
       <input type="hidden" name="blockContacts" value={blockContacts ? "on" : "off"} />
 
       <OceanCard>
-        <span className="grid size-11 place-items-center rounded-md bg-white/12"><ShieldIcon size={22} className="text-aqua" /></span>
-        <div className="text-h4 text-on-ocean">Block my contacts</div>
-        <p className="text-body-sm leading-relaxed text-on-ocean-muted">
+        <span className="grid size-11 place-items-center rounded-md bg-surface text-accent"><ShieldIcon size={22} /></span>
+        <div className="text-h4 text-text">Block my contacts</div>
+        <p className="text-body-sm leading-relaxed text-text">
           {"People you block from your contacts won't be shown your dating profile, and you won't see theirs. Numbers are hashed on your device and never stored in plain text."}
         </p>
-        <p className="text-caption text-on-ocean-muted">
+        <p className="text-caption text-text-secondary">
           Full address-book blocking is available in the Thundi app. On the web you can add numbers to hide from later in Privacy &amp; Safety.
         </p>
-        <Button type="button" variant={blockContacts ? "white" : "primary"} size="md" className="h-13 text-body font-bold" onClick={() => setBlockContacts((v) => !v)} aria-pressed={blockContacts}>
+        <Button type="button" variant={blockContacts ? "secondary" : "primary"} size="md" className="h-13 text-body font-bold" onClick={() => setBlockContacts((v) => !v)} aria-pressed={blockContacts}>
           {blockContacts ? "Contact blocking on ✓" : "Turn on contact blocking"}
         </Button>
       </OceanCard>

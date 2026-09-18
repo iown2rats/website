@@ -27,7 +27,7 @@ export function EmptyState({ icon, title, description, actions, className, frame
         className,
       )}
     >
-      <span className="grid place-items-center size-18 rounded-full bg-aqua-soft text-primary-pressed [&>svg]:size-7.5" aria-hidden="true">
+      <span className="grid place-items-center size-18 rounded-full bg-aqua-soft text-primary-ink [&>svg]:size-7.5" aria-hidden="true">
         {icon}
       </span>
       <h2 className="text-h4 text-text">{title}</h2>
@@ -82,7 +82,7 @@ export function SuccessMark({ size = 120, className, label = "Done" }: { size?: 
       <span aria-hidden="true" className="absolute inset-0 rounded-full bg-aqua opacity-50 motion-ok:animate-ripple" />
       <span aria-hidden="true" className="absolute inset-0 rounded-full bg-aqua opacity-50 motion-ok:animate-ripple [animation-delay:1.2s]" />
       <span className="relative grid place-items-center rounded-full like-gradient" style={{ width: inner, height: inner }}>
-        <svg width={Math.round(inner * 0.41)} height={Math.round(inner * 0.41)} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg width={Math.round(inner * 0.41)} height={Math.round(inner * 0.41)} viewBox="0 0 24 24" fill="none" stroke="var(--on-primary)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M5 12l5 5L20 7" />
         </svg>
       </span>

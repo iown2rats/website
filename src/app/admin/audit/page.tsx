@@ -22,7 +22,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
       <FilterLinks label="Action" current={sp.action ?? ""} items={[{ value: "", label: "All actions", href: query({ action: undefined, page: undefined }) }, ...result.actions.map((a) => ({ value: a, label: a, href: query({ action: a, page: undefined }) }))]} />
       {sp.targetId || sp.actorId ? (
         <p className="text-caption text-text-secondary">
-          Filtered to {sp.targetId ? `target ${sp.targetId}` : ""}{sp.actorId ? `actor ${sp.actorId}` : ""}. <Link href="/admin/audit" className="font-semibold text-primary-pressed hover:underline">Clear</Link>
+          Filtered to {sp.targetId ? `target ${sp.targetId}` : ""}{sp.actorId ? `actor ${sp.actorId}` : ""}. <Link href="/admin/audit" className="font-semibold text-primary-ink hover:underline">Clear</Link>
         </p>
       ) : null}
       <RowList empty="No audit entries yet.">
@@ -30,7 +30,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
           <div key={e.id} className="flex flex-col gap-1.5 border-b border-border px-4 py-3 last:border-0">
             <div className="flex flex-wrap items-center gap-2 text-caption">
               <span className="font-mono font-bold text-text">{e.action}</span>
-              <span className="text-text-secondary">by {e.actor ? <Link href={`/admin/users/${e.actor.userId}`} className="font-semibold text-primary-pressed hover:underline">{e.actor.displayName ?? e.actor.userId}</Link> : "system"}</span>
+              <span className="text-text-secondary">by {e.actor ? <Link href={`/admin/users/${e.actor.userId}`} className="font-semibold text-primary-ink hover:underline">{e.actor.displayName ?? e.actor.userId}</Link> : "system"}</span>
               {e.targetType ? (
                 <span className="text-text-secondary">
                   on {e.targetType} {e.targetType === "User" && e.targetId ? <Link href={`/admin/users/${e.targetId}`} className="font-mono hover:underline">{e.targetId}</Link> : e.targetType === "SubscriptionOrder" && e.targetId ? <Link href={`/admin/payments/${e.targetId}`} className="font-mono hover:underline">{e.targetId}</Link> : <span className="font-mono">{e.targetId}</span>}

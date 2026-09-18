@@ -68,7 +68,7 @@ export default async function AdminVerificationDetailPage({ params }: { params: 
         <Panel title="Submission">
           <KeyValueList
             items={[
-              { label: "Member", value: <Link href={`/admin/users/${d.userId}`} className="font-semibold text-primary-pressed hover:underline">Open member page</Link> },
+              { label: "Member", value: <Link href={`/admin/users/${d.userId}`} className="font-semibold text-primary-ink hover:underline">Open member page</Link> },
               { label: "Account state", value: <StatusPill status={d.accountStatus} /> },
               { label: "Status", value: <StatusPill status={d.status} /> },
               { label: "Submitted", value: formatDateTime(d.submittedAt) },

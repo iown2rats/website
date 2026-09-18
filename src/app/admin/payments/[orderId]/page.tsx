@@ -40,7 +40,7 @@ export default async function AdminPaymentDetailPage({ params }: { params: Promi
         <Panel title="Customer and payment method">
           <KeyValueList
             items={[
-              { label: "Customer", value: <Link href={`/admin/users/${o.user.userId}`} className="font-semibold text-primary-pressed hover:underline">{o.user.displayName ?? "(no name)"}{o.user.handle ? ` @${o.user.handle}` : ""}</Link> },
+              { label: "Customer", value: <Link href={`/admin/users/${o.user.userId}`} className="font-semibold text-primary-ink hover:underline">{o.user.displayName ?? "(no name)"}{o.user.handle ? ` @${o.user.handle}` : ""}</Link> },
               { label: "Account state", value: <StatusPill status={o.user.status} /> },
               { label: "Method", value: o.method.label },
               { label: "Bank", value: o.method.bankName },

@@ -3,9 +3,9 @@ import { cn } from "@/lib/cn";
 
 /*
  * Tags and badges from the prototype:
- *  - CounterBadge: teal pill, ocean text, 11 px/800, min 20 px (nav variant 16 px, 9.5 px).
- *  - PlusTag: ocean background, sand text, 8.5–12 px/800, letter-spacing .04em, radius 5–8.
- *  - Tag: aqua-soft background, ocean text, 11 px/800 uppercase (QUESTION), radius 8.
+ *  - CounterBadge: rose pill, plum text, 11 px/800, min 20 px (nav variant 16 px, 9.5 px).
+ *  - PlusTag: Plus gold background, plum text, 8.5–12 px/800, letter-spacing .04em, radius 5–8 (the only gold in the UI).
+ *  - Tag: teal-tint background, plum text, 11 px/800 uppercase (QUESTION), radius 8.
  */
 
 export interface CounterBadgeProps extends HTMLAttributes<HTMLSpanElement> {
@@ -36,13 +36,13 @@ export type TagVariant = "aqua" | "plus" | "premium" | "neutral" | "success" | "
 
 const tagVariant: Record<TagVariant, string> = {
   aqua: "bg-aqua-soft text-on-aqua-soft",
-  plus: "bg-ocean text-sand",
-  premium: "bg-ocean text-sand",
+  plus: "bg-sand text-on-sand",
+  premium: "bg-sand text-on-sand",
   neutral: "bg-surface-muted text-text-secondary",
-  success: "bg-success/15 text-success",
+  success: "bg-aqua-soft text-success",
   warning: "bg-warning/15 text-warning",
   danger: "bg-danger/10 text-danger",
-  onPhoto: "bg-white text-ocean",
+  onPhoto: "bg-white text-text",
 };
 
 export interface TagProps extends HTMLAttributes<HTMLSpanElement> {
@@ -78,10 +78,10 @@ export function PlusTag({ size = "sm", className, label = "Plus" }: { size?: "xs
   );
 }
 
-/** Larger label chip "THUNDI PLUS" on the Plus hero (26 px, sand background, ocean text). */
+/** Larger label chip "THUNDI PLUS" on the Plus hero (26 px, gold background, plum text). */
 export function PlusHeroTag({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center h-6.5 px-2.5 rounded-xs bg-sand text-ocean text-micro font-extrabold tracking-[.04em] uppercase", className)}>
+    <span className={cn("inline-flex items-center h-6.5 px-2.5 rounded-xs bg-sand text-on-sand text-micro font-extrabold tracking-[.04em] uppercase", className)}>
       Thundi Plus
     </span>
   );

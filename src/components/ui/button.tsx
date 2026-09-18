@@ -2,9 +2,9 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 /*
- * Buttons — prototype values: primary 52 px radius 16 turquoise with ocean text 16–17 px/700;
- * secondary bordered surface; ocean (dark) buttons for Post/Submit report; sand-on-ocean for Plus;
- * ghost text buttons 44 px. Press feedback scale(.97) over 120 ms.
+ * Buttons — geometry from the prototype (primary 52 px radius 16, 16–17 px/700; secondary bordered surface; ghost
+ * 44 px). Colour follows the Pastel Rose / Teal identity: every high-emphasis action (primary, the historic "ocean"
+ * Post/Submit/Approve variant and the "plus" upgrade variant) is rose with plum text; there are no dark-teal blocks. Press feedback scale(.97) over 120 ms.
  */
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "ocean" | "plus" | "white" | "muted";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -23,9 +23,9 @@ const variantClasses: Record<ButtonVariant, string> = {
   secondary: "bg-surface text-text border border-border hover:bg-surface-muted",
   ghost: "bg-transparent text-text-secondary hover:text-text border-0",
   destructive: "bg-transparent text-danger border border-border hover:bg-surface-muted",
-  ocean: "bg-ocean text-on-ocean border-0 hover:brightness-110",
-  plus: "bg-ocean text-sand border-0 hover:brightness-110",
-  white: "bg-white text-ocean border-0",
+  ocean: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-pressed border-0",
+  plus: "bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-pressed border-0",
+  white: "bg-white text-text border-0",
   muted: "bg-surface-muted text-text border-0 hover:bg-border",
 };
 
@@ -90,10 +90,10 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
 const iconVariant: Record<IconButtonVariant, string> = {
   bordered: "bg-surface text-text border border-border",
   ghost: "bg-transparent text-text border-0",
-  onPhoto: "bg-white/90 text-ocean border-0",
+  onPhoto: "bg-white/90 text-text border-0",
   muted: "bg-surface-muted text-text-secondary border-0",
   primary: "bg-primary text-on-primary border-0",
-  ocean: "bg-ocean text-on-ocean border-0",
+  ocean: "bg-primary text-on-primary border-0",
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(

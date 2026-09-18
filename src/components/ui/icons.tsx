@@ -188,21 +188,21 @@ export const WifiOffIcon = (p: IconProps) => (
   </Base>
 );
 
-/** Verified seal: 12-point teal badge with an ocean check. Filled, not stroked. */
+/** Verified seal: 12-point teal badge with a plum check. Filled, not stroked. Teal marks trust (docs/DESIGN_SYSTEM.md §2). */
 export function VerifiedBadge({ size = 20, className, title = "Photo verified" }: { size?: number; className?: string; title?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className} role="img" aria-label={title}>
       <path
-        fill="#18C7C8"
+        fill="var(--accent)"
         d="M12 2l2.4 2.1 3.1-.4 1 3 2.9 1.3-.6 3.1 1.9 2.5-1.9 2.5.6 3.1-2.9 1.3-1 3-3.1-.4L12 22l-2.4-2.1-3.1.4-1-3-2.9-1.3.6-3.1L1.3 12l1.9-2.5-.6-3.1 2.9-1.3 1-3 3.1.4z"
       />
-      <path d="M8.5 12l2.3 2.3 4.7-4.8" stroke="#063B4C" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.5 12l2.3 2.3 4.7-4.8" stroke="var(--on-accent)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
 /** Thundi wordmark logo: wave + island ellipse. */
-export function ThundiLogo({ size = 24, color = "#18C7C8", className }: { size?: number; color?: string; className?: string }) {
+export function ThundiLogo({ size = 24, color = "var(--accent)", className }: { size?: number; color?: string; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 26 26" fill="none" className={className} aria-hidden="true">
       <path d="M3 16c4-6 8-6 10 0s6 6 10 0" stroke={color} strokeWidth="2.6" strokeLinecap="round" />

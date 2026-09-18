@@ -89,8 +89,8 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
   return (
     <PageOverlay title="Privacy & Safety" backHref="/profile">
       <OceanCard className="flex-row items-start gap-3.5 p-5">
-        <ShieldIcon size={26} className="shrink-0 text-aqua" />
-        <p className="text-body-sm leading-relaxed text-on-ocean-muted">You control exactly who sees you. Your phone number and exact location are never shown to anyone.</p>
+        <ShieldIcon size={26} className="shrink-0 text-accent" />
+        <p className="text-body-sm leading-relaxed text-text">You control exactly who sees you. Your phone number and exact location are never shown to anyone.</p>
       </OceanCard>
 
       <section className="flex flex-col gap-2.5" aria-labelledby="privacy-visibility">
@@ -106,7 +106,7 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
                 aria-checked={on}
                 disabled={busy === "visibility"}
                 onClick={() => void chooseVisibility(o.value)}
-                className={cn("flex min-h-14.5 items-center justify-between gap-3 rounded-lg border-[1.5px] px-4.5 py-2.5 text-left text-text", on ? "border-primary bg-aqua-soft" : "border-border bg-surface")}
+                className={cn("flex min-h-14.5 items-center justify-between gap-3 rounded-lg border-[1.5px] px-4.5 py-2.5 text-left text-text", on ? "border-primary bg-surface-muted" : "border-border bg-surface")}
               >
                 <span className="min-w-0">
                   <span className="flex items-center gap-2 text-body font-semibold">{o.label}{o.plus ? <PlusTag size="xs" /> : null}</span>
@@ -125,7 +125,7 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
             {INVISIBLE_MODE_DISCLOSURE}
             {privacy.invisibleMode.suspended ? (
               <span className="mt-2.5 flex gap-2">
-                <Link href="/settings/membership" className="inline-flex h-9 items-center rounded-md bg-ocean px-3.5 text-caption font-bold text-on-ocean">Renew Thundi Plus</Link>
+                <Link href="/settings/membership" className="inline-flex h-9 items-center rounded-md bg-primary px-3.5 text-caption font-bold text-on-primary">Renew Thundi Plus</Link>
                 <Button size="sm" variant="secondary" className="h-9 rounded-md px-3.5 text-caption" onClick={() => void chooseVisibility("everyone")} loading={busy === "visibility"}>Turn Invisible Mode off</Button>
               </span>
             ) : null}
@@ -148,7 +148,7 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
       <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-[17px] font-extrabold tracking-[-.01em] text-text">Block my contacts</h2>
-          <span className={cn("inline-flex h-6 items-center rounded-xs px-2.5 text-[11px] font-extrabold", privacy.blockContacts ? "bg-aqua-soft text-ocean" : "bg-surface-muted text-text-secondary")} role="status">{privacy.blockContacts ? "ON" : "OFF"}</span>
+          <span className={cn("inline-flex h-6 items-center rounded-xs px-2.5 text-[11px] font-extrabold", privacy.blockContacts ? "bg-aqua-soft text-accent" : "bg-surface-muted text-text-secondary")} role="status">{privacy.blockContacts ? "ON" : "OFF"}</span>
         </div>
         <p className="m-0 text-body-sm leading-relaxed text-text-secondary">People you block from your contacts won&apos;t be shown your dating profile, and you won&apos;t see theirs. Numbers are hashed on your device — we never store your contacts.</p>
         {privacy.blockContacts ? (
@@ -175,7 +175,7 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
         <DialogTitle id={plusTitleId} className="text-[22px]">Invisible Mode is part of Thundi Plus</DialogTitle>
         <DialogDescription>With Plus, only people you like can find you in Discover. {INVISIBLE_MODE_DISCLOSURE}</DialogDescription>
         <div className="flex flex-col gap-2.5 pt-1">
-          <Link href="/settings/membership" className="flex h-13 items-center justify-center rounded-lg bg-ocean text-body font-bold text-sand">See Thundi Plus</Link>
+          <Link href="/settings/membership" className="flex h-13 items-center justify-center rounded-lg bg-primary text-body font-bold text-on-primary">See Thundi Plus</Link>
           <Button variant="muted" size="md" onClick={() => setPlusOpen(false)} fullWidth>Not now</Button>
         </div>
       </ResponsiveDialog>

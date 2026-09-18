@@ -72,8 +72,8 @@ function NavList({ role, badges, pathname, onNavigate, dense = false }: { role: 
               const active = isActive(it, pathname);
               const count = it.key in badges ? (badges[it.key as keyof AdminNavBadges] ?? 0) : 0;
               return (
-                <Link key={it.key} href={it.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-lg px-3 text-body-sm font-semibold transition-colors", dense ? "h-11" : "h-11", active ? "bg-aqua-soft text-text" : "text-text-secondary hover:bg-surface-muted")}>
-                  <it.Icon size={20} className={active ? "text-ocean" : "text-text-secondary"} />
+                <Link key={it.key} href={it.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-lg px-3 text-body-sm font-semibold transition-colors", dense ? "h-11" : "h-11", active ? "bg-surface-muted text-text" : "text-text-secondary hover:bg-surface-muted")}>
+                  <it.Icon size={20} className={active ? "text-text" : "text-text-secondary"} />
                   <span className="flex-1">{it.label}</span>
                   {count > 0 ? <CounterBadge count={count} aria-label={`${count} waiting`} /> : null}
                 </Link>
@@ -96,7 +96,7 @@ export function AdminShell({ role, badges = {}, children }: { role: AdminRole; b
         <Link href="/admin" className="flex items-center gap-2 px-3 text-h4 text-text" aria-label="Thundi admin home">
           <ThundiLogo size={24} />
           <span>thundi</span>
-          <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-sand">Admin</span>
+          <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-on-ocean">Admin</span>
         </Link>
         <NavList role={role} badges={badges} pathname={pathname} />
         <div className="mt-auto flex flex-col gap-2">
@@ -108,7 +108,7 @@ export function AdminShell({ role, badges = {}, children }: { role: AdminRole; b
         <header className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 desktop:hidden" style={{ height: "calc(var(--page-header-height) + var(--safe-top))", paddingTop: "var(--safe-top)" }}>
           <Link href="/admin" className="flex items-center gap-1.5 text-body font-extrabold" aria-label="Admin home">
             <ThundiLogo size={20} />
-            <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-sand">Admin</span>
+            <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-on-ocean">Admin</span>
           </Link>
           <span className="min-w-0 flex-1 truncate text-body-sm font-semibold text-text-secondary">{current?.label ?? "Admin"}</span>
           <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open admin menu" className="grid size-11 place-items-center rounded-md text-text hover:bg-surface-muted">

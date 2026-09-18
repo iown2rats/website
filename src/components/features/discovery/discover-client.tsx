@@ -322,7 +322,7 @@ function AllowancePill({ allowance, msUntilReset, onClick }: { allowance: Allowa
       data-testid="allowance-pill"
       className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-surface px-3 text-caption font-bold text-text tabular-nums"
     >
-      <HeartIcon size={14} filled strokeWidth={0} className={exhausted ? "text-text-muted" : "text-primary-pressed"} />
+      <HeartIcon size={14} filled strokeWidth={0} className={exhausted ? "text-text-muted" : "text-primary-ink"} />
       {label}
     </button>
   );

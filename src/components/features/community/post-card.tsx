@@ -87,7 +87,7 @@ export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, on
           onClick={() => onToggleLike(post)}
           aria-pressed={post.likedByMe}
           aria-label={`${post.likedByMe ? "Unlike" : "Like"} (${post.likeCount})`}
-          className={cn(actionClass, post.likedByMe && "text-primary-pressed")}
+          className={cn(actionClass, post.likedByMe && "text-primary-ink")}
         >
           <HeartIcon size={18} filled={post.likedByMe} className={post.likedByMe ? "text-primary" : undefined} />
           <span className="tabular-nums">{post.likeCount}</span>

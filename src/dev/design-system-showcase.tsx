@@ -297,7 +297,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
             <Button variant="secondary" size="md" onClick={() => toast.show("Welcome to Thundi Plus", { tone: "success" })}>Success toast</Button>
           </div>
           <BottomSheet open={sheet} onClose={() => setSheet(false)} labelledBy="ds-sheet-title">
-            <div className="flex items-center justify-between"><DialogTitle id="ds-sheet-title">Filters</DialogTitle><Button variant="ghost" size="sm" className="text-primary-pressed" onClick={() => setSheet(false)}>Reset</Button></div>
+            <div className="flex items-center justify-between"><DialogTitle id="ds-sheet-title">Filters</DialogTitle><Button variant="ghost" size="sm" className="text-primary-ink" onClick={() => setSheet(false)}>Reset</Button></div>
             <div className="flex flex-col gap-2.5"><div className="text-body font-semibold">Show me</div><div className="flex gap-2">{["Women", "Men", "Everyone"].map((g, i) => <Chip key={g} selected={i === 0} className="flex-1 justify-center rounded-md">{g}</Chip>)}</div></div>
             <Button onClick={() => setSheet(false)} className="text-cta-lg">Apply</Button>
           </BottomSheet>

@@ -82,7 +82,7 @@ export function ContactsSheet({ open, onClose, privacy, onChange }: { open: bool
         <Textarea id={`${titleId}-numbers`} value={numbers} onChange={(e) => setNumbers(e.target.value)} rows={3} placeholder={"One per line, e.g. 777 1234"} disabled={busy} />
         <Button size="md" onClick={() => void submit(numbers.split(/[\n,;]+/), "MANUAL")} loading={busy} disabled={numbers.trim().length === 0} fullWidth>Hide from these numbers</Button>
       </div>
-      {message ? <p role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-caption font-semibold text-danger" : "text-caption font-semibold text-primary-pressed"}>{message.text}</p> : null}
+      {message ? <p role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-caption font-semibold text-danger" : "text-caption font-semibold text-primary-ink"}>{message.text}</p> : null}
       {privacy.contactHashCount > 0 ? (
         <Button variant="ghost" size="md" onClick={() => void clear()} disabled={busy} fullWidth className="text-danger">Clear the list</Button>
       ) : null}

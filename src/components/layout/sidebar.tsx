@@ -31,10 +31,10 @@ export function Sidebar({ badges = {} }: { badges?: NavBadges }) {
             aria-current={isActive ? "page" : undefined}
             className={cn(
               "flex h-12 items-center gap-3 rounded-lg px-3.5 text-body font-semibold transition-colors duration-150",
-              isActive ? "bg-aqua-soft text-text" : "text-text-secondary hover:bg-surface-muted",
+              isActive ? "bg-surface-muted text-text" : "text-text-secondary hover:bg-surface-muted",
             )}
           >
-            <Icon size={22} className={isActive ? "text-ocean" : "text-text-secondary"} />
+            <Icon size={22} className={isActive ? "text-text" : "text-text-secondary"} />
             <span>{label}</span>
             {count > 0 ? <CounterBadge count={count} className="ml-auto" aria-label={`${count} new`} /> : null}
           </Link>

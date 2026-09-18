@@ -50,7 +50,7 @@ function upload(file: File, onProgress: (pct: number) => void): Promise<Verifica
 function Seal({ verified }: { verified: boolean }) {
   return (
     <span className={cn("grid size-21 place-items-center rounded-full", verified ? "bg-aqua-soft" : "bg-surface-muted")} aria-hidden="true">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill={verified ? "#18C7C8" : "var(--border)"}><path d="M12 2l2.4 2.1 3.1-.4 1 3 2.9 1.3-.6 3.1 1.9 2.5-1.9 2.5.6 3.1-2.9 1.3-1 3-3.1-.4L12 22l-2.4-2.1-3.1.4-1-3-2.9-1.3.6-3.1L1.3 12l1.9-2.5-.6-3.1 2.9-1.3 1-3 3.1.4z" /><path d="M8.5 12l2.3 2.3 4.7-4.8" stroke="#063B4C" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill={verified ? "var(--accent)" : "var(--border)"}><path d="M12 2l2.4 2.1 3.1-.4 1 3 2.9 1.3-.6 3.1 1.9 2.5-1.9 2.5.6 3.1-2.9 1.3-1 3-3.1-.4L12 22l-2.4-2.1-3.1.4-1-3-2.9-1.3.6-3.1L1.3 12l1.9-2.5-.6-3.1 2.9-1.3 1-3 3.1.4z" /><path d="M8.5 12l2.3 2.3 4.7-4.8" stroke={verified ? "var(--on-accent)" : "var(--text-secondary)"} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
     </span>
   );
 }
@@ -154,7 +154,7 @@ export function VerificationClient({ initial }: { initial: VerificationStateDto 
           <ListGroup>
             {INSTRUCTIONS.map(([label, sub]) => (
               <div key={label} className="flex items-center gap-3.5 px-4.5 py-3.5">
-                <span className="grid size-8.5 shrink-0 place-items-center rounded-full bg-aqua-soft text-ocean"><CheckIcon size={16} strokeWidth={2.4} /></span>
+                <span className="grid size-8.5 shrink-0 place-items-center rounded-full bg-aqua-soft text-accent"><CheckIcon size={16} strokeWidth={2.4} /></span>
                 <div className="min-w-0 flex-1">
                   <div className="text-body font-bold text-text">{label}</div>
                   <div className="text-caption-sm text-text-secondary">{sub}</div>

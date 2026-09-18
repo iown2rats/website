@@ -2,7 +2,7 @@
 
 Extracted from `prototype/Thundi.dc.html` by re-inspecting the inline styles (counts below are occurrences in the source, so the most common values are the system; outliers are one-off screen decisions). Implemented in `src/styles/tokens.css`, `src/app/globals.css` (Tailwind v4 `@theme`) and `src/components/ui/*`.
 
-Principles: white and neutral space carry the interface; turquoise is an accent for actions and selection; deep ocean is used for dark cards, the match screen, toasts and the Plus treatment; radii are large and consistent; shadows are soft and tinted with ocean, never grey; density is native-app compact on 375–430 px screens.
+Principles (Pastel Rose / Teal identity, 2026-09-18): warm rose space carries the interface and soft rose is the emotional colour for actions and selection; teal is the recognisable ocean/privacy accent (verification, safety, toggles, progress, the logo detail); gold is reserved for Thundi Plus; plum is the text colour and the only dark surface (toasts, status pills). There are no gradients and no dark-teal blocks; radii are large and consistent; shadows are soft and tinted with ocean, never grey; density is native-app compact on 375–430 px screens.
 
 ## 1. Typography
 
@@ -40,32 +40,33 @@ Long copy uses line-height 1.5 (24×) or 1.55 (5×); headings use `text-wrap: pr
 
 ## 2. Colour tokens
 
-| Token | Light | Dark | Notes |
-| --- | --- | --- | --- |
-| `--color-background` | `#FCFDFC` | `#0B1518` | app background |
-| `--color-surface` | `#FFFFFF` | `#132329` | cards, sheets, inputs |
-| `--color-surface-muted` | `#F5F7F5` | `#101D21` | inset fields, segmented track, keypad, subtle fills |
-| `--color-text` | `#101719` | `#F2F7F6` | primary text |
-| `--color-text-secondary` | `#667477` | `#8FA3A6` | subtitles, inactive nav, meta |
-| `--color-text-muted` | `#667477` @ 70 % | `#8FA3A6` @ 70 % | placeholder text, tertiary meta (new, derived) |
-| `--color-border` | `#DFEBE9` | `#1F343B` | 1 px / 1.5 px borders, tracks, toggle off |
-| `--color-primary` | `#18C7C8` | same | lagoon turquoise: CTAs, Like, selection, my bubbles |
-| `--color-primary-hover` | `#14B8B9` | same | derived (−6 % lightness) |
-| `--color-primary-pressed` | `#079A9F` | same | prototype `--primary-dark`; also links and secondary teal text |
-| `--color-on-primary` | `#063B4C` | same | text on turquoise (prototype uses ocean, never white) |
-| `--color-ocean` | `#063B4C` | same | deep ocean: dark cards, match screen, toasts, FAB, Plus CTA |
-| `--color-aqua` | `#8BE3DE` | same | ripple rings, icon accent on ocean, prompt label on ocean |
-| `--color-aqua-soft` | `#E6F7F6` | `#12333A` | selected fills, callouts, their bubbles, empty-state discs |
-| `--color-on-aqua-soft` | `#063B4C` | `#8BE3DE` | **new**: fixes the prototype's dark-mode contrast bug (ocean text on dark aqua-soft) |
-| `--color-success` | `#20B87A` | same | prototype `--green` |
-| `--color-warning` | `#D9A441` | same | new; sand-adjacent amber |
-| `--color-danger` | `#C0392B` | same | Unmatch, Delete account, under-18 message |
-| `--color-sand` | `#D9C7A3` | same | Plus accent, used sparingly: tags, "Unlock" button, CTA text on ocean |
-| `--color-glass` | `rgba(255,255,255,.78)` | `rgba(19,35,41,.82)` | bottom nav, chat header (with blur 20 px / 16 px) |
-| `--color-scrim` | `rgba(6,59,76,.4)` | same | sheet backdrop (+ blur 4 px) |
-| `--color-photo-scrim` | `rgba(6,20,26,.78)` | same | card/hero bottom gradient end (0 → .72–.8) |
+Pastel Rose / Teal identity (2026-09-18). Values live in `src/styles/tokens.css` and are exposed as Tailwind colours in `src/app/globals.css`; components never use raw hex. Light mode is the primary experience; dark mode is a warm "berry night", not the old teal-black.
 
-Gradients (the only ones allowed): Like button `linear-gradient(160deg, #18C7C8, #079A9F)`; photo scrim `linear-gradient(180deg, rgba(6,20,26,0), rgba(6,20,26,.78))`; welcome hero scrims over the night-beach photograph (`rgba(5,13,20,…)` linear gradients: top 0.5→0 and bottom 0→0.82 on phones, left 0.72→0 on wide screens; the former lagoon gradient is retired); demo photo placeholders `linear-gradient(160deg, hsl(h 45% 74%), hsl(h 55% 42%))`.
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `--color-background` | `#FCEDEA` | `#32232A` | app background |
+| `--color-surface` | `#FFF9F7` | `#49323A` | cards, sheets, inputs, nav |
+| `--color-surface-muted` | `#F9D9D3` | `#3D2A32` | soft tinted surface: selected options, active nav, prompt cards, search field |
+| `--color-text` | `#472B30` | `#FFF8F6` | main text, icons, focus ring |
+| `--color-text-secondary` | `#826B70` | `#D0BBC0` | secondary text (AA on surface) |
+| `--color-border` | `#EAD1CB` | `#5B4149` | borders, dividers, progress tracks |
+| `--color-primary` | `#E88B86` | `#E99A9C` | primary CTAs (Continue, Like, Send, Save, Upgrade, Post, Approve), my chat bubbles, selected borders, counters |
+| `--color-primary-hover` / `-pressed` | `#D97875` | `#E3898B` | hover and pressed CTA |
+| `--color-on-primary` | `#472B30` | `#32232A` | text and icons on rose (white would fail contrast at 2.5:1; plum reads at 5.1:1) |
+| `--color-primary-ink` | `#AE5352` | `#F2B3B4` | rose as *text* (links, "Selected", prompt labels): the brand rose deepened until it reads at AA on the warm surfaces |
+| `--color-accent` (`--color-aqua`) | `#3BAEA8` | `#7AD7CE` | teal: verified seal, safety and location icons, active toggles, progress, completion ring, Boost countdown, logo detail |
+| `--color-on-accent` | `#472B30` | `#32232A` | check inside the seal, text on teal pills |
+| `--color-aqua-soft` / `--color-on-aqua-soft` | `#DDF0EE` / `#472B30` | `#2F4A48` / `#FFF8F6` | teal tint: trust cards, info and success callouts, their chat bubbles, icon discs, tags |
+| `--color-success` | `#17756F` | `#7AD7CE` | teal deepened for status words (Approved, Match) so they read on light surfaces |
+| `--color-warning` | `#B8791F` | `#E6B85C` | warning callouts and tags |
+| `--color-danger` | `#C85459` | `#E88A8E` | errors and destructive actions only; the pastel rose is never an error colour |
+| `--color-sand` / `--color-on-sand` | `#C79A59` / `#472B30` | `#F0C978` / `#32232A` | Thundi Plus gold: Plus tags, plan badges, the Plus hero edge and disc, the active-Plus card. Nothing else is gold |
+| `--color-ocean` / `--color-on-ocean` | `#472B30` / `#FFF8F6` | `#5C4149` / `#FFF8F6` | historic name, now the plum emphasis surface: toasts, status pills, the Admin marker. Buttons and cards no longer use it |
+| `--color-glass` | `rgba(255,249,247,.82)` | `rgba(73,50,58,.85)` | bottom nav, glass headers |
+| `--color-scrim` | `rgba(71,43,48,.4)` | `rgba(20,10,14,.5)` | dialog backdrop |
+| `--color-on-photo*` | white / 85 % / 16 % | same | text and chips over photographs |
+
+Shadows are warm (`rgba(71,43,48,.08)` / `.16`), the Like shadow is rose (`rgba(232,139,134,.4)`). The `like-gradient` utility keeps its name but is the solid rose; the only remaining gradients are the photo scrim and the demo photo placeholders. Component mapping: high-emphasis `Button` variants (`primary`, the historic `ocean`, `plus`) are all rose with plum text; `PillTabs` active is rose; `OceanCard` is the teal-tint trust card (`premium` = warm surface with a gold edge for the Plus hero); the match overlay is rose with white ripple rings; `Switch`, `Progress` and the profile completion ring are teal; `PlusTag`, `PlusHeroTag` and plan badges are gold with plum text; `VerifiedBadge` and `ThundiLogo` read `var(--accent)`.
 
 ## 3. Radius
 
@@ -347,4 +348,8 @@ Button. The existing `ContinueWithGoogle` link, restyled to 56 px tall, 12 px ra
 Delivery (`scripts/render-hero.mjs`, master in `docs/assets/hero/night-beach-master.png`, 941×1672 PNG): static AVIF + WebP at 480, 640, 828 and 941 px wide in `public/hero/`, chosen by the browser with `sizes="100vw"`, preloaded from the server-rendered head with `type="image/avif"` and `fetchpriority="high"`, a 178-byte inline blurred placeholder behind it so nothing shifts. Measured transfers: 375 and 390 px phones at 2× fetch the 828 px AVIF (92.5 KB); 430 px phones and every desktop fetch the 941 px AVIF (110 KB); WebP fallbacks are 59.6 / 96.0 / 136.3 / 162.6 KB. On a 1280 px desktop the 941 px source is scaled up 1.36× by the browser; a wider master would be needed to avoid that.
 
 Verified with Playwright at 375×667, 390×844, 430×932, 768×1024, 1280×800 and 1440×900: no horizontal overflow, page height equals the viewport (no browser-height scroll), the button sits 24 px plus the safe-area inset above the bottom edge, the headline never covers the couple, the Milky Way stays visible, the image renders at its natural aspect ratio (not stretched), the preload tag is present, only one hero request is made per page, and the first Tab lands on Continue with Google with a visible focus ring. Screenshots in `screenshots/welcome/` (gitignored).
+
+## 22. Pastel Rose / Teal identity (2026-09-18)
+
+A visual-system update only: screens, content, navigation and geometry are unchanged. Every colour now comes from the tokens in §2. What changed in components: rose replaces turquoise for CTAs, selection and my bubbles; teal is confined to trust (verified seal, safety icons, privacy card), toggles, progress and the logo detail; gold appears only on Plus; the dark-teal blocks (ocean buttons, pill tabs, the privacy card, the prompt card, the match screen, plan badges, the Plus lock) were replaced with rose, teal-tint or warm surfaces; toasts and status pills are the only dark (plum) surfaces left. Dark mode is the berry-night set. Verified with Playwright screenshots at 390 px (Discover, Likes, Chats, Community, Profile, Settings, Membership, Privacy & Safety, Verification, Safety Center, full profile, filters, onboarding), 390 px dark (Discover, Profile, Membership, Chats, Privacy) and 1280 px (Discover, Membership, admin dashboard, users, payments). Screenshots in `screenshots/theme/` (gitignored). Contrast: plum on rose 5.1:1, plum on gold 4.95:1, plum on teal 4.7:1, secondary text on surface 4.5:1, rose ink on surface 4.7:1.
 

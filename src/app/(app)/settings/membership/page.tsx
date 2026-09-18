@@ -33,8 +33,8 @@ export default async function MembershipPage() {
     <PageOverlay title="Membership" backHref="/profile">
       <OceanCard premium>
         <div><PlusHeroTag /></div>
-        <h2 className="text-[24px] font-extrabold leading-[1.15] tracking-[-.025em] text-on-ocean">{m.tier === "PLUS" ? "You're on Thundi Plus." : "More of what matters. Nothing you don't need."}</h2>
-        <p className="text-body-sm leading-normal text-on-ocean-muted">
+        <h2 className="text-[24px] font-extrabold leading-[1.15] tracking-[-.025em] text-text">{m.tier === "PLUS" ? "You're on Thundi Plus." : "More of what matters. Nothing you don't need."}</h2>
+        <p className="text-body-sm leading-normal text-text-secondary">
           {m.tier === "PLUS"
             ? periodEnd
               ? `${m.cancelAtPeriodEnd ? "Plus ends" : "Renews"} on ${periodEnd}${m.planName ? ` · ${m.planName}` : ""}.`
@@ -51,7 +51,7 @@ export default async function MembershipPage() {
               <tr className="border-b border-border text-left">
                 <th scope="col" className="w-[46%] px-4 py-3 text-label uppercase text-text-secondary">Feature</th>
                 <th scope="col" className={cn("px-3 py-3 text-label uppercase", m.tier === "FREE" ? "text-text" : "text-text-secondary")}>Free{m.tier === "FREE" ? <span className="sr-only"> (your plan)</span> : null}</th>
-                <th scope="col" className="px-3 py-3 text-label uppercase text-ocean"><span className="inline-flex items-center gap-1.5">Plus{m.tier === "PLUS" ? <span className="sr-only"> (your plan)</span> : null}<PlusTag size="xs" /></span></th>
+                <th scope="col" className="px-3 py-3 text-label uppercase text-text"><span className="inline-flex items-center gap-1.5">Plus{m.tier === "PLUS" ? <span className="sr-only"> (your plan)</span> : null}<PlusTag size="xs" /></span></th>
               </tr>
             </thead>
             <tbody>

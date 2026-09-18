@@ -28,7 +28,7 @@ export default async function AdminReportDetailPage({ params }: { params: Promis
           <KeyValueList
             items={[
               { label: "What", value: r.target.kind },
-              { label: "Who", value: r.target.userId ? <Link href={`/admin/users/${r.target.userId}`} className="font-semibold text-primary-pressed hover:underline">{r.target.displayName ?? "(unknown)"}{r.target.handle ? ` @${r.target.handle}` : ""}</Link> : "—" },
+              { label: "Who", value: r.target.userId ? <Link href={`/admin/users/${r.target.userId}`} className="font-semibold text-primary-ink hover:underline">{r.target.displayName ?? "(unknown)"}{r.target.handle ? ` @${r.target.handle}` : ""}</Link> : "—" },
               { label: "Account state", value: r.target.accountStatus ? <StatusPill status={r.target.accountStatus} /> : "—" },
               { label: "Other open reports about them", value: String(r.targetOpenReports) },
               ...(r.content ? [{ label: "Reported content", value: <span className="whitespace-pre-wrap">{r.content}</span> }] : []),
@@ -38,7 +38,7 @@ export default async function AdminReportDetailPage({ params }: { params: Promis
         <Panel title="Reporter and outcome">
           <KeyValueList
             items={[
-              { label: "Reporter", value: <Link href={`/admin/users/${r.reporter.userId}`} className="font-semibold text-primary-pressed hover:underline">{r.reporter.displayName ?? "(unknown)"}{r.reporter.handle ? ` @${r.reporter.handle}` : ""}</Link> },
+              { label: "Reporter", value: <Link href={`/admin/users/${r.reporter.userId}`} className="font-semibold text-primary-ink hover:underline">{r.reporter.displayName ?? "(unknown)"}{r.reporter.handle ? ` @${r.reporter.handle}` : ""}</Link> },
               { label: "Note", value: r.note ? <span className="whitespace-pre-wrap">{r.note}</span> : "—" },
               { label: "Resolution", value: r.resolution ?? "—" },
               { label: "Decided", value: r.resolvedAt ? `${formatDateTime(r.resolvedAt)}${r.resolvedBy ? ` by ${r.resolvedBy}` : ""}` : "—" },

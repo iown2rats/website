@@ -68,7 +68,7 @@ export default async function ProfilePage() {
                     href={SUGGESTION_HREF[s.key] ?? "/profile/edit"}
                     height={56}
                     label={s.label}
-                    leading={<span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-aqua-soft text-micro font-extrabold text-primary-pressed">+{s.points}</span>}
+                    leading={<span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-aqua-soft text-micro font-extrabold text-primary-ink">+{s.points}</span>}
                     className="pl-3 pr-3.5"
                   />
                 ))}

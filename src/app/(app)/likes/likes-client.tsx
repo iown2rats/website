@@ -85,7 +85,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
               ))}
             </div>
             <div className="flex flex-col items-center gap-3 rounded-3xl border border-border bg-surface p-5 text-center">
-              <span className="grid size-12 place-items-center rounded-full bg-aqua-soft text-ocean" aria-hidden="true"><LockIcon size={22} /></span>
+              <span className="grid size-12 place-items-center rounded-full bg-aqua-soft text-accent" aria-hidden="true"><LockIcon size={22} /></span>
               <div>
                 <h2 className="text-h4 text-text">{data.count === 1 ? "1 person likes you" : `${data.count} people like you`}</h2>
                 <p className="mt-1 text-body-sm text-text-secondary">See who likes you</p>
@@ -125,7 +125,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
                   <div className="flex items-center gap-1.5 text-body font-bold text-text"><span className="truncate">{m.name}</span>{m.verified ? <VerifiedBadge size={14} className="shrink-0" /> : null}</div>
                   <div className="text-caption text-text-secondary">Matched</div>
                 </div>
-                {m.conversationId ? <Link href={`/chats/${m.conversationId}`} className="inline-flex h-9 items-center rounded-lg bg-ocean px-3.5 text-caption font-bold text-on-ocean pressable">Say hello</Link> : null}
+                {m.conversationId ? <Link href={`/chats/${m.conversationId}`} className="inline-flex h-9 items-center rounded-lg bg-primary px-3.5 text-caption font-bold text-on-primary pressable">Say hello</Link> : null}
               </li>
             ))}
           </ul>

@@ -46,7 +46,7 @@ export function LikeLimitDialog({ open, onClose, limit, tier, resetsAt, serverTi
   return (
     <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId}>
       <div className="flex flex-col items-center gap-3 pt-2 text-center">
-        <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-pressed" aria-hidden="true">
+        <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-ink" aria-hidden="true">
           <HeartIcon size={28} filled strokeWidth={0} />
         </span>
         <DialogTitle id={titleId}>You&apos;ve used today&apos;s {limit} likes.</DialogTitle>

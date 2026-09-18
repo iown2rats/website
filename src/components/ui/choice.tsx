@@ -32,7 +32,7 @@ export const RadioCard = forwardRef<HTMLButtonElement, RadioCardProps>(function 
       onClick={onSelect}
       className={cn(
         "w-full min-h-13 px-4.5 py-2.5 rounded-lg border-[1.5px] text-left flex items-center justify-between gap-3 text-text",
-        selected ? "border-primary bg-aqua-soft" : "border-border bg-surface",
+        selected ? "border-primary bg-surface-muted" : "border-border bg-surface",
         className,
       )}
       {...rest}
@@ -80,7 +80,7 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
-      className={cn("relative shrink-0 rounded-full border-0 transition-colors duration-200 disabled:opacity-45", checked ? "bg-primary" : "bg-border", className)}
+      className={cn("relative shrink-0 rounded-full border-0 transition-colors duration-200 disabled:opacity-45", checked ? "bg-accent" : "bg-border", className)}
       style={{ width: w, height: h }}
       {...rest}
     >
@@ -127,7 +127,7 @@ export const Radio = forwardRef<HTMLInputElement, CheckboxProps>(function Radio(
   );
 });
 
-/** Selectable chip (interests, filters): 40 px pill, 1.5 px border; selected = aqua-soft + primary border + ocean text. */
+/** Selectable chip (interests, filters): 40 px pill, 1.5 px border; selected = soft rose fill + rose border + plum text. */
 export interface ChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   selected?: boolean;
   size?: "sm" | "md";
@@ -142,7 +142,7 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip({ sel
       className={cn(
         "inline-flex items-center rounded-full border-[1.5px] font-semibold whitespace-nowrap",
         size === "md" ? "h-10 px-4 text-body-sm" : "h-9.5 px-4 text-body-sm",
-        selected ? "border-primary bg-aqua-soft text-on-aqua-soft" : "border-border bg-surface text-text",
+        selected ? "border-primary bg-surface-muted text-text" : "border-border bg-surface text-text",
         className,
       )}
       {...rest}

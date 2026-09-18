@@ -136,7 +136,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           </ul>
         )}
         <p className="mt-3 text-caption text-text-secondary">
-          Full log: <Link href={`/admin/audit?targetId=${a.userId}`} className="font-semibold text-primary-pressed hover:underline">audit entries for this user</Link>
+          Full log: <Link href={`/admin/audit?targetId=${a.userId}`} className="font-semibold text-primary-ink hover:underline">audit entries for this user</Link>
         </p>
       </Panel>
     </AdminPage>

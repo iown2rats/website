@@ -1,43 +1,54 @@
 /*
- * Thundi design tokens — values extracted from prototype/Thundi.dc.html (see docs/DESIGN_SYSTEM.md).
+ * Thundi design tokens (see docs/DESIGN_SYSTEM.md §2). Colours follow the Pastel Rose / Teal identity; geometry,
+ * spacing and motion still follow prototype/Thundi.dc.html.
  * Components consume these through Tailwind utilities mapped in globals.css; raw hex never appears in components.
  */
 :root {
   color-scheme: light;
 
-  /* Colour */
-  --background: #fcfdfc;
-  --surface: #ffffff;
-  --surface-muted: #f5f7f5;
-  --text: #101719;
-  --text-secondary: #667477;
-  --text-muted: color-mix(in srgb, #667477 70%, transparent);
-  --border: #dfebe9;
-  --primary: #18c7c8;
-  --primary-hover: #14b8b9;
-  --primary-pressed: #079a9f;
-  --on-primary: #063b4c;
-  --ocean: #063b4c;
-  --on-ocean: #ffffff;
-  --on-ocean-muted: rgba(255, 255, 255, 0.75);
-  --aqua: #8be3de;
-  --aqua-soft: #e6f7f6;
-  --on-aqua-soft: #063b4c;
-  --success: #20b87a;
-  --warning: #d9a441;
-  --danger: #c0392b;
-  --sand: #d9c7a3;
-  --glass: rgba(255, 255, 255, 0.78);
-  --scrim: rgba(6, 59, 76, 0.4);
-  --photo-scrim: rgba(6, 20, 26, 0.78);
+  /* Colour — Pastel Rose / Teal identity (2026-09-18). Rose carries emotion and actions; teal marks privacy,
+     verification, toggles and progress; gold is reserved for Thundi Plus. Raw hex lives only here. */
+  --background: #fcedea;
+  --surface: #fff9f7;
+  --surface-muted: #f9d9d3;
+  --text: #472b30;
+  --text-secondary: #826b70;
+  --text-muted: color-mix(in srgb, #826b70 70%, transparent);
+  --border: #ead1cb;
+  --primary: #e88b86;
+  --primary-hover: #d97875;
+  --primary-pressed: #d97875;
+  --on-primary: #472b30;
+  /* Rose as text (links, "Selected", counts): deepened until it reads at AA on the warm surfaces. */
+  --primary-ink: #ae5352;
+  /* Dark emphasis surface (toasts, status pills, admin marker): warm plum, never teal. */
+  --ocean: #472b30;
+  --on-ocean: #fff8f6;
+  --on-ocean-muted: rgba(255, 248, 246, 0.75);
+  /* Teal accent: privacy, trust, verification, toggles, progress, logo detail. */
+  --accent: #3baea8;
+  --on-accent: #472b30;
+  --aqua: #3baea8;
+  --aqua-soft: #ddf0ee;
+  --on-aqua-soft: #472b30;
+  /* Teal deepened for text so status words stay legible on light surfaces. */
+  --success: #17756f;
+  --warning: #b8791f;
+  --danger: #c85459;
+  /* Thundi Plus gold. */
+  --sand: #c79a59;
+  --on-sand: #472b30;
+  --glass: rgba(255, 249, 247, 0.82);
+  --scrim: rgba(71, 43, 48, 0.4);
+  --photo-scrim: rgba(40, 20, 26, 0.78);
   --on-photo: #ffffff;
   --on-photo-muted: rgba(255, 255, 255, 0.85);
   --on-photo-glass: rgba(255, 255, 255, 0.16);
 
   /* Elevation */
-  --shadow-sm: 0 8px 30px rgba(6, 59, 76, 0.08);
-  --shadow-lg: 0 20px 60px rgba(6, 59, 76, 0.16);
-  --shadow-like: 0 12px 30px rgba(24, 199, 200, 0.4);
+  --shadow-sm: 0 8px 30px rgba(71, 43, 48, 0.08);
+  --shadow-lg: 0 20px 60px rgba(71, 43, 48, 0.16);
+  --shadow-like: 0 12px 30px rgba(232, 139, 134, 0.4);
   --shadow-knob: 0 1px 4px rgba(0, 0, 0, 0.2);
 
   /* Radius */
@@ -85,16 +96,33 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #0b1518;
-  --surface: #132329;
-  --surface-muted: #101d21;
-  --text: #f2f7f6;
-  --text-secondary: #8fa3a6;
-  --text-muted: color-mix(in srgb, #8fa3a6 70%, transparent);
-  --border: #1f343b;
-  --aqua-soft: #12333a;
-  --on-aqua-soft: #8be3de;
-  --glass: rgba(19, 35, 41, 0.82);
+  --background: #32232a;
+  --surface: #49323a;
+  --surface-muted: #3d2a32;
+  --text: #fff8f6;
+  --text-secondary: #d0bbc0;
+  --text-muted: color-mix(in srgb, #d0bbc0 70%, transparent);
+  --border: #5b4149;
+  --primary: #e99a9c;
+  --primary-hover: #e3898b;
+  --primary-pressed: #e3898b;
+  --on-primary: #32232a;
+  --primary-ink: #f2b3b4;
+  --ocean: #5c4149;
+  --on-ocean: #fff8f6;
+  --on-ocean-muted: rgba(255, 248, 246, 0.75);
+  --accent: #7ad7ce;
+  --on-accent: #32232a;
+  --aqua: #7ad7ce;
+  --aqua-soft: #2f4a48;
+  --on-aqua-soft: #fff8f6;
+  --success: #7ad7ce;
+  --warning: #e6b85c;
+  --danger: #e88a8e;
+  --sand: #f0c978;
+  --on-sand: #32232a;
+  --glass: rgba(73, 50, 58, 0.85);
+  --scrim: rgba(20, 10, 14, 0.5);
   --shadow-sm: 0 8px 30px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
@@ -102,16 +130,33 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --background: #0b1518;
-    --surface: #132329;
-    --surface-muted: #101d21;
-    --text: #f2f7f6;
-    --text-secondary: #8fa3a6;
-    --text-muted: color-mix(in srgb, #8fa3a6 70%, transparent);
-    --border: #1f343b;
-    --aqua-soft: #12333a;
-    --on-aqua-soft: #8be3de;
-    --glass: rgba(19, 35, 41, 0.82);
+    --background: #32232a;
+    --surface: #49323a;
+    --surface-muted: #3d2a32;
+    --text: #fff8f6;
+    --text-secondary: #d0bbc0;
+    --text-muted: color-mix(in srgb, #d0bbc0 70%, transparent);
+    --border: #5b4149;
+    --primary: #e99a9c;
+    --primary-hover: #e3898b;
+    --primary-pressed: #e3898b;
+    --on-primary: #32232a;
+    --primary-ink: #f2b3b4;
+    --ocean: #5c4149;
+    --on-ocean: #fff8f6;
+    --on-ocean-muted: rgba(255, 248, 246, 0.75);
+    --accent: #7ad7ce;
+    --on-accent: #32232a;
+    --aqua: #7ad7ce;
+    --aqua-soft: #2f4a48;
+    --on-aqua-soft: #fff8f6;
+    --success: #7ad7ce;
+    --warning: #e6b85c;
+    --danger: #e88a8e;
+    --sand: #f0c978;
+    --on-sand: #32232a;
+    --glass: rgba(73, 50, 58, 0.85);
+    --scrim: rgba(20, 10, 14, 0.5);
     --shadow-sm: 0 8px 30px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
   }

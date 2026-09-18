@@ -291,7 +291,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
               <span>
                 Next free message in <b className="tabular-nums text-text">{mmss(waitingMs)}</b>. Chat anytime with Thundi Plus.
               </span>
-              <Link href="/settings/membership" className="shrink-0 text-[13px] font-bold text-primary-pressed">Get Thundi Plus</Link>
+              <Link href="/settings/membership" className="shrink-0 text-[13px] font-bold text-primary-ink">Get Thundi Plus</Link>
             </div>
           ) : null}
           <form
@@ -358,7 +358,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
             <DialogDescription>Reports are anonymous. We&apos;ll review within 24 hours. Submitting also blocks {header.other.name}.</DialogDescription>
             <div className="flex flex-col gap-2" role="radiogroup" aria-label="Reason">
               {REASONS.map(([value, label]) => (
-                <button key={value} type="button" role="radio" aria-checked={reportReason === value} onClick={() => setReportReason(value)} className={cn("h-12.5 rounded-lg border-[1.5px] px-4.5 text-left text-body font-semibold text-text", reportReason === value ? "border-primary bg-aqua-soft" : "border-border bg-surface")}>
+                <button key={value} type="button" role="radio" aria-checked={reportReason === value} onClick={() => setReportReason(value)} className={cn("h-12.5 rounded-lg border-[1.5px] px-4.5 text-left text-body font-semibold text-text", reportReason === value ? "border-primary bg-surface-muted" : "border-border bg-surface")}>
                   {label}
                 </button>
               ))}
@@ -368,7 +368,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
         ) : (
           <>
             <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-pressed" aria-hidden="true">
+              <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-ink" aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
               </span>
               <DialogTitle id={reportTitleId} className="text-[22px]">Thanks for looking out</DialogTitle>

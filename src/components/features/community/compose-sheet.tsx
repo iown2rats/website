@@ -125,7 +125,7 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
             aria-checked={kind === k.value}
             disabled={busy}
             onClick={() => { setKind(k.value); setError(null); }}
-            className={cn("h-11 flex-1 rounded-[14px] border-[1.5px] text-body-sm font-bold text-text", kind === k.value ? "border-primary bg-aqua-soft" : "border-border bg-surface")}
+            className={cn("h-11 flex-1 rounded-[14px] border-[1.5px] text-body-sm font-bold text-text", kind === k.value ? "border-primary bg-surface-muted" : "border-border bg-surface")}
           >
             {k.label}
           </button>

@@ -21,9 +21,12 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-pressed: var(--primary-pressed);
   --color-on-primary: var(--on-primary);
+  --color-primary-ink: var(--primary-ink);
   --color-ocean: var(--ocean);
   --color-on-ocean: var(--on-ocean);
   --color-on-ocean-muted: var(--on-ocean-muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
   --color-aqua: var(--aqua);
   --color-aqua-soft: var(--aqua-soft);
   --color-on-aqua-soft: var(--on-aqua-soft);
@@ -31,6 +34,7 @@
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-sand: var(--sand);
+  --color-on-sand: var(--on-sand);
   --color-glass: var(--glass);
   --color-scrim: var(--scrim);
   --color-on-photo: var(--on-photo);
@@ -190,7 +194,7 @@
     margin: 0;
   }
   a {
-    color: var(--primary-pressed);
+    color: var(--primary-ink);
     text-decoration: none;
   }
   ::-webkit-scrollbar {
@@ -198,7 +202,7 @@
     height: 0;
   }
   :focus-visible {
-    outline: 2px solid var(--primary);
+    outline: 2px solid var(--text);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -226,8 +230,9 @@
   background: linear-gradient(180deg, rgba(6, 20, 26, 0), var(--photo-scrim));
 }
 
+/* Historic name kept for the Like controls; the identity has no gradients, so this is the solid rose. */
 @utility like-gradient {
-  background: linear-gradient(160deg, #18c7c8, #079a9f);
+  background: var(--primary);
 }
 
 @utility pressable {

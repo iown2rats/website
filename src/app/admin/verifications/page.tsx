@@ -25,7 +25,7 @@ export default async function AdminVerificationsPage() {
         ))}
       </RowList>
       <p className="text-caption text-text-secondary">
-        Decided verifications are visible on each member&apos;s page under <Link href="/admin/users" className="font-semibold text-primary-pressed hover:underline">Users</Link>.
+        Decided verifications are visible on each member&apos;s page under <Link href="/admin/users" className="font-semibold text-primary-ink hover:underline">Users</Link>.
       </p>
     </AdminPage>
   );

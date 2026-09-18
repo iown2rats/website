@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
  * Two tab patterns from the prototype:
  *  - SegmentedControl (Likes You / Matches): surface-muted track radius 18 padding 4, segments 42 px radius 14,
  *    active = surface background + shadow-sm + text colour; inactive = secondary text.
- *  - PillTabs (Community, Edit profile): 38 px pills, 1.5 px border; active = ocean background, white text.
+ *  - PillTabs (Community, Edit profile): 38 px pills, 1.5 px border; active = rose background, plum text.
  */
 
 export interface TabItem<T extends string> {
@@ -72,7 +72,7 @@ export function PillTabs<T extends string>({ items, value, onChange, label, clas
             onKeyDown={(e) => handleArrowKeys(e, items, value, onChange)}
             className={cn(
               "shrink-0 h-9.5 px-4 rounded-full border-[1.5px] text-body-sm font-bold whitespace-nowrap",
-              active ? "bg-ocean text-on-ocean border-ocean" : "bg-surface text-text border-border",
+              active ? "bg-primary text-on-primary border-primary" : "bg-surface text-text border-border",
             )}
           >
             {item.label}

@@ -13,7 +13,7 @@ export function AdminPage({ title, description, actions, children, backHref }: {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-2">
-        {backHref ? <Link href={backHref.href} className="text-caption font-semibold text-primary-pressed hover:underline">‹ {backHref.label}</Link> : null}
+        {backHref ? <Link href={backHref.href} className="text-caption font-semibold text-primary-ink hover:underline">‹ {backHref.label}</Link> : null}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-h3 text-text">{title}</h1>
@@ -79,9 +79,9 @@ export function FilterLinks({ items, current, label = "Filter" }: { items: { val
       {items.map((it) => {
         const active = it.value === current;
         return (
-          <Link key={it.value} href={it.href} aria-current={active ? "page" : undefined} className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-caption font-bold", active ? "border-ocean bg-ocean text-on-ocean" : "border-border bg-surface text-text-secondary hover:bg-surface-muted")}>
+          <Link key={it.value} href={it.href} aria-current={active ? "page" : undefined} className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-caption font-bold", active ? "border-primary bg-primary text-on-primary" : "border-border bg-surface text-text-secondary hover:bg-surface-muted")}>
             {it.label}
-            {it.count !== undefined ? <span className={cn("rounded-full px-1.5 text-[11px] tabular-nums", active ? "bg-white/20" : "bg-surface-muted")}>{it.count}</span> : null}
+            {it.count !== undefined ? <span className={cn("rounded-full px-1.5 text-[11px] tabular-nums", active ? "bg-white/40" : "bg-surface-muted")}>{it.count}</span> : null}
           </Link>
         );
       })}

@@ -60,7 +60,7 @@ export function LocationForm({ locations, initialId }: { locations: LocationOpti
                 {l.name}
                 {l.kind !== "ATOLL" ? <span className="ml-2 text-caption font-medium text-text-secondary">{l.atollName}</span> : null}
               </span>
-              {isSelected ? <span className="text-caption font-semibold text-primary-pressed">Selected</span> : null}
+              {isSelected ? <span className="text-caption font-semibold text-primary-ink">Selected</span> : null}
             </button>
           );
         })}

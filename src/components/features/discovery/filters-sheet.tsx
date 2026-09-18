@@ -65,14 +65,14 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
     setDraft({ interestedIn: draft.interestedIn, ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: null, heightMaxCm: null, education: null });
     setShowPicker(false);
   };
-  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md border-[1.5px] text-body-sm font-semibold text-text", on ? "border-primary bg-aqua-soft" : "border-border bg-surface");
+  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md border-[1.5px] text-body-sm font-semibold text-text", on ? "border-primary bg-surface-muted" : "border-border bg-surface");
   const specificName = locations.find((l) => l.id === draft.locationId)?.name;
 
   return (
     <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId} className="desktop:max-w-[560px]">
       <div className="flex items-center justify-between">
         <h2 id={titleId} className="text-[22px] font-extrabold tracking-[-.02em]">Filters</h2>
-        <button type="button" onClick={reset} className="h-10 border-0 bg-transparent text-body-sm font-bold text-primary-pressed">Reset</button>
+        <button type="button" onClick={reset} className="h-10 border-0 bg-transparent text-body-sm font-bold text-primary-ink">Reset</button>
       </div>
 
       <section className="flex flex-col gap-3">

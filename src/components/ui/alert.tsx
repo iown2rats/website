@@ -3,17 +3,17 @@ import { cn } from "@/lib/cn";
 import { InfoIcon } from "./icons";
 
 /*
- * Callouts: prototype info callout = aqua-soft background, ocean text, radius 18, padding 14px 16px, 13 px/1.5, 18 px icon.
- * The dark-mode contrast fix lives in the --on-aqua-soft token. Ocean variant = dark notice card (privacy screen).
+ * Callouts: info = teal-tint background, plum text, teal icon, radius 18, padding 14px 16px, 13 px/1.5, 18 px icon.
+ * The "ocean" tone (historic name) is the premium card: warm surface, gold edge and icon, used when Plus is active.
  */
 export type CalloutTone = "info" | "success" | "warning" | "danger" | "ocean";
 
 const tones: Record<CalloutTone, string> = {
-  info: "bg-aqua-soft text-on-aqua-soft",
-  success: "bg-success/12 text-success",
+  info: "bg-aqua-soft text-on-aqua-soft [&_svg]:text-accent",
+  success: "bg-aqua-soft text-on-aqua-soft [&_svg]:text-success",
   warning: "bg-warning/15 text-warning",
   danger: "bg-danger/10 text-danger",
-  ocean: "bg-ocean text-on-ocean-muted [&_svg]:text-aqua rounded-3xl p-5",
+  ocean: "bg-surface text-text border border-sand/60 [&_svg]:text-sand rounded-3xl p-5",
 };
 
 export interface CalloutProps extends HTMLAttributes<HTMLDivElement> {

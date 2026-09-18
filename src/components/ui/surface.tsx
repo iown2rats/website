@@ -7,7 +7,8 @@ import { ChevronRightIcon } from "./icons";
  * Surfaces from the prototype:
  *  - Card: surface, 1 px border, radius 24, padding 18 (post cards) / 22 (prompt cards, with shadow-sm).
  *  - Surface (inset): surface-muted, radius 18, padding 14–16 (intro prompt preview, support card radius 24 padding 20).
- *  - OceanCard: ocean background, white text, radius 24, padding 20–22 (privacy notice, contact blocking, Plus hero).
+ *  - OceanCard (historic name): the trust card — teal-tint background, plum text, radius 24, padding 20–22 (privacy
+ *    notice, contact blocking); `premium` = the Plus hero on a warm surface with a faint gold disc.
  *  - ListGroup: bordered surface, radius 20–24, rows 54–60 px separated by 1 px borders; row = label, meta, chevron.
  */
 
@@ -34,14 +35,14 @@ export function Surface({ className, padding = "md", ...rest }: CardProps) {
 }
 
 export interface OceanCardProps extends HTMLAttributes<HTMLDivElement> {
-  /** Adds the faint sand disc used on the Plus hero. */
+  /** Plus hero: warm surface with a faint gold disc instead of the teal trust tint. */
   premium?: boolean;
 }
 
 export function OceanCard({ className, premium = false, children, ...rest }: OceanCardProps) {
   return (
-    <div className={cn("relative overflow-hidden bg-ocean text-on-ocean rounded-3xl p-5.5 flex flex-col gap-3.5", className)} {...rest}>
-      {premium ? <span aria-hidden="true" className="absolute -right-15 -top-15 size-55 rounded-full bg-sand/12" /> : null}
+    <div className={cn("relative overflow-hidden rounded-3xl p-5.5 flex flex-col gap-3.5", premium ? "bg-surface border border-sand/50 text-text" : "bg-aqua-soft text-on-aqua-soft", className)} {...rest}>
+      {premium ? <span aria-hidden="true" className="absolute -right-15 -top-15 size-55 rounded-full bg-sand/15" /> : null}
       <div className="relative flex flex-col gap-3.5">{children}</div>
     </div>
   );

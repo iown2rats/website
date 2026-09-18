@@ -67,7 +67,7 @@ export function AboutForm({ interests, prompts, initialBio, initialInterestIds, 
                 className="flex h-13.5 w-full items-center justify-between border-0 bg-transparent px-4.5 text-left text-body font-bold text-text"
               >
                 <span>{p.text}</span>
-                <span className="text-micro text-primary-pressed">{has ? "Answered" : canOpen ? "Add" : ""}</span>
+                <span className="text-micro text-primary-ink">{has ? "Answered" : canOpen ? "Add" : ""}</span>
               </button>
               {isOpen ? (
                 <textarea

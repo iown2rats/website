@@ -49,9 +49,9 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
                   aria-checked={selected}
                   disabled={!p.forSale || !m.paymentsAvailable}
                   onClick={() => setChosen(p.id)}
-                  className={cn("relative flex flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-4 text-center transition-colors disabled:opacity-60", selected ? "border-primary bg-aqua-soft" : "border-border bg-surface")}
+                  className={cn("relative flex flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-4 text-center transition-colors disabled:opacity-60", selected ? "border-primary bg-surface-muted" : "border-border bg-surface")}
                 >
-                  {p.badge ? <span className="absolute -top-2.5 rounded-full bg-ocean px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.05em] text-sand">{p.badge}</span> : null}
+                  {p.badge ? <span className="absolute -top-2.5 rounded-full bg-sand px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[.05em] text-on-sand">{p.badge}</span> : null}
                   <span className="text-micro font-bold text-text-secondary">{p.name}</span>
                   <span className="text-body font-extrabold tracking-[-.02em] text-text">{p.price ?? "Price TBA"}</span>
                   <span className="text-[11px] text-text-secondary">{p.intervalDays} days</span>
@@ -81,7 +81,7 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
             <div className="flex flex-col gap-2.5">
               <div className={cn("grid gap-2.5", m.plans.length >= 3 ? "grid-cols-3" : "grid-cols-2")} role="radiogroup" aria-label="Renewal plans">
                 {sellable.map((p) => (
-                  <button key={p.id} type="button" role="radio" aria-checked={chosen === p.id} onClick={() => setChosen(p.id)} className={cn("flex flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-3.5 text-center", chosen === p.id ? "border-primary bg-aqua-soft" : "border-border bg-surface")}>
+                  <button key={p.id} type="button" role="radio" aria-checked={chosen === p.id} onClick={() => setChosen(p.id)} className={cn("flex flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-3.5 text-center", chosen === p.id ? "border-primary bg-surface-muted" : "border-border bg-surface")}>
                     <span className="text-micro font-bold text-text-secondary">{p.name}</span>
                     <span className="text-body font-extrabold text-text">{p.price}</span>
                   </button>
@@ -115,7 +115,7 @@ export function CurrentOrderCard({ order }: { order: MembershipDto["currentOrder
         {attached ? <div>Open the order to see what we read from your receipt and submit it for review. Nothing has been sent yet.</div> : null}
         {o.status === "AWAITING_PAYMENT" && !attached ? <div>Transfer {o.amountLabel} using the reference above, then upload your receipt.</div> : null}
         {o.status === "AWAITING_PAYMENT" || o.status === "SUBMITTED" ? (
-          <Link href={`/settings/membership/order/${o.id}`} className="mt-1 inline-flex h-10 items-center justify-center rounded-lg bg-ocean px-4 text-body-sm font-bold text-on-ocean">
+          <Link href={`/settings/membership/order/${o.id}`} className="mt-1 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-body-sm font-bold text-on-primary">
             {attached ? "Submit receipt" : o.status === "AWAITING_PAYMENT" ? "Payment instructions" : "View order"}
           </Link>
         ) : null}

@@ -123,8 +123,8 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
               </section>
             ) : null}
             {secondPrompt ? (
-              <div className="flex flex-col gap-2.5 rounded-3xl bg-ocean p-5.5 text-on-ocean">
-                <div className="text-[13px] font-semibold text-aqua">{secondPrompt.prompt}</div>
+              <div className="flex flex-col gap-2.5 rounded-3xl bg-surface-muted p-5.5 text-text">
+                <div className="text-[13px] font-semibold text-primary-ink">{secondPrompt.prompt}</div>
                 <div className="text-prompt font-bold leading-[1.35] tracking-[-.015em]">{secondPrompt.answer}</div>
               </div>
             ) : null}
@@ -138,7 +138,7 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
             <button type="button" onClick={onPass} aria-label="Pass" className="pointer-events-auto grid size-15 place-items-center rounded-full border border-border bg-surface text-text shadow-lg pressable-round">
               <CloseIcon size={24} strokeWidth={2.4} />
             </button>
-            <button type="button" onClick={onLike} aria-label="Like" className="pointer-events-auto grid size-16.5 place-items-center rounded-full border-0 like-gradient text-white shadow-like pressable-round">
+            <button type="button" onClick={onLike} aria-label="Like" className="pointer-events-auto grid size-16.5 place-items-center rounded-full border-0 like-gradient text-on-primary shadow-like pressable-round">
               <HeartIcon size={30} filled strokeWidth={0} />
             </button>
           </div>

@@ -57,7 +57,7 @@ export function LocationPicker({ open, onClose, title, locations, selectedId, on
         {allowNone ? (
           <button type="button" role="option" aria-selected={selectedId === null} onClick={() => choose(null)} className="flex h-13.5 items-center justify-between border-0 bg-transparent px-4.5 text-left text-body font-semibold text-text-secondary hover:bg-surface-muted">
             <span>None</span>
-            {selectedId === null ? <span className="text-caption font-bold text-primary-pressed">Selected</span> : null}
+            {selectedId === null ? <span className="text-caption font-bold text-primary-ink">Selected</span> : null}
           </button>
         ) : null}
         {results.map((l) => {
@@ -68,7 +68,7 @@ export function LocationPicker({ open, onClose, title, locations, selectedId, on
                 {l.name}
                 {l.kind !== "ATOLL" && l.atollName !== l.name ? <span className="ml-1.5 text-caption font-medium text-text-secondary">{l.atollName}</span> : null}
               </span>
-              {isSelected ? <span className="text-caption font-bold text-primary-pressed">Selected</span> : null}
+              {isSelected ? <span className="text-caption font-bold text-primary-ink">Selected</span> : null}
             </button>
           );
         })}

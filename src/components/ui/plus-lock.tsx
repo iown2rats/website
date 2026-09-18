@@ -17,7 +17,7 @@ export function PlusLockSheet({ open, onClose, feature, description, children }:
   return (
     <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId}>
       <div className="flex items-center gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-aqua-soft text-ocean" aria-hidden="true"><LockIcon size={20} /></span>
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-sand/20 text-text" aria-hidden="true"><LockIcon size={20} /></span>
         <div className="min-w-0">
           <DialogTitle id={titleId}>{feature}</DialogTitle>
           <div className="mt-0.5"><PlusTag size="sm" label="Plus feature" /></div>
@@ -26,7 +26,7 @@ export function PlusLockSheet({ open, onClose, feature, description, children }:
       <DialogDescription>{description}</DialogDescription>
       {children}
       <div className="flex flex-col gap-2.5 pt-1">
-        <Link href="/settings/membership" onClick={onClose} className="flex h-13 items-center justify-center rounded-lg bg-ocean text-body-lg font-bold text-on-ocean pressable">Upgrade to Plus</Link>
+        <Link href="/settings/membership" onClick={onClose} className="flex h-13 items-center justify-center rounded-lg bg-primary text-body-lg font-bold text-on-primary pressable">Upgrade to Plus</Link>
         <Button variant="muted" size="md" onClick={onClose} fullWidth>Not now</Button>
       </div>
     </ResponsiveDialog>

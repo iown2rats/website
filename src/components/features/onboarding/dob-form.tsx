@@ -58,7 +58,7 @@ export function DobForm({ initial }: { initial: { day: number; month: number; ye
         </Select>
       </div>
       {age != null ? (
-        <p className={adult ? "text-body-sm font-semibold text-primary-pressed" : "text-body-sm font-semibold text-danger"} role="status">
+        <p className={adult ? "text-body-sm font-semibold text-primary-ink" : "text-body-sm font-semibold text-danger"} role="status">
           {adult ? `You're ${age}. That's what people will see.` : `You must be ${MINIMUM_AGE} or older to use Thundi.`}
         </p>
       ) : null}

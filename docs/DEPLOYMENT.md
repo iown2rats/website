@@ -8,7 +8,7 @@ names, hosts and procedures. Keep this file current whenever the hosted setup ch
 | Piece | Where | Notes |
 | --- | --- | --- |
 | Application | Vercel project `thundi`, team Kingdom Trips, Node 24, framework Next.js | Linked to `github.com/iown2rats/website`; production branch `claude/intelligent-cannon-0s0pnf` (the repository's default branch). Every push to it builds a production deployment. |
-| Public origin | `https://thundi.vercel.app` today; moving to `https://mellocrush.com` (§8) | The only origin to use: `APP_URL`, the Google redirect URI and cookies are bound to this host. `thundi-kingdom-trips.vercel.app` and the git-branch alias also resolve but must not be used for sign-in. |
+| Public origin | `https://www.mellocrush.com` (primary; `mellocrush.com` and the `*.vercel.app` names redirect to it, §8) | The only origin to use: `APP_URL`, the Google redirect URI and cookies are bound to this host. `thundi-kingdom-trips.vercel.app` and the git-branch alias also resolve but must not be used for sign-in. |
 | Deployment protection | Vercel Authentication on **preview deployments only** | Production is public. Previews stay behind a Vercel login. |
 | Database | Supabase project `Thundi` (`qkubuaicuyoaskzcabcu`, ap-south-1, Postgres 17) | Runtime through the Supavisor transaction pooler (6543, `pgbouncer=true&connection_limit=5`); tooling through the session pooler (5432). Both connect as the `postgres` role. |
 | Storage | Supabase Storage bucket `profile-photos`, private, 10 MB/file, JPEG/PNG/WebP | The app writes WebP after processing and enforces 8 MB itself. Accessed with the server-only secret key. |
@@ -23,7 +23,7 @@ Set by the owner in the Vercel dashboard, never through chat, source or commits.
 
 | Variable | Kind | Value or source |
 | --- | --- | --- |
-| `APP_URL` | fixed | `https://thundi.vercel.app` |
+| `APP_URL` | fixed | `https://www.mellocrush.com` |
 | `AUTH_PROVIDER` | fixed | `google` |
 | `STORAGE_PROVIDER` | fixed | `supabase` |
 | `NEXT_PUBLIC_SUPABASE_URL` | fixed | `https://qkubuaicuyoaskzcabcu.supabase.co` |
@@ -130,27 +130,22 @@ Post-deployment check for this feature: attach a rendered fixture receipt to a t
 environment, or read the runtime logs for a `[ocr] completed` line after the first real upload. Never upload the owner's
 real bank receipt as a test.
 
-## 8. Custom domain: mellocrush.com
+## 8. Custom domain: mellocrush.com (connected 2026-09-18)
 
-The owner bought `mellocrush.com`. Connecting it is four dashboard steps plus one redeploy; the code already supports it
-(`CANONICAL_HOST` in `next.config.ts`). Do them in this order so sign-in never breaks.
+DNS at GoDaddy: `A @ → 76.76.21.21`-class Vercel record (resolves to Vercel's anycast IPs) and `CNAME www → <project>.vercel-dns-017.com`,
+as shown by Vercel when the domain was added. Vercel keeps **`www.mellocrush.com` as the primary host** and redirects
+`mellocrush.com` to it (308). Production environment: `APP_URL=https://www.mellocrush.com` and
+`CANONICAL_HOST=www.mellocrush.com` (never set for Preview); `next.config.ts` redirects every other host that reaches
+the deployment (`thundi.vercel.app`, `thundi-kingdom-trips.vercel.app`, the git-branch alias) to the same path on the
+canonical host. Google OAuth client: authorised origin `https://www.mellocrush.com`, redirect URI
+`https://www.mellocrush.com/auth/google/callback` (the old `thundi.vercel.app` entries can be removed once nothing
+links to them).
 
-1. **Google Cloud Console → the OAuth client** (Credentials → Web application client used by this app): add
-   `https://mellocrush.com` to *Authorised JavaScript origins* and `https://mellocrush.com/auth/google/callback` to
-   *Authorised redirect URIs*. Keep the existing `thundi.vercel.app` entries for now. Save.
-2. **Vercel → project `thundi` → Settings → Domains → Add**: `mellocrush.com`. Vercel shows the DNS it needs:
-   - if the domain was bought through Vercel, nothing else: it is configured automatically;
-   - otherwise, at the registrar, add an `A` record for `@` → `76.76.21.21` and a `CNAME` for `www` → `cname.vercel-dns.com`
-     (or the values Vercel shows if they differ). Also add `www.mellocrush.com` in Vercel and choose *Redirect to
-     mellocrush.com*. Wait until both show **Valid Configuration** (minutes to an hour; the certificate is automatic).
-3. **Vercel → Settings → Environment Variables (Production)**: set `APP_URL` = `https://mellocrush.com` and add
-   `CANONICAL_HOST` = `mellocrush.com`. Do not set `CANONICAL_HOST` for Preview.
-4. **Redeploy** the current production commit (Deployments → ⋯ → Redeploy). Environment changes need a new build.
+Why the order matters: the OAuth state cookie is set on the host that started sign-in, and Google returns the browser to
+`APP_URL`'s host. If the two differ (old host still serving, new `APP_URL`), sign-in from the old host fails with
+"That sign-in link expired" — which is exactly why the canonical redirect must be on whenever `APP_URL` has moved.
 
-After the redeploy: `https://mellocrush.com` serves the app; `https://thundi.vercel.app/…`, the team alias and `www.`
-redirect (308) to the same path on `mellocrush.com`; "Continue with Google" round-trips through
-`https://mellocrush.com/auth/google/callback`. Everyone signs in again once, because the session cookie is bound to the
-old host; nothing else changes (same project, database, storage and data). Once it all works, the old
-`thundi.vercel.app` entries can be removed from the Google client. Verification list: §5 against the new origin, plus
-`curl -sI https://thundi.vercel.app/discover` returning `308` with `location: https://mellocrush.com/discover`.
-
+Verification: `https://www.mellocrush.com/` serves the app (title Mellocrush, manifest, icons);
+`/auth/google/start` on it redirects to Google with `redirect_uri=https://www.mellocrush.com/auth/google/callback`;
+`https://mellocrush.com/<path>` → 308 `https://www.mellocrush.com/<path>`; `https://thundi.vercel.app/<path>` → 308
+to the same path on `www.mellocrush.com`. Everyone signs in again once (session cookies are per host); data is untouched.

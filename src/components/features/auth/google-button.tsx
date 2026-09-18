@@ -55,7 +55,31 @@ const LABELS: Record<SignInButtonProvider, string> = { google: "Continue with Go
  * "Continue with <provider>": a plain link to that provider's start endpoint (no JS needed). Surface classes are
  * chosen per appearance (never stacked), so a caller's `className` only adds size, radius and shadow.
  */
-export function ContinueWith({ provider, className, label, purpose = "login", returnTo, appearance = "white", markSize = 20, shape = "rounded" }: { provider: SignInButtonProvider; className?: string; label?: string; purpose?: "login" | "reauth"; returnTo?: string; appearance?: SignInButtonAppearance; markSize?: number; shape?: "rounded" | "pill" }) {
+export function ContinueWith({
+  provider,
+  className,
+  label,
+  purpose = "login",
+  returnTo,
+  appearance = "white",
+  markSize = 20,
+  shape = "rounded",
+  textClass = "text-cta-lg",
+  heightClass = "h-13",
+}: {
+  provider: SignInButtonProvider;
+  className?: string;
+  label?: string;
+  purpose?: "login" | "reauth";
+  returnTo?: string;
+  appearance?: SignInButtonAppearance;
+  markSize?: number;
+  shape?: "rounded" | "pill";
+  /** Label type. A prop rather than a class the caller appends, for the same reason as `shape`: `cn` only joins. */
+  textClass?: string;
+  /** Button height, a prop for the same reason. */
+  heightClass?: string;
+}) {
   const start = signInRoute(provider);
   const href = purpose === "reauth" ? `${start}?purpose=reauth${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}` : start;
   const brandBlue = appearance === "brand" && provider === "telegram";
@@ -70,7 +94,7 @@ export function ContinueWith({ provider, className, label, purpose = "login", re
   // stylesheet order rather than by the caller's intent.
   const radius = shape === "pill" ? "rounded-full" : "rounded-lg";
   return (
-    <Link href={href} prefetch={false} className={cn("flex h-13 items-center justify-center gap-3 text-cta-lg shadow-sm pressable", radius, surface, className)}>
+    <Link href={href} prefetch={false} className={cn("flex items-center justify-center gap-3 shadow-sm pressable", heightClass, textClass, radius, surface, className)}>
       {mark}
       {label ?? LABELS[provider]}
     </Link>

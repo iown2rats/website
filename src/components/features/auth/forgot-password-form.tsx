@@ -14,14 +14,14 @@ export function ForgotPasswordForm() {
 
   if (done) {
     return (
-      <p className="mt-5 text-[15px] leading-relaxed text-white/85">
+      <p className="mt-4 text-[13px] leading-relaxed text-white/85">
         If that address has a Mellocrush account with a password, a reset link is on its way. It works once and expires in an hour.
       </p>
     );
   }
   return (
     <form
-      className="mt-5 flex w-full flex-col gap-2.5"
+      className="mt-4 flex w-full flex-col gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);

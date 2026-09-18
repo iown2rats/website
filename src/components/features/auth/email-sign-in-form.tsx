@@ -16,7 +16,7 @@ export function EmailSignInForm() {
 
   return (
     <form
-      className="mt-5 flex w-full flex-col gap-2.5"
+      className="mt-4 flex w-full flex-col gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);
@@ -30,12 +30,12 @@ export function EmailSignInForm() {
       <GlassField label="Email" name="email" type="email" autoComplete="email" inputMode="email" placeholder="Email" required disabled={busy} />
       <GlassPasswordField label="Password" name="password" autoComplete="current-password" placeholder="Password" required disabled={busy} />
       {error ? (
-        <p role="alert" className="px-4 text-left text-[13px] font-semibold text-[#ffc9c9]">
+        <p role="alert" className="px-4 text-left text-[12px] font-semibold text-[#ffc9c9]">
           {error}
         </p>
       ) : null}
       <GlassSubmit loading={busy}>{busy ? "Signing in…" : "Continue"}</GlassSubmit>
-      <div className="mt-1 flex items-center justify-between text-[14px]">
+      <div className="mt-0.5 flex items-center justify-between text-[12.5px]">
         <Link href={ROUTES.register} className="font-semibold text-white underline decoration-white/50 underline-offset-[3px]">
           Create account
         </Link>

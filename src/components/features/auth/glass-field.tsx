@@ -15,7 +15,7 @@ export interface GlassFieldProps extends Omit<InputHTMLAttributes<HTMLInputEleme
 }
 
 const base =
-  "h-13 w-full rounded-full border border-white/25 bg-white/10 px-5 text-[16px] text-white placeholder:text-white/55 " +
+  "h-12 w-full rounded-full border border-white/25 bg-white/10 px-4.5 text-[14px] text-white placeholder:text-white/55 " +
   "outline-none focus-visible:border-white/60 focus-visible:outline-2 focus-visible:outline-white/80 " +
   "aria-[invalid=true]:border-[#ffb3b3] disabled:opacity-60";
 
@@ -30,7 +30,7 @@ export function GlassField({ label, error, id: providedId, ...rest }: GlassField
       </label>
       <input id={id} aria-describedby={errorId} aria-invalid={error ? true : undefined} className={base} {...rest} />
       {error ? (
-        <p id={errorId} role="alert" className="px-4 text-[13px] font-semibold text-[#ffc9c9]">
+        <p id={errorId} role="alert" className="px-4 text-[12px] font-semibold text-[#ffc9c9]">
           {error}
         </p>
       ) : null}
@@ -55,13 +55,13 @@ export function GlassPasswordField({ label, error, id: providedId, ...rest }: Gl
           type="button"
           onClick={() => setShown((v) => !v)}
           aria-pressed={shown}
-          className="absolute right-1.5 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full text-white/75 hover:text-white focus-visible:outline-2 focus-visible:outline-white/80"
+          className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-white/75 hover:text-white focus-visible:outline-2 focus-visible:outline-white/80"
         >
-          {shown ? <EyeOffIcon size={20} title="Hide password" /> : <EyeIcon size={20} title="Show password" />}
+          {shown ? <EyeOffIcon size={18} title="Hide password" /> : <EyeIcon size={18} title="Show password" />}
         </button>
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="px-4 text-[13px] font-semibold text-[#ffc9c9]">
+        <p id={errorId} role="alert" className="px-4 text-[12px] font-semibold text-[#ffc9c9]">
           {error}
         </p>
       ) : null}
@@ -76,7 +76,7 @@ export function GlassSubmit({ children, loading = false, ...rest }: { children: 
       type="submit"
       disabled={loading || rest.disabled}
       aria-busy={loading || undefined}
-      className="pressable flex h-13 w-full items-center justify-center rounded-full bg-primary text-[17px] font-bold text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.25)] disabled:opacity-60"
+      className="pressable flex h-12 w-full items-center justify-center rounded-full bg-primary text-[15px] font-bold text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.25)] disabled:opacity-60"
       {...rest}
     >
       {children}

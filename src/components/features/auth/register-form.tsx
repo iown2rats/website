@@ -19,18 +19,18 @@ export function RegisterForm() {
 
   if (sentTo) {
     return (
-      <div className="mt-5 flex w-full flex-col gap-3 text-[15px] leading-relaxed text-white/85">
+      <div className="mt-4 flex w-full flex-col gap-2.5 text-[13px] leading-relaxed text-white/85">
         <p>
           If <span className="font-semibold text-white">{sentTo}</span> can be used, a confirmation link is on its way. Open it to finish setting up your account.
         </p>
-        <p className="text-[13px] text-white/70">The link works once and expires in 24 hours. Check your spam folder if it hasn&apos;t arrived in a few minutes.</p>
+        <p className="text-[12px] text-white/70">The link works once and expires in 24 hours. Check your spam folder if it hasn&apos;t arrived in a few minutes.</p>
       </div>
     );
   }
 
   return (
     <form
-      className="mt-5 flex w-full flex-col gap-2.5"
+      className="mt-4 flex w-full flex-col gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);
@@ -67,9 +67,9 @@ export function RegisterForm() {
         disabled={busy}
         error={error?.field === "confirmPassword" ? error.message : undefined}
       />
-      <p className="px-4 text-left text-[13px] text-white/70">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
+      <p className="px-4 text-left text-[12px] text-white/70">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
       {error && !error.field ? (
-        <p role="alert" className="px-4 text-left text-[13px] font-semibold text-[#ffc9c9]">
+        <p role="alert" className="px-4 text-left text-[12px] font-semibold text-[#ffc9c9]">
           {error.message}
         </p>
       ) : null}

@@ -410,8 +410,15 @@ plane. The coral Continue pill is the only filled control, which is what marks i
 ring is the white outline used across the card. The password toggle is a real button with an eye icon and an
 `aria-pressed` state, and it names what it does for screen readers.
 
-The card is 608 px tall at every phone width with all three methods on it, so it still clears the viewport at
+Type is deliberately quiet, so the card reads as a form rather than a poster: provider labels and the Continue pill
+at 15 px, fields at 14 px, the "Create account" / "Forgot password?" row at 12.5 px, the legal line at 11.5 px, the
+tagline at 11 px uppercase, and the wordmark 30 px tall. Controls are 48 px, comfortably above the 44 px minimum
+touch target. Button height and label size are **props** on `ContinueWith` (`heightClass`, `textClass`), not classes a
+caller appends: `cn` only joins strings, so two competing utilities would be settled by stylesheet order rather than
+by intent — the same trap that first shipped a 16 px radius where a pill was asked for.
+
+The card is 531 px tall at every phone width with all three methods on it, so it clears the viewport at
 375 × 812 with the couple visible below; each method is hidden when it cannot complete, which shortens it further.
-Verified with Playwright at 375, 390, 430 and 1280 px: no horizontal or vertical page scroll, every control the same
-width within a card, the registration flow reaching "Verify your email", and that screen offering only Resend, Change
+Verified with Playwright at 375, 390, 430 and 1280 px: no horizontal or vertical page scroll, every control 48 px tall
+and the same width within a card, the registration flow reaching "Verify your email", and that screen offering only Resend, Change
 email and Sign out. Screenshots in `screenshots/emailauth/` (gitignored).

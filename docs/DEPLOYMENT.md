@@ -51,7 +51,7 @@ explicit owner approval. The four migrations up to `20260917230000_google_auth` 
 repository checksums, so `npm run db:deploy` (against `DIRECT_DATABASE_URL`) treats them as applied and only
 runs newer ones. The build command is plain `next build`; migrations are never run from the build.
 
-**Pending migration.** `20260918030000_admin_billing` (admin dashboard + Plus orders) is applied locally and in tests but NOT yet on the hosted project; apply it through the approved process before using `/admin` or buying Plus on staging.
+`20260918030000_admin_billing` (admin dashboard + Plus orders) was applied to the hosted project on 2026-09-18 with owner approval and recorded the same way; RLS was enabled on the two new tables (39 of 39 public tables).
 
 **Reference data.** Locations (35), interests (27), prompts (6) and subscription plans (3, placeholder
 prices) come from `prisma/seed-data/reference.ts` and were loaded with idempotent upserts keyed on `slug`

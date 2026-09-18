@@ -95,9 +95,13 @@ new environment variable is needed. Selfies are written to the existing private 
 pending) and by admins; deleting an account removes the object. The deployment carrying Phase 10 is an ordinary push
 to the production branch (§4).
 
-## 3d. Telegram sign-in (2026-09-18): migration `20260918160000_telegram_auth` — NOT YET APPLIED to the hosted database
+## 3d. Telegram sign-in (2026-09-18): migration `20260918160000_telegram_auth` — applied
 
-Additive only, no rows changed or removed:
+Applied to the hosted project on 2026-09-18 with owner approval through the Supabase management connection and
+recorded in `_prisma_migrations` with the repository checksum
+(`b11b6302f75aa9c770a99e5c20981fa9a16e9252f624e45c66dc94922a5ffe3f`). Post-checks: enum `GOOGLE,TELEGRAM`;
+`AuthIdentity.email` nullable and `providerUsername` present; the four existing Google identities unchanged; RLS still
+enabled on all 39 public tables. Additive only, no rows changed or removed:
 
 ```sql
 ALTER TYPE "AuthProvider" ADD VALUE 'TELEGRAM';
@@ -105,18 +109,17 @@ ALTER TABLE "AuthIdentity" ALTER COLUMN "email" DROP NOT NULL;
 ALTER TABLE "AuthIdentity" ADD COLUMN "providerUsername" TEXT;
 ```
 
-Order of operations once the owner approves: apply the migration (`prisma migrate deploy` against `DIRECT_DATABASE_URL`,
-or the same SQL plus the `_prisma_migrations` bookkeeping row as in §3), confirm RLS is still enabled on `AuthIdentity`
-(no new table, so nothing else to enable), then redeploy production. Until the migration is applied the deployed code hides
-the Telegram button and returns 404 from the Telegram routes even with the variables set: `telegram-availability.ts`
-checks for the `TELEGRAM` enum value in the hosted database (cached, re-checked every minute while missing), so the
-order of the migration and the deployment does not matter and there is no window with a broken button. Once the
-migration lands the button appears within a minute without a redeploy.
+The deployed code hides the Telegram button and returns 404 from the Telegram routes until both the variables and this
+migration are present: `telegram-availability.ts` checks for the `TELEGRAM` enum value in the hosted database (cached,
+re-checked every minute while missing), so the order of the migration and a deployment never matters and there is no
+window with a broken button.
 
-Post-deployment check: `https://www.mellocrush.com/` shows both buttons; `/auth/telegram/start` redirects to
-`https://oauth.telegram.org/auth` with `client_id`, `redirect_uri=https://www.mellocrush.com/auth/telegram/callback`,
-`scope=openid profile`, `state`, `nonce`, `code_challenge`; a real Telegram sign-in by the owner lands on onboarding
-step 2 as a new account (Telegram and Google accounts are never merged); Settings shows "Telegram account · @username".
+Verified 2026-09-18 after the migration and deployment `f5ce1a2`: `https://www.mellocrush.com/` shows both buttons;
+`/auth/telegram/start` redirects to `https://oauth.telegram.org/auth` with `client_id`,
+`redirect_uri=https://www.mellocrush.com/auth/telegram/callback`, `scope=openid profile`, `state`, `nonce`,
+`code_challenge` (S256) and sets the provider-tagged `thundi_oauth` cookie; `/auth/google/start` is unchanged. Still to
+do by the owner: one real Telegram sign-in from a phone, which lands on onboarding step 2 as a new account (Telegram and
+Google accounts are never merged); Settings then shows "Telegram account · @username".
 
 ## 4. Redeploying
 

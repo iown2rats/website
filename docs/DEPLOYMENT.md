@@ -124,9 +124,19 @@ Verified 2026-09-18 after the migration and deployment `f5ce1a2`: `https://www.m
 do by the owner: one real Telegram sign-in from a phone, which lands on onboarding step 2 as a new account (Telegram and
 Google accounts are never merged); Settings then shows "Telegram account · @username".
 
-## 3e. Email + password sign-in (2026-09-18): migration `20260918190000_email_auth` — NOT YET APPLIED to the hosted database
+## 3e. Email + password sign-in (2026-09-18): migration `20260918190000_email_auth` — applied
 
-Additive only. No existing row is read, changed or removed; Google and Telegram identities keep `passwordHash` NULL
+Applied to the hosted project on 2026-09-18 with owner approval through the Supabase management connection and
+recorded in `_prisma_migrations` with the repository checksum
+(`06be6b2f4ae4f98a9e0f002bedd9ff6ef6cae7c790af4b35378dceaa2954e8c0`). Post-checks: `AuthProvider` is
+`GOOGLE,TELEGRAM,EMAIL`; `AuthTokenPurpose` is `EMAIL_VERIFICATION,PASSWORD_RESET`; `AuthIdentity` has
+`passwordHash` and `passwordUpdatedAt`; `AuthToken` exists with its three indexes, the unique `tokenHash` and the
+cascading foreign key; RLS is enabled on it and on all 40 public tables; the 5 existing Google and Telegram
+identities are unchanged with no password. **Email + password is still not visible in production**: the second gate,
+a working mail provider (§10), is not configured, so the welcome card shows Google and Telegram only and
+`/auth/register` redirects to it.
+
+Additive only. No existing row was read, changed or removed; Google and Telegram identities keep `passwordHash` NULL
 and never enter the verification flow.
 
 ```sql

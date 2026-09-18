@@ -15,14 +15,20 @@ import { createHash, createHmac, randomBytes, timingSafeEqual, type JsonWebKey }
 import { getEnv, telegramLoginEnabled } from "@/lib/env";
 import { assertClaims, decodeJwt, signHs256, toB64url, TokenError, verifyHs256, verifyRs256, type VerifiedClaims } from "./jwt";
 
-/** The sign-in methods offered to people. Each maps to one AuthProvider enum value in the database. */
-export type SignInProvider = "google" | "telegram";
-export const SIGN_IN_PROVIDERS: readonly SignInProvider[] = ["google", "telegram"];
-export const PROVIDER_LABEL: Record<SignInProvider, string> = { google: "Google", telegram: "Telegram" };
-export const PROVIDER_ENUM = { google: "GOOGLE", telegram: "TELEGRAM" } as const satisfies Record<SignInProvider, "GOOGLE" | "TELEGRAM">;
+/**
+ * The sign-in methods offered to people. Each maps to one AuthProvider enum value in the database. "email" is not an
+ * OpenID Connect provider — it has no authorization server and no ID token — so the OIDC machinery below covers only
+ * `OidcSignInProvider`; email + password lives in `email-identity.ts` and shares the identity model, not the flow.
+ */
+export type SignInProvider = "google" | "telegram" | "email";
+export type OidcSignInProvider = "google" | "telegram";
+export const SIGN_IN_PROVIDERS: readonly SignInProvider[] = ["google", "telegram", "email"];
+export const PROVIDER_LABEL: Record<SignInProvider, string> = { google: "Google", telegram: "Telegram", email: "Email" };
+export const PROVIDER_ENUM = { google: "GOOGLE", telegram: "TELEGRAM", email: "EMAIL" } as const satisfies Record<SignInProvider, "GOOGLE" | "TELEGRAM" | "EMAIL">;
 export type AuthProviderEnum = (typeof PROVIDER_ENUM)[SignInProvider];
 
-export function isSignInProvider(value: unknown): value is SignInProvider {
+/** The two providers that really run an OpenID Connect flow (the welcome screen's Google and Telegram buttons). */
+export function isSignInProvider(value: unknown): value is OidcSignInProvider {
   return value === "google" || value === "telegram";
 }
 
@@ -46,7 +52,7 @@ export interface CodeExchange {
 export interface OidcProvider {
   readonly id: "google" | "telegram" | "dev";
   /** Which sign-in method this instance serves (the dev stand-in serves either). */
-  readonly kind: SignInProvider;
+  readonly kind: OidcSignInProvider;
   authorizationUrl(req: AuthorizationRequest): string;
   exchangeCode(input: CodeExchange, now?: Date): Promise<{ idToken: string }>;
   verifyIdToken(idToken: string, expected: { nonce: string; now?: Date }): Promise<VerifiedClaims>;
@@ -250,7 +256,7 @@ export class TelegramOidcProvider extends JwksRs256Provider implements OidcProvi
 
 export const DEV_OIDC = {
   issuer: "https://dev-google.thundi.local",
-  issuers: { google: "https://dev-google.thundi.local", telegram: "https://dev-telegram.thundi.local" } as Record<SignInProvider, string>,
+  issuers: { google: "https://dev-google.thundi.local", telegram: "https://dev-telegram.thundi.local" } as Record<OidcSignInProvider, string>,
   audience: "thundi-dev",
   codeTtlMs: 10 * 60_000,
   idTokenTtlMs: 5 * 60_000,
@@ -275,7 +281,7 @@ export class DevOidcProvider implements OidcProvider {
   readonly id = "dev" as const;
   private readonly codeKey: Buffer;
   private readonly tokenKey: Buffer;
-  constructor(private readonly appUrl: string, secret: string, readonly kind: SignInProvider = "google") {
+  constructor(private readonly appUrl: string, secret: string, readonly kind: OidcSignInProvider = "google") {
     this.codeKey = createHmac("sha256", secret).update(`dev-oidc-code:${kind}`).digest();
     this.tokenKey = createHmac("sha256", secret).update(`dev-oidc-id-token:${kind}`).digest();
   }
@@ -330,7 +336,7 @@ const cached = new Map<SignInProvider, OidcProvider>();
  * is (callers check `telegramLoginEnabled()` first and the routes 404 otherwise). With AUTH_PROVIDER=dev both are
  * the local stand-in.
  */
-export function getOidcProvider(kind: SignInProvider = "google"): OidcProvider {
+export function getOidcProvider(kind: OidcSignInProvider = "google"): OidcProvider {
   const hit = cached.get(kind);
   if (hit) return hit;
   const env = getEnv();
@@ -353,6 +359,6 @@ export function resetOidcProviderCache(): void {
 }
 
 /** The registered callback for a provider: `${APP_URL}/auth/<provider>/callback`, exact match required at the provider. */
-export function redirectUri(kind: SignInProvider = "google"): string {
+export function redirectUri(kind: OidcSignInProvider = "google"): string {
   return new URL(`/auth/${kind}/callback`, getEnv().APP_URL).toString();
 }

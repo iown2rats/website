@@ -10,6 +10,9 @@ import { getUserDetail } from "@/server/admin/users";
 export const metadata = { title: "User · Admin" };
 export const dynamic = "force-dynamic";
 
+/** Never shows a password hash or a token hash: the DTO does not carry them (src/server/admin/users.ts). */
+const PROVIDER_LABELS = { GOOGLE: "Google", TELEGRAM: "Telegram", EMAIL: "Email" } as const;
+
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ userId: string }> }) {
   const admin = await requireAdminPage("users.view");
   const { userId } = await params;
@@ -45,7 +48,8 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               { label: "Age", value: a.ageYears !== null ? `${a.ageYears}` : "—" },
               { label: "Phone on file", value: a.hasPhone ? "Yes (never shown here)" : "No" },
               { label: "Open sessions", value: String(a.activeSessions) },
-              { label: "Signs in with", value: d.signIn ? `${d.signIn.provider === "TELEGRAM" ? "Telegram" : "Google"} · ${d.signIn.account ?? "—"}` : "—" },
+              { label: "Signs in with", value: d.signIn ? `${PROVIDER_LABELS[d.signIn.provider]} · ${d.signIn.account ?? "—"}` : "—" },
+              ...(d.signIn?.emailVerified !== null && d.signIn?.emailVerified !== undefined ? [{ label: "Email address", value: d.signIn.emailVerified ? "Email verified" : "Email unverified" }] : []),
               { label: "Last sign-in via provider", value: formatDateTime(d.signIn?.lastLoginAt) },
               ...(a.deletedAt ? [{ label: "Deleted", value: formatDateTime(a.deletedAt) }] : []),
             ]}

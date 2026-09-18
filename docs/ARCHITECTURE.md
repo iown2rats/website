@@ -148,6 +148,60 @@ Authentication is "Continue with Google" or "Continue with Telegram" and nothing
 - **Failures** land on `/auth/error?reason=…&provider=…` (cancelled, state, token, session, identity, unavailable, provider) with no account detail; the screen names the provider that failed and offers that provider's button; enumeration is not possible because sign-in creates or resumes without ever saying which.
 - **Existing accounts**: Google accounts are untouched by the Telegram addition (the migration is additive: an enum value, a nullable email, a nullable username column). The hosted database has never been migrated from phone auth, so no real phone-authenticated users exist. Development demo accounts receive an explicit seeded identity per demo key (`dev-<key>`, `<key>@demo.thundi.dev`) — a mapping defined by the seed, never guessed from names; their demo phones stay as optional contact-blocking data. Any other locally created phone-only account has no identity and simply cannot sign in (nothing is merged or deleted); if real phone-only users ever existed, the safe path would be an in-app "link your Google account" step while signed in, not an automatic merge.
 
+### 4.1b Sign-in: email and password (added 2026-09-18; not exposed in production until §20 is cleared)
+
+The third method, beside Google and Telegram, using the same identity model rather than a parallel system: one
+`AuthIdentity` row with `provider = EMAIL`, `providerSubject` = the normalised address (this provider's natural stable
+key), `email` the same value, `emailVerified` starting false, and `passwordHash` holding the verifier. Sessions,
+onboarding, deletion and re-authentication are the existing ones.
+
+- **Passwords** (`src/server/auth/password.ts`): scrypt from Node's own crypto, N = 2^16, r = 8, p = 1 (64 MiB), a
+  16-byte random salt per password, stored as `scrypt$N$r$p$salt$hash`. Plaintext is never stored, logged or
+  returned. Because each verifier carries its parameters, the cost can be raised later without invalidating anyone:
+  `verifyPassword` reports `needsRehash` and sign-in re-hashes transparently; a future Argon2id implementation adds a
+  prefix behind the same interface. Rules are NIST-style: at least 10 characters, a maximum of 200, and a refusal of
+  one repeated character, a keyboard sequence and a short list of breach-corpus passwords. No character classes.
+- **Tokens** (`src/server/auth/auth-tokens.ts`, table `AuthToken`): 32 random bytes, base64url. Only the SHA-256 is
+  stored, so a leaked table cannot be replayed as a link. Single-use (a conditional `UPDATE` on `consumedAt`, so two
+  clicks race safely and one wins), expiring (verification 24 hours, reset 60 minutes), and issuing a token consumes
+  the identity's outstanding tokens of that purpose so only the newest link works. A verification token records the
+  address it confirms, so a link sent to a previous address cannot confirm a new one.
+- **Registration** → an account in ONBOARDING whose address is unverified, plus the verification email. The account is
+  signed in immediately so it lands on the verification screen rather than a dead end.
+- **The unverified restriction** is enforced in one place, not in the UI. `resolveSession` selects whether the user has
+  an unverified EMAIL identity, `authKindForUser` returns `"unverified"` for it, and from there: `resolveAccess` allows
+  only `/auth/verify-email` (everything else, including onboarding and `/admin`, redirects there or 404s), and
+  **`requireActor()` throws `EmailVerificationRequiredError`**, which is what actually closes discovery, likes,
+  matches, messages, Likes You, Boost, Community, posts, comments and Plus — every server action goes through it. The
+  verification screen's own three actions use `requireUnverifiedActor()`, which accepts nothing else.
+- **Enumeration**: registration, sign-in and "forgot password" answer identically whatever the address is. A duplicate
+  registration returns the same result and emails the address's real owner instead; a wrong password and an unknown
+  address share one message; "forgot password" always reports success, even when rate-limited, because a different
+  answer would itself separate addresses.
+- **Rate limits** (Postgres buckets, `EMAIL_AUTH_RULES`): registration 3/hour per address and 5/hour per client;
+  verification resend 4/hour per identity with a 60-second cooldown; sign-in 10 per 15 minutes per address and 30 per
+  client; password reset 3/hour per address and 10/hour per client; password re-authentication 5 per 15 minutes per
+  session.
+- **Reset** consumes the token, stores the new verifier, retires every outstanding reset token and **revokes every
+  session** — if the password was reset because someone else had it, their sessions end too.
+- **Re-authentication** (§4.4) is per provider: a Google account re-authenticates with Google, a Telegram account with
+  Telegram, an email account by confirming its password (`reauthenticateWithPassword`), all writing the same
+  `Session.reauthenticatedAt` mark on that session only.
+- **No automatic linking.** An EMAIL identity is never joined to a Google or Telegram account because the addresses
+  match; they are different people to the system until an explicit, authenticated linking step exists (none does).
+  Tested directly.
+- **Google and Telegram are untouched**: their identities keep `passwordHash` NULL, never enter this flow, and a
+  Telegram account with no address at all behaves exactly as before. Tested directly.
+- **Feature gate** (`src/server/auth/email-availability.ts`): the method appears only when it is switched on, a mail
+  provider that can really deliver is configured, and the database carries both the `EMAIL` enum value and the
+  `AuthToken` table. Every page and every server action re-checks it, so an incomplete deployment shows fewer buttons
+  rather than a broken registration form.
+- **Email delivery** (`src/lib/email/`): a one-method `EmailProvider` interface with a Resend implementation (plain
+  HTTPS fetch, no SDK, no native dependency) and a development `ConsoleEmailProvider` that prints the link to the
+  server log and is refused in production. Only two messages exist, "confirm your email" and "reset your password";
+  no marketing, no tracking pixels. Verification URLs are built from `APP_URL`, which is
+  `https://www.mellocrush.com` in production.
+
 ### 4.2 Sessions (as built)
 
 - Opaque 32-byte token (base64url) in cookie `thundi_session`: `HttpOnly; SameSite=Lax; Path=/`, `Secure` in production. The database stores only `sha256(token)` plus user id, created/lastSeen/expires, user agent and the IP /24 prefix.
@@ -599,6 +653,10 @@ GOOGLE_CLIENT_ID=        # required with AUTH_PROVIDER=google; redirect URI ${AP
 GOOGLE_CLIENT_SECRET=    # server only
 TELEGRAM_CLIENT_ID=      # optional pair: BotFather → Login Widget; redirect URI ${APP_URL}/auth/telegram/callback. "Continue with Telegram" is offered only when both are set
 TELEGRAM_CLIENT_SECRET=  # server only (not the bot token)
+EMAIL_PROVIDER=          # resend (production) | console (development: prints the link to the log, refused in production)
+RESEND_API_KEY=          # server only; required with EMAIL_PROVIDER=resend
+EMAIL_FROM=              # e.g. "Mellocrush <hello@mellocrush.com>", on a domain verified with the provider
+EMAIL_AUTH=on            # off switches email + password sign-in off even when a provider is configured
 ADMIN_BOOTSTRAP_TOKEN=   # optional, one-time: first-admin claim at /admin-setup while no admin exists (§21.2); remove after use
 STORAGE_PROVIDER=local   # local (dev/test) | supabase
 LOCAL_STORAGE_DIR=.storage
@@ -635,6 +693,7 @@ APP_URL=http://localhost:3000
 | 11a Receipt OCR (done; hosted migration applied 2026-09-18) | Migration `20260918120000_receipt_ocr` (`ReceiptVerification`, `ReceiptOutcome`), `src/server/ocr/*` (engine, extractors, `bml-v1`/`mib-v1`/`generic-v1` parsers, verifier), `src/server/billing/{receipts,receipt-dto}.ts`, two-step attach/submit flow, admin check panel with Re-run OCR and approve-with-reason, `next.config.ts` OCR asset tracing, 51 new tests (260 total). |
 | 10 Plus, verification & entitlement completion (done) | Photo verification end to end (`src/server/verification/*`, `/settings/verification`, `POST /api/verification/selfie`, `/admin/verifications/[userId]`), the Likes tab (`src/server/likes/likes-page.ts`, `/likes`), Boost control, the `PlusLockSheet` lock state, Membership comparison table, accurate HEIC/PDF messages on photo upload, 16 new tests (276 total). No migration. |
 | Telegram sign-in (done 2026-09-18; hosted migration applied) | Migration `20260918160000_telegram_auth` (`TELEGRAM` enum value, nullable `AuthIdentity.email`, `AuthIdentity.providerUsername`), `TelegramOidcProvider` beside Google over a shared RS256/JWKS base, `src/server/auth/flow.ts` shared by `/auth/{google,telegram}/{start,callback}`, provider-aware identity mapping and re-authentication, Continue with Telegram on the welcome screen, provider-aware error/deleted/Settings/admin copy, dev stand-in Telegram shape, 12 new tests (288 total). |
+| Email + password sign-in (built 2026-09-18; hosted migration and email provider pending owner approval) | Migration `20260918190000_email_auth` (`EMAIL` enum value, `AuthIdentity.passwordHash`/`passwordUpdatedAt`, `AuthToken` table + `AuthTokenPurpose`), `src/server/auth/{password,auth-tokens,email-identity,email-availability}.ts`, `src/lib/email/*`, `src/actions/email-auth.ts`, `/auth/{register,verify,verify-email,forgot-password,reset-password}`, the glass auth shell and fields, unverified enforcement in session/route-access/`requireActor`, admin provider + verification row, 21 new tests (313 total). |
 | 12 Hardening | Tests, CSP, rate limits review, build, security review. |
 
 ## 19. Decisions taken without asking (reversible)
@@ -660,6 +719,9 @@ APP_URL=http://localhost:3000
 
 - Staging is deployed (`docs/DEPLOYMENT.md`): Vercel project `thundi` at `https://thundi.vercel.app`, Supabase project `qkubuaicuyoaskzcabcu` migrated through `20260917230000_google_auth`, reference data loaded, RLS enabled, private bucket `profile-photos` created, and the Google OAuth client registered for that origin. Still needed before launch: a paid Vercel plan and custom domain (the Hobby plan is non-commercial), and the redirect URI `${APP_URL}/auth/google/callback` registered for each additional environment.
 - Telegram sign-in is live (migration `20260918160000_telegram_auth` applied 2026-09-18, `docs/DEPLOYMENT.md` §3d). Owner to do: one real Telegram sign-in from a phone to confirm Telegram's side end to end; it creates a new account separate from the Google one.
+- **Email + password goes live only after** migration `20260918190000_email_auth` is applied to the hosted database with owner approval (`docs/DEPLOYMENT.md` §3e) AND a transactional email provider is configured with its DNS records (`docs/DEPLOYMENT.md` §10). Until both are true the feature gate hides the email form and every email route redirects, so Google and Telegram are unaffected.
+- **Account recovery for an email account whose address is lost** is deliberately not built: changing the address is allowed only while it is still unverified. A verified member who loses access to their inbox has no self-service path yet, and inventing one (support-driven or otherwise) needs the owner's decision on how identity would be proven.
+- **Account linking** (one person, several providers) does not exist. Signing in with Google and with email creates two accounts. If one account per person across providers is wanted, it needs an explicit, authenticated "link this method" step while signed in.
 - Verified phone (optional): sign-in no longer verifies a phone. If the product wants "phone verified" as an independent signal (or wants people to hide from contacts through their own number), an explicit phone step with its own SMS provider decision is needed; nothing is assumed meanwhile.
 - Photo moderation before launch: production shows APPROVED photos only (§7.1). Either the moderation/approval workflow (Phase 12) must exist so uploads become APPROVED, or the owner must approve an alternative photo policy. Without one of these, new users will not be discoverable in production.
 - Account deletion retention (Phase 9, Google-auth migration): deletion anonymises immediately but keeps the anonymised User row, message history, reports, blocks, subscription records and the scrubbed identity row (Google subject only, so a returning Google account is told its account was deleted) indefinitely because no legal retention period has been decided. The owner (with legal advice) must set how long those records are kept before a purge job is written; no duration was invented.

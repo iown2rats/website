@@ -92,7 +92,8 @@ export async function searchUsers(admin: AdminActor, input: UserSearchInput, dep
 
 export interface UserDetailDto {
   account: { userId: string; handle: string | null; displayName: string | null; status: AccountStatus; role: string; onboardingStage: string; onboardingCompletedAt: string | null; createdAt: string; lastActiveAt: string | null; deletedAt: string | null; hasPhone: boolean; ageYears: number | null; activeSessions: number };
-  signIn: { provider: "GOOGLE" | "TELEGRAM"; account: string | null; lastLoginAt: string | null } | null;
+  /** How this member signs in. `emailVerified` is null for Google and Telegram, which have no such step. Never a password or token hash. */
+  signIn: { provider: "GOOGLE" | "TELEGRAM" | "EMAIL"; account: string | null; emailVerified: boolean | null; lastLoginAt: string | null } | null;
   profile: { location: string | null; intent: string | null; photos: { approved: number; pending: number; rejected: number }; bioLength: number; interests: number; prompts: number } | null;
   privacy: { paused: boolean; invisibleMode: boolean; visibility: string; blockContacts: boolean } | null;
   verification: { status: string; submittedAt: string | null; decidedAt: string | null; rejectionReason: string | null; hasSelfie: boolean };
@@ -113,7 +114,7 @@ export async function getUserDetail(admin: AdminActor, userId: string, deps: { d
       profile: { select: { handle: true, displayName: true, bio: true, intent: true, location: { select: { name: true } }, photos: { select: { moderation: true } }, _count: { select: { interests: true, prompts: true } } } },
       privacy: { select: { pausedAt: true, invisibleMode: true, visibility: true, blockContacts: true } },
       verification: { select: { status: true, submittedAt: true, decidedAt: true, rejectionReason: true, selfieStorageKey: true } },
-      identities: { where: { releasedAt: null }, orderBy: { createdAt: "asc" }, select: { provider: true, email: true, providerUsername: true, displayName: true, lastLoginAt: true }, take: 1 },
+      identities: { where: { releasedAt: null }, orderBy: { createdAt: "asc" }, select: { provider: true, email: true, emailVerified: true, providerUsername: true, displayName: true, lastLoginAt: true }, take: 1 },
       subscriptions: { orderBy: { currentPeriodEnd: "desc" }, take: 10, select: { id: true, status: true, provider: true, currentPeriodStart: true, currentPeriodEnd: true, plan: { select: { name: true } }, order: { select: { reference: true } } } },
       orders: { orderBy: { createdAt: "desc" }, take: 10, select: { id: true, reference: true, status: true, planName: true, amountMinor: true, currency: true, createdAt: true, submittedAt: true, decidedAt: true } },
       _count: { select: { sessions: true, reportsFiled: true, reportsReceived: true, blocksGiven: true, blocksReceived: true } },
@@ -139,6 +140,7 @@ export async function getUserDetail(admin: AdminActor, userId: string, deps: { d
       ? {
           provider: u.identities[0].provider,
           account: u.identities[0].provider === "TELEGRAM" ? (u.identities[0].providerUsername ? `@${u.identities[0].providerUsername}` : u.identities[0].displayName) : u.identities[0].email,
+          emailVerified: u.identities[0].provider === "EMAIL" ? u.identities[0].emailVerified : null,
           lastLoginAt: u.identities[0].lastLoginAt?.toISOString() ?? null,
         }
       : null,

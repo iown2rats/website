@@ -7,7 +7,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { getEnv } from "@/lib/env";
-import type { SignInProvider } from "@/server/auth/oidc";
+import type { OidcSignInProvider } from "@/server/auth/oidc";
 
 export const OAUTH_COOKIE = "thundi_oauth";
 export const PENDING_IDENTITY_COOKIE = "thundi_identity";
@@ -15,7 +15,7 @@ export const OAUTH_TTL_MS = 10 * 60_000;
 
 export interface PendingAuth {
   /** Which provider's callback may complete this flow; the other provider's callback refuses it. */
-  provider: SignInProvider;
+  provider: OidcSignInProvider;
   state: string;
   nonce: string;
   codeVerifier: string;
@@ -28,7 +28,7 @@ export interface PendingAuth {
 }
 
 export interface PendingIdentity {
-  provider: SignInProvider;
+  provider: OidcSignInProvider;
   subject: string;
   email: string | null;
   name: string | null;

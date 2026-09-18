@@ -103,12 +103,13 @@ export interface SignInIdentityView {
 export async function getSignInIdentity(db: DbLike, userId: string): Promise<SignInIdentityView | null> {
   const row = await db.authIdentity.findFirst({ where: { userId, releasedAt: null }, orderBy: { createdAt: "asc" }, select: { provider: true, email: true, displayName: true, providerUsername: true } });
   if (!row) return null;
-  return { provider: row.provider === "TELEGRAM" ? "telegram" : "google", email: row.email, name: row.displayName, username: row.providerUsername };
+  const provider: SignInProvider = row.provider === "TELEGRAM" ? "telegram" : row.provider === "EMAIL" ? "email" : "google";
+  return { provider, email: row.email, name: row.displayName, username: row.providerUsername };
 }
 
 /** "you@example.com" for Google, "@name" or the display name for Telegram: what the person recognises as their account. */
 export function describeSignInIdentity(identity: Pick<SignInIdentityView, "provider" | "email" | "name" | "username"> | null): string | null {
   if (!identity) return null;
-  if (identity.provider === "google") return identity.email;
+  if (identity.provider === "google" || identity.provider === "email") return identity.email;
   return identity.username ? `@${identity.username}` : identity.name;
 }

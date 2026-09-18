@@ -27,7 +27,7 @@ export interface SettingsClientProps {
   /** Masked (+960 •••• 123) when the user has added a phone; null otherwise — phones are optional profile data. */
   maskedPhone: string | null;
   /** How the user signs in (owner-facing only): the provider and the account as they recognise it (email or @username). */
-  signIn: { provider: "google" | "telegram"; account: string | null } | null;
+  signIn: { provider: "google" | "telegram" | "email"; account: string | null } | null;
   verificationStatus: keyof typeof VERIFICATION_LABELS;
   notifications: NotificationSettingsDto;
   privacy: PrivacySettingsDto;
@@ -48,6 +48,8 @@ const NOTIFICATION_ROWS: { key: keyof NotificationSettingsDto; label: string; de
   { key: "community", label: "Community", description: "Reactions and comments on your posts" },
   { key: "marketing", label: "Marketing", description: "News and offers from Mellocrush" },
 ];
+
+const SIGN_IN_LABELS = { google: "Google account", telegram: "Telegram account", email: "Email address" } as const;
 
 export function SettingsClient({ maskedPhone, signIn, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy, recentAuth, openDelete = false, isAdmin = false }: SettingsClientProps) {
   const router = useRouter();
@@ -99,7 +101,7 @@ export function SettingsClient({ maskedPhone, signIn, verificationStatus, notifi
           <SectionLabel id="settings-account">Account</SectionLabel>
           <ListGroup>
             <LinkRow href="/profile/edit?section=info" height={54} label="Personal information" />
-            <ListRow asDiv height={54} label={signIn?.provider === "telegram" ? "Telegram account" : "Google account"} meta={signIn?.account ?? "—"} />
+            <ListRow asDiv height={54} label={SIGN_IN_LABELS[signIn?.provider ?? "google"]} meta={signIn?.account ?? "—"} />
             <ListRow asDiv height={54} label="Phone number" meta={maskedPhone ?? "Not added"} />
             <LinkRow href="/settings/verification" height={54} label="Verification" meta={VERIFICATION_LABELS[verificationStatus]} />
             <LinkRow href="/settings/discovery" height={54} label="Discovery preferences" />

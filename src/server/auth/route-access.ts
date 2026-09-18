@@ -2,7 +2,7 @@
  * Route access rules (docs/ARCHITECTURE.md §4.2; Phase 5 §21). Pure and unit-tested; used by proxy.ts
  * (cookie presence only) and by the server layouts (full session state).
  */
-export type AuthKind = "anonymous" | "onboarding" | "active";
+export type AuthKind = "anonymous" | "onboarding" | "active" | "unverified";
 
 export type RouteGroup = "public" | "auth" | "onboarding" | "app" | "system";
 
@@ -16,6 +16,12 @@ export const ROUTES = {
   telegramCallback: "/auth/telegram/callback",
   deleted: "/auth/deleted",
   authError: "/auth/error",
+  /** Email + password (docs/ARCHITECTURE.md §4.1b). */
+  register: "/auth/register",
+  verifyEmail: "/auth/verify-email",
+  verifyEmailToken: "/auth/verify",
+  forgotPassword: "/auth/forgot-password",
+  resetPassword: "/auth/reset-password",
   logout: "/auth/logout",
   onboarding: "/onboarding",
   home: "/discover",
@@ -42,7 +48,13 @@ export function signInRoute(provider: "google" | "telegram"): string {
  */
 function isAuthFlowEndpoint(pathname: string): boolean {
   return (
-    pathname === ROUTES.signIn || pathname === ROUTES.callback || pathname === ROUTES.telegramSignIn || pathname === ROUTES.telegramCallback || pathname === ROUTES.logout || pathname === ROUTES.authError
+    pathname === ROUTES.signIn ||
+    pathname === ROUTES.callback ||
+    pathname === ROUTES.telegramSignIn ||
+    pathname === ROUTES.telegramCallback ||
+    pathname === ROUTES.verifyEmailToken ||
+    pathname === ROUTES.logout ||
+    pathname === ROUTES.authError
   );
 }
 
@@ -61,6 +73,10 @@ export function resolveAccess(kind: AuthKind, pathname: string): AccessDecision 
   switch (kind) {
     case "anonymous":
       return group === "public" || group === "auth" ? { allow: true } : { allow: false, redirectTo: ROUTES.welcome };
+    case "unverified":
+      // An email account that has not confirmed its address reaches exactly one screen. Member routes, onboarding,
+      // the admin area and every server action are refused regardless of what the UI offers.
+      return pathname === ROUTES.verifyEmail ? { allow: true } : { allow: false, redirectTo: ROUTES.verifyEmail };
     case "onboarding":
       return group === "onboarding" ? { allow: true } : { allow: false, redirectTo: ROUTES.onboarding };
     case "active":

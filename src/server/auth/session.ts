@@ -60,6 +60,11 @@ export interface SessionUser {
   status: "ONBOARDING" | "ACTIVE" | "SUSPENDED" | "BANNED" | "DELETED";
   onboardingStage: string;
   onboardingCompletedAt: Date | null;
+  /**
+   * True only for an EMAIL identity whose address is still unconfirmed (docs/ARCHITECTURE.md §4.1b). Google and
+   * Telegram accounts are always false: this flow never applies to them.
+   */
+  emailVerificationPending: boolean;
 }
 
 export interface ResolvedSession {
@@ -68,11 +73,16 @@ export interface ResolvedSession {
   expiresAt: Date;
 }
 
-export type UserAuthKind = "onboarding" | "active" | "blocked";
+export type UserAuthKind = "onboarding" | "active" | "blocked" | "unverified";
 
-/** Pure classification shared by the request-scoped auth state and tests. */
-export function authKindForUser(user: Pick<SessionUser, "status" | "onboardingCompletedAt">): UserAuthKind {
+/**
+ * Pure classification shared by the request-scoped auth state and tests. "unverified" comes before everything but
+ * "blocked": an email account that has not confirmed its address holds a session and nothing else, so it can never
+ * be read as onboarding or active anywhere in the app.
+ */
+export function authKindForUser(user: Pick<SessionUser, "status" | "onboardingCompletedAt"> & { emailVerificationPending?: boolean }): UserAuthKind {
   if (user.status === "SUSPENDED" || user.status === "BANNED" || user.status === "DELETED") return "blocked";
+  if (user.emailVerificationPending) return "unverified";
   if (user.status === "ACTIVE" && user.onboardingCompletedAt) return "active";
   return "onboarding";
 }
@@ -96,7 +106,18 @@ export async function resolveSession(db: DbLike, token: string | null | undefine
       expiresAt: true,
       absoluteExpiresAt: true,
       lastSeenAt: true,
-      user: { select: { id: true, role: true, status: true, onboardingStage: true, onboardingCompletedAt: true } },
+      user: {
+        select: {
+          id: true,
+          role: true,
+          status: true,
+          onboardingStage: true,
+          onboardingCompletedAt: true,
+          // One EMAIL identity that is still unconfirmed is enough to hold the account back (§4.1b). Selected in the
+          // same query as the session, so this costs no extra round trip.
+          identities: { where: { provider: "EMAIL", emailVerified: false, releasedAt: null }, select: { id: true }, take: 1 },
+        },
+      },
     },
   });
   if (!session) return null;
@@ -111,7 +132,8 @@ export async function resolveSession(db: DbLike, token: string | null | undefine
     if (defer) defer(refresh);
     else await refresh();
   }
-  return { sessionId: session.id, user: session.user, expiresAt };
+  const { identities, ...user } = session.user;
+  return { sessionId: session.id, user: { ...user, emailVerificationPending: identities.length > 0 }, expiresAt };
 }
 
 export async function revokeSession(db: DbLike, token: string | null | undefined): Promise<boolean> {

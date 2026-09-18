@@ -449,6 +449,13 @@ model NotificationSettings {
 enum AuthProvider {
   GOOGLE
   TELEGRAM
+  EMAIL
+}
+
+/// What a hashed, single-use AuthToken authorises (docs/ARCHITECTURE.md §4.1b).
+enum AuthTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
 }
 
 /// A sign-in identity from an external provider, mapped to our canonical User.id (docs/ARCHITECTURE.md §4.1).
@@ -456,25 +463,51 @@ enum AuthProvider {
 /// scrubbed and releasedAt set, so the same Google or Telegram account is told its previous account was deleted
 /// before a new one is made. Identities are never linked across providers by name, username or email.
 model AuthIdentity {
-  id               String       @id @default(cuid(2))
-  userId           String
-  provider         AuthProvider
+  id                String       @id @default(cuid(2))
+  userId            String
+  provider          AuthProvider
   /// The provider's stable subject identifier (Google `sub`, Telegram user id). Never an email: emails can change.
-  providerSubject  String
+  providerSubject   String
   /// Google always supplies one; Telegram's OpenID Connect issues no email claim, so it is null there.
-  email            String?
-  emailVerified    Boolean      @default(false)
-  displayName      String?
+  email             String?
+  emailVerified     Boolean      @default(false)
+  displayName       String?
   /// Telegram `preferred_username` (without @), for display in Settings and admin only. Never used for matching.
-  providerUsername String?
-  createdAt        DateTime     @default(now())
-  lastLoginAt      DateTime?
-  releasedAt       DateTime?
+  providerUsername  String?
+  /// EMAIL only: the password verifier, `scrypt$N$r$p$salt$hash` (src/server/auth/password.ts). Never a plaintext
+  /// password, never sent to a client, never shown in admin. Null for Google and Telegram identities.
+  passwordHash      String?
+  passwordUpdatedAt DateTime?
+  createdAt         DateTime     @default(now())
+  lastLoginAt       DateTime?
+  releasedAt        DateTime?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokens AuthToken[]
 
   @@unique([provider, providerSubject])
   @@index([userId])
+}
+
+/// Email verification and password-reset tokens (docs/ARCHITECTURE.md §4.1b). Only the SHA-256 of the token is
+/// stored, so a database leak cannot be replayed as a link; each row is single-use (`consumedAt`) and expires.
+/// Issuing a new token of a purpose consumes the identity's outstanding ones, so only the newest link works.
+model AuthToken {
+  id         String           @id @default(cuid(2))
+  identityId String
+  purpose    AuthTokenPurpose
+  /// SHA-256 of the raw token; the raw value exists only in the email that was sent.
+  tokenHash  Bytes            @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime         @default(now())
+  /// For EMAIL_VERIFICATION after a change of address: the address this token confirms.
+  email      String?
+
+  identity AuthIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@index([identityId, purpose])
+  @@index([expiresAt])
 }
 
 model Session {

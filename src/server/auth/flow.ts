@@ -18,17 +18,17 @@ import { getDb } from "@/lib/db";
 import { clearPendingAuth, readPendingAuth, setPendingAuth, setPendingIdentity } from "@/lib/oauth-cookie";
 import { readSessionToken, setSessionCookie } from "@/lib/session-cookie";
 import { getSignInIdentity, recordReauthentication, signInWithIdentity } from "./identity";
-import { createPkcePair, getOidcProvider, randomToken, redirectUri, type SignInProvider } from "./oidc";
+import { createPkcePair, getOidcProvider, randomToken, redirectUri, type OidcSignInProvider } from "./oidc";
 import { ROUTES, safeInternalPath } from "./route-access";
 import { authKindForUser, createSession, resolveSession } from "./session";
 import { telegramSignInAvailable } from "./telegram-availability";
 
 /** Google is always on; Telegram needs its client variables and the hosted migration (telegram-availability.ts). */
-async function providerAvailable(db: ReturnType<typeof getDb>, provider: SignInProvider): Promise<boolean> {
+async function providerAvailable(db: ReturnType<typeof getDb>, provider: OidcSignInProvider): Promise<boolean> {
   return provider === "google" || telegramSignInAvailable(db);
 }
 
-export async function startSignIn(request: NextRequest, provider: SignInProvider): Promise<NextResponse> {
+export async function startSignIn(request: NextRequest, provider: OidcSignInProvider): Promise<NextResponse> {
   const db = getDb();
   if (!(await providerAvailable(db, provider))) return new NextResponse("Not found", { status: 404 });
   const params = request.nextUrl.searchParams;
@@ -63,7 +63,7 @@ export async function startSignIn(request: NextRequest, provider: SignInProvider
   return NextResponse.redirect(url);
 }
 
-export async function completeSignIn(request: NextRequest, provider: SignInProvider): Promise<NextResponse> {
+export async function completeSignIn(request: NextRequest, provider: OidcSignInProvider): Promise<NextResponse> {
   const db = getDb();
   if (!(await providerAvailable(db, provider))) return new NextResponse("Not found", { status: 404 });
   const params = request.nextUrl.searchParams;

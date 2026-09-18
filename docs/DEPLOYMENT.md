@@ -39,6 +39,9 @@ Set by the owner in the Vercel dashboard, never through chat, source or commits.
 | `GOOGLE_CLIENT_SECRET` | secret | same |
 | `TELEGRAM_CLIENT_ID` | secret (set 2026-09-18) | BotFather → the bot → Login Widget → Client ID |
 | `TELEGRAM_CLIENT_SECRET` | secret (set 2026-09-18) | same screen → Client Secret (not the bot token). Both or neither: a lone variable fails the boot. |
+| `EMAIL_PROVIDER` | fixed, **not yet set** | `resend` — required before email + password sign-in appears (§10) |
+| `RESEND_API_KEY` | secret, **not yet set** | Resend → API Keys (§10) |
+| `EMAIL_FROM` | fixed, **not yet set** | `Mellocrush <hello@mellocrush.com>` on the verified domain (§10) |
 
 Production-only behaviour that follows from `NODE_ENV=production` (`src/lib/env.ts`, `src/lib/runtime.ts`):
 the development identity provider and local disk storage are refused, `PHOTO_VISIBILITY_POLICY` is
@@ -120,6 +123,86 @@ Verified 2026-09-18 after the migration and deployment `f5ce1a2`: `https://www.m
 `code_challenge` (S256) and sets the provider-tagged `thundi_oauth` cookie; `/auth/google/start` is unchanged. Still to
 do by the owner: one real Telegram sign-in from a phone, which lands on onboarding step 2 as a new account (Telegram and
 Google accounts are never merged); Settings then shows "Telegram account · @username".
+
+## 3e. Email + password sign-in (2026-09-18): migration `20260918190000_email_auth` — NOT YET APPLIED to the hosted database
+
+Additive only. No existing row is read, changed or removed; Google and Telegram identities keep `passwordHash` NULL
+and never enter the verification flow.
+
+```sql
+CREATE TYPE "AuthTokenPurpose" AS ENUM ('EMAIL_VERIFICATION', 'PASSWORD_RESET');
+ALTER TYPE "AuthProvider" ADD VALUE 'EMAIL';
+ALTER TABLE "AuthIdentity" ADD COLUMN "passwordHash" TEXT;
+ALTER TABLE "AuthIdentity" ADD COLUMN "passwordUpdatedAt" TIMESTAMP(3);
+CREATE TABLE "AuthToken" (
+    "id" TEXT NOT NULL,
+    "identityId" TEXT NOT NULL,
+    "purpose" "AuthTokenPurpose" NOT NULL,
+    "tokenHash" BYTEA NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "consumedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "email" TEXT,
+    CONSTRAINT "AuthToken_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "AuthToken_tokenHash_key" ON "AuthToken"("tokenHash");
+CREATE INDEX "AuthToken_identityId_purpose_idx" ON "AuthToken"("identityId", "purpose");
+CREATE INDEX "AuthToken_expiresAt_idx" ON "AuthToken"("expiresAt");
+ALTER TABLE "AuthToken" ADD CONSTRAINT "AuthToken_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "AuthIdentity"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AuthToken" ENABLE ROW LEVEL SECURITY;
+```
+
+`ALTER TYPE … ADD VALUE` cannot run inside a transaction block on PostgreSQL, so apply it as its own statement (the
+Supabase management connection and `prisma migrate deploy` both do this correctly).
+
+Rollback: dropping the table and the two columns reverses everything except the enum value, which PostgreSQL cannot
+remove from an existing type — a rollback would leave `'EMAIL'` present and unused, which is harmless because no code
+would reference it once the deployment is rolled back. Any account created through the method would be orphaned, so
+roll back only before the first registration.
+
+RLS: `AuthToken` is created with RLS enabled and no policy, matching every other table (§3); the application reaches
+it server-side as the BYPASSRLS `postgres` role, and the Data API roles see nothing. After applying, the table count
+becomes 40 of 40.
+
+Order of operations: the feature gate means the migration and the deployment can land in either order without a
+broken window, but email + password stays hidden until BOTH this migration and §10's provider configuration are done.
+
+## 10. Transactional email (required before email + password sign-in)
+
+Mellocrush sends exactly two messages: "confirm your email" and "reset your password". Owning mellocrush.com does not
+by itself let the app send mail — a provider must be set up and the domain's DNS must authorise it.
+
+**Recommended provider: Resend** (resend.com). It is an HTTPS API the app calls with a plain `fetch`, so nothing
+native is bundled or traced into the serverless function; its free tier covers the launch volume; and the domain
+setup is the standard SPF/DKIM/DMARC trio. Any provider with an HTTPS send API would fit the `EmailProvider`
+interface (`src/lib/email/provider.ts`); Postmark and SendGrid are equivalent choices if preferred.
+
+Vercel environment variables (Production, Sensitive where marked):
+
+| Variable | Kind | Value |
+| --- | --- | --- |
+| `EMAIL_PROVIDER` | fixed | `resend` |
+| `RESEND_API_KEY` | secret | Resend → API Keys → a key with send permission |
+| `EMAIL_FROM` | fixed | `Mellocrush <hello@mellocrush.com>` (must be on the verified domain) |
+| `EMAIL_AUTH` | fixed, optional | `on` (default). Set `off` to switch the method off without removing the provider. |
+
+DNS records at GoDaddy, exactly as the Resend dashboard prints them after "Add domain" (the selector and host values
+are generated per domain, so copy them from the dashboard rather than from here):
+
+| Type | Host | Value | Purpose |
+| --- | --- | --- | --- |
+| TXT | `send` (or the subdomain Resend names) | `v=spf1 include:amazonses.com ~all` | SPF: authorises the provider to send as the domain |
+| MX | `send` | `feedback-smtp.<region>.amazonses.com` priority 10 | Bounce and complaint handling |
+| TXT | `resend._domainkey` | the long public key Resend shows | DKIM: signs each message so receivers can verify it |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:dmarc@mellocrush.com` | DMARC: reporting first; tighten to `p=quarantine` once reports look clean |
+
+Sending from a subdomain (`send.mellocrush.com`) is the usual advice: a deliverability problem with transactional
+mail then cannot damage the reputation of the apex domain. Verification in the Resend dashboard usually completes
+within an hour of the records propagating.
+
+Until `EMAIL_PROVIDER` and its key are set, `emailAuthConfigured()` is false, the welcome screen shows only Google and
+Telegram, and `/auth/register` redirects to it. Development uses `EMAIL_PROVIDER=console`, which prints the link to
+the server log and is refused in production by `src/lib/env.ts`.
 
 ## 4. Redeploying
 

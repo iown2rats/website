@@ -1,10 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { confirmAccountDeletion } from "@/actions/account";
+import { confirmPasswordAction } from "@/actions/email-auth";
 import { ContinueWith } from "@/components/features/auth/google-button";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogTitle, ResponsiveDialog } from "@/components/ui/dialog";
+import { Field, Input } from "@/components/ui/field";
 
 /*
  * Delete account (prototype Settings → Account management → "Delete Account", red). Two explicit steps
@@ -19,18 +22,34 @@ export interface RecentAuthDto {
 }
 
 export interface SignInSummary {
-  provider: "google" | "telegram";
+  provider: "google" | "telegram" | "email";
   /** Email (Google) or @username / name (Telegram); null when unknown. */
   account: string | null;
 }
 
-const PROVIDER_NAME = { google: "Google", telegram: "Telegram" } as const;
+const PROVIDER_NAME = { google: "Google", telegram: "Telegram", email: "your password" } as const;
 
 export function DeleteAccountSheet({ open, onClose, signIn, recentAuth }: { open: boolean; onClose: () => void; signIn: SignInSummary | null; recentAuth: RecentAuthDto }) {
   const titleId = useId();
+  const router = useRouter();
   const provider = signIn?.provider ?? "google";
   const P = PROVIDER_NAME[provider];
   const account = signIn?.account ?? null;
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  /** An email account re-authenticates by confirming its password; the mark it writes is the same one (§4.4). */
+  const confirmPassword = async () => {
+    setBusy(true);
+    setPasswordError(null);
+    const r = await confirmPasswordAction({ password });
+    setBusy(false);
+    if (r.ok) {
+      setPassword("");
+      // The server marked this session; re-render the page so the sheet reads the fresh recent-auth state.
+      router.refresh();
+    } else setPasswordError(r.message ?? "That password isn't right.");
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
@@ -63,21 +82,45 @@ export function DeleteAccountSheet({ open, onClose, signIn, recentAuth }: { open
             <li>Your profile, photos, likes and Community posts are removed.</li>
             <li>Your matches end and your chats close for the other person.</li>
             <li>Safety records (reports and blocks) are kept so they stay effective.</li>
-            <li>Signing in with the same {P} account later starts a brand-new account; nothing comes back.</li>
+            <li>{provider === "email" ? "Signing up with the same address later starts a brand-new account; nothing comes back." : `Signing in with the same ${P} account later starts a brand-new account; nothing comes back.`}</li>
           </ul>
           <p className="text-body-sm text-text-secondary">
-            To confirm, sign in with {P} again{account ? <> as <span className="font-semibold text-text">{account}</span></> : null}.
+            {provider === "email" ? (
+              <>Confirm your password to continue{account ? <> as <span className="font-semibold text-text">{account}</span></> : null}.</>
+            ) : (
+              <>To confirm, sign in with {P} again{account ? <> as <span className="font-semibold text-text">{account}</span></> : null}.</>
+            )}
           </p>
           {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
           <div className="flex flex-col gap-2.5 pt-1">
-            <ContinueWith provider={provider} purpose="reauth" returnTo="/settings?confirmDelete=1" label={`Continue with ${P} to confirm`} className="shadow-sm" />
+            {provider === "email" ? (
+              <>
+                <Field label="Password" hideLabel error={passwordError ?? undefined}>
+                  {(props) => (
+                    <Input
+                      {...props}
+                      type="password"
+                      name="password"
+                      autoComplete="current-password"
+                      placeholder="Your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={busy}
+                    />
+                  )}
+                </Field>
+                <Button onClick={() => void confirmPassword()} loading={busy} disabled={password.length === 0} fullWidth>Confirm password</Button>
+              </>
+            ) : (
+              <ContinueWith provider={provider} purpose="reauth" returnTo="/settings?confirmDelete=1" label={`Continue with ${P} to confirm`} className="shadow-sm" />
+            )}
             <Button variant="muted" size="md" onClick={onClose} disabled={busy} fullWidth>Cancel</Button>
           </div>
         </>
       ) : (
         <>
           <DialogTitle id={titleId} className="text-[22px]">Confirm deletion</DialogTitle>
-          <DialogDescription>You just confirmed with {P}{account ? ` as ${account}` : ""}. This is the last step and can&apos;t be undone.</DialogDescription>
+          <DialogDescription>{provider === "email" ? "You just confirmed your password" : `You just confirmed with ${P}`}{account ? ` as ${account}` : ""}. This is the last step and can&apos;t be undone.</DialogDescription>
           {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
           <div className="flex flex-col gap-2.5 pt-1">
             <Button variant="destructive" onClick={() => void confirm()} loading={busy} fullWidth>Delete my account</Button>

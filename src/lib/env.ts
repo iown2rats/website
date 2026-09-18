@@ -25,6 +25,17 @@ const schema = z
      */
     TELEGRAM_CLIENT_ID: z.string().min(1).optional(),
     TELEGRAM_CLIENT_SECRET: z.string().min(1).optional(),
+    /**
+     * Email + password sign-in (docs/ARCHITECTURE.md §4.1b). It is offered only when transactional email can
+     * actually be delivered, because an account that cannot receive its verification link is a dead end:
+     * `resend` needs RESEND_API_KEY and EMAIL_FROM; `console` prints the link to the server log and is refused in
+     * production. EMAIL_AUTH=off switches the whole method off even when a provider is configured.
+     */
+    EMAIL_PROVIDER: z.enum(["resend", "console"]).optional(),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    /** RFC 5322 From address on a domain verified with the provider, e.g. `Mellocrush <hello@mellocrush.com>`. */
+    EMAIL_FROM: z.string().min(3).optional(),
+    EMAIL_AUTH: z.enum(["on", "off"]).default("on"),
     STORAGE_PROVIDER: z.enum(["local", "supabase"]).default("local"),
     LOCAL_STORAGE_DIR: z.string().default(".storage"),
     APP_URL: z.string().url().default("http://localhost:3000"),
@@ -41,6 +52,7 @@ const schema = z
   })
   .transform((env) => ({
     ...env,
+    EMAIL_PROVIDER: env.EMAIL_PROVIDER ?? (env.NODE_ENV === "production" ? undefined : ("console" as const)),
     AUTH_PROVIDER: env.AUTH_PROVIDER ?? (env.NODE_ENV === "production" ? ("google" as const) : ("dev" as const)),
     PHOTO_VISIBILITY_POLICY: env.PHOTO_VISIBILITY_POLICY ?? (env.NODE_ENV === "production" ? ("approved-only" as const) : ("approved-and-pending" as const)),
   }))
@@ -55,12 +67,18 @@ const schema = z
       if (env.STORAGE_PROVIDER === "local") {
         ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "Local disk storage is not allowed in production" });
       }
+      if (env.EMAIL_PROVIDER === "console") {
+        ctx.addIssue({ code: "custom", path: ["EMAIL_PROVIDER"], message: "The console email provider only prints to the log; production needs a real provider (EMAIL_PROVIDER=resend)" });
+      }
     }
     if (env.AUTH_PROVIDER === "google" && (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET)) {
       ctx.addIssue({ code: "custom", path: ["AUTH_PROVIDER"], message: "AUTH_PROVIDER=google needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" });
     }
     if (!!env.TELEGRAM_CLIENT_ID !== !!env.TELEGRAM_CLIENT_SECRET) {
       ctx.addIssue({ code: "custom", path: ["TELEGRAM_CLIENT_ID"], message: "Telegram sign-in needs both TELEGRAM_CLIENT_ID and TELEGRAM_CLIENT_SECRET (or neither)" });
+    }
+    if (env.EMAIL_PROVIDER === "resend" && (!env.RESEND_API_KEY || !env.EMAIL_FROM)) {
+      ctx.addIssue({ code: "custom", path: ["EMAIL_PROVIDER"], message: "EMAIL_PROVIDER=resend needs RESEND_API_KEY and EMAIL_FROM" });
     }
     if (env.STORAGE_PROVIDER === "supabase" && (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SECRET_KEY)) {
       ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "Supabase storage needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY" });
@@ -80,6 +98,16 @@ export function getEnv(): Env {
   }
   cached = parsed.data;
   return cached;
+}
+
+/**
+ * Whether email + password sign-in is configured at all: the method is switched on and a provider that can really
+ * deliver is set. The database must also carry the migration; `src/server/auth/email-availability.ts` checks both.
+ */
+export function emailAuthConfigured(env: Env = getEnv()): boolean {
+  if (env.EMAIL_AUTH === "off") return false;
+  if (env.EMAIL_PROVIDER === "resend") return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
+  return env.EMAIL_PROVIDER === "console" && env.NODE_ENV !== "production";
 }
 
 /**

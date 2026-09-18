@@ -393,3 +393,21 @@ welcome screen never links to a dead end.
 Verified with Playwright at 375, 390, 430 and 1280 px: no horizontal or vertical page scroll, the card is fully visible
 above the couple at every width, both pills are 58 px tall with a 999 px radius and the same width, and the white
 wordmark renders from the light artwork. Screenshots in `screenshots/welcome2/` (gitignored).
+
+## 27. Email + password on the glass card (2026-09-18)
+
+The welcome card gains a third way in below the "or" rule: an email field, a password field with a show/hide toggle,
+a coral Continue pill, then "Create account" and "Forgot password?" on one row. Registration, "verify your email",
+"forgot password" and "reset password" are separate screens rendered by the same `AuthShell`, so the whole flow is
+one place: the same photograph, the same 28 px glass card, the same white wordmark.
+
+Fields match the provider buttons rather than the member app's warm inputs: 52 px tall, fully rounded, the card's
+content width, a translucent white surface with a white hairline, white text and a 55 %-white placeholder. The focus
+ring is the white outline used across the card. The password toggle is a real button with an eye icon and an
+`aria-pressed` state, and it names what it does for screen readers.
+
+The card is 608 px tall at every phone width with all three methods on it, so it still clears the viewport at
+375 × 812 with the couple visible below; each method is hidden when it cannot complete, which shortens it further.
+Verified with Playwright at 375, 390, 430 and 1280 px: no horizontal or vertical page scroll, every control the same
+width within a card, the registration flow reaching "Verify your email", and that screen offering only Resend, Change
+email and Sign out. Screenshots in `screenshots/emailauth/` (gitignored).

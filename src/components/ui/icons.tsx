@@ -169,6 +169,12 @@ export const UndoIcon = (p: IconProps) => (
     <path d="M4 9h11a5 5 0 010 10h-3" />
   </Base>
 );
+export const EyeIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M2 12c1-3 5-7 10-7s9 4 10 7c-1 3-5 7-10 7s-9-4-10-7z" />
+    <circle cx="12" cy="12" r="3" />
+  </Base>
+);
 export const EyeOffIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M3 3l18 18" />

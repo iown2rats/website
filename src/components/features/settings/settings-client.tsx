@@ -19,7 +19,7 @@ import { DeleteAccountSheet, type RecentAuthDto } from "./delete-account-sheet";
 
 /*
  * Prototype "Settings": groups of 54 px rows (label, 13 px meta, chevron or 44×26 toggle) with uppercase group
- * labels and the footer "Thundi 1.0 · Made in the Maldives". On desktop (≥ 900) the page widens to 900 with a
+ * labels and the footer "Mellocrush 1.0 · Made in the Maldives". On desktop (≥ 900) the page widens to 900 with a
  * 220 px section nav on the left and shows one group at a time. Rows without a real destination (Email, Terms,
  * Privacy Policy, Report a Problem) are shown as "Not yet available" rather than dead links.
  */
@@ -46,7 +46,7 @@ const NOTIFICATION_ROWS: { key: keyof NotificationSettingsDto; label: string; de
   { key: "likes", label: "Likes", description: "When someone likes you" },
   { key: "messages", label: "Messages", description: "New messages in your chats" },
   { key: "community", label: "Community", description: "Reactions and comments on your posts" },
-  { key: "marketing", label: "Marketing", description: "News and offers from Thundi" },
+  { key: "marketing", label: "Marketing", description: "News and offers from Mellocrush" },
 ];
 
 export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy, recentAuth, openDelete = false, isAdmin = false }: SettingsClientProps) {
@@ -127,7 +127,7 @@ export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, n
           </ListGroup>
           <p className="px-4.5 text-caption text-text-secondary">
             {NOTIFICATION_ROWS.map((r) => <span key={r.key} id={`notif-${r.key}-d`} className="sr-only">{r.description}</span>)}
-            Notifications appear inside Thundi. Turning a category off stops new notifications of that kind; earlier ones stay.
+            Notifications appear inside Mellocrush. Turning a category off stops new notifications of that kind; earlier ones stay.
           </p>
         </section>
       ) : null}
@@ -179,7 +179,7 @@ export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, n
         </section>
       ) : null}
 
-      {!desktop || group === "Account management" ? <p className="text-center text-micro text-text-secondary">Thundi 1.0 · Made in the Maldives</p> : null}
+      {!desktop || group === "Account management" ? <p className="text-center text-micro text-text-secondary">Mellocrush 1.0 · Made in the Maldives</p> : null}
 
       <ConfirmationDialog
         open={pauseOpen}

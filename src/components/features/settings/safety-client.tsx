@@ -12,7 +12,7 @@ import { PageOverlay } from "@/components/layout/page-overlay";
  * emergency number.
  */
 const CARDS: [string, string][] = [
-  ["Dating safely", "Keep conversations on Thundi until you trust someone. Never send money, and be wary of anyone who asks — a request for money, gift cards or bank details is the clearest sign of a scam."],
+  ["Dating safely", "Keep conversations on Mellocrush until you trust someone. Never send money, and be wary of anyone who asks — a request for money, gift cards or bank details is the clearest sign of a scam."],
   ["Meeting someone", "Meet in a public place in Malé or your island, tell a friend where you'll be, and arrange your own transport home."],
   ["Protecting your privacy", "Use only your island or atoll, hide your age or active status if you prefer, and block your contacts so family and colleagues never see you here. Your phone number is never shown to anyone."],
   ["Reporting someone", "Tap the ··· on any profile, post or chat. Reports are anonymous, and blocking is immediate. Reporting a chat also blocks that person; reporting a post doesn't, so you can choose."],
@@ -23,7 +23,7 @@ export function SafetyClient() {
   const [open, setOpen] = useState<number | null>(null);
   return (
     <PageOverlay title="Safety Center" backHref="/profile">
-      <p className="text-body leading-relaxed text-text-secondary">Everything about staying safe on Thundi, in one place.</p>
+      <p className="text-body leading-relaxed text-text-secondary">Everything about staying safe on Mellocrush, in one place.</p>
       <div className="flex flex-col gap-2.5">
         {CARDS.map(([label, body], i) => {
           const isOpen = open === i;

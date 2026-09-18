@@ -54,7 +54,7 @@ export function BoostControl({ boost, tier, serverTime, onSync, onBoosted, onLoc
   }
   return (
     <>
-      <IconButton aria-label={tier === "PLUS" ? `Boost your profile, ${boost.remaining} of ${boost.limit} left this week` : "Boost your profile (Thundi Plus)"} onClick={() => (tier === "PLUS" ? setConfirmOpen(true) : onLocked())}>
+      <IconButton aria-label={tier === "PLUS" ? `Boost your profile, ${boost.remaining} of ${boost.limit} left this week` : "Boost your profile (Mellocrush Plus)"} onClick={() => (tier === "PLUS" ? setConfirmOpen(true) : onLocked())}>
         <BoltIcon size={20} />
       </IconButton>
       <ConfirmationDialog

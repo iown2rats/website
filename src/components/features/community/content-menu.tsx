@@ -79,7 +79,7 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
     if (!r.ok) return fail(r);
     setBusy(false);
     onClose();
-    toast.show(`Blocked. You and ${target.authorName} won't see each other on Thundi.`);
+    toast.show(`Blocked. You and ${target.authorName} won't see each other on Mellocrush.`);
     onBlocked(target);
   };
 
@@ -162,7 +162,7 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
         onClose={close}
         onConfirm={() => void block()}
         title={`Block ${target.authorName}?`}
-        description="You won't see each other's posts, comments or profiles anywhere on Thundi, and any conversation between you closes. Blocking is immediate."
+        description="You won't see each other's posts, comments or profiles anywhere on Mellocrush, and any conversation between you closes. Blocking is immediate."
         confirmLabel="Block"
         loading={busy}
       />

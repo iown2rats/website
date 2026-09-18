@@ -5,7 +5,7 @@ import { extractAmount } from "../extract/amount";
 import { extractRecipientAccount } from "../extract/account";
 import { extractTransactionDate, parseMaldivesDate } from "../extract/date";
 import { extractParties } from "../extract/parties";
-import { extractThundiReference } from "../extract/reference";
+import { extractMellocrushReference } from "../extract/reference";
 import { extractRemarks } from "../extract/remarks";
 import { extractStatus } from "../extract/status";
 import { extractTransactionId, normalizeTransactionId } from "../extract/transaction-id";
@@ -18,7 +18,7 @@ export function parseCommon(text: string, bank: BankCode | null, parserVersion: 
   const account = extractRecipientAccount(text);
   const parties = extractParties(text);
   const dateRaw = extractTransactionDate(text);
-  const thundi = extractThundiReference(text);
+  const thundi = extractMellocrushReference(text);
   return {
     bank,
     parserVersion,

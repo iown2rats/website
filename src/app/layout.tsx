@@ -16,10 +16,14 @@ const jakarta = localFont({
   ],
 });
 
+const DESCRIPTION = "Meet someone closer to home. Dating for the Maldives. Private by design, 18+ only.";
+
 export const metadata: Metadata = {
-  title: { default: "Thundi", template: "%s · Thundi" },
-  description: "Meet someone closer to home. Dating for the Maldives. Private by design, 18+ only.",
-  applicationName: "Thundi",
+  title: { default: "Mellocrush", template: "%s · Mellocrush" },
+  description: DESCRIPTION,
+  applicationName: "Mellocrush",
+  openGraph: { title: "Mellocrush", siteName: "Mellocrush", description: DESCRIPTION, type: "website" },
+  twitter: { card: "summary", title: "Mellocrush", description: DESCRIPTION },
 };
 
 export const viewport: Viewport = {

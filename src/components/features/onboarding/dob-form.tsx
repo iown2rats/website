@@ -10,7 +10,7 @@ import { useDismissableError } from "./use-dismissable-error";
 
 /*
  * Prototype step 4: three selects (Day / Month / Year; years from currentYear−18 downwards), live line
- * "You're N. That's what people will see." or "You must be 18 or older to use Thundi.", and the aqua callout.
+ * "You're N. That's what people will see." or "You must be 18 or older to use Mellocrush.", and the aqua callout.
  * The live line is a hint only: the server recomputes eligibility.
  */
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -59,10 +59,10 @@ export function DobForm({ initial }: { initial: { day: number; month: number; ye
       </div>
       {age != null ? (
         <p className={adult ? "text-body-sm font-semibold text-primary-ink" : "text-body-sm font-semibold text-danger"} role="status">
-          {adult ? `You're ${age}. That's what people will see.` : `You must be ${MINIMUM_AGE} or older to use Thundi.`}
+          {adult ? `You're ${age}. That's what people will see.` : `You must be ${MINIMUM_AGE} or older to use Mellocrush.`}
         </p>
       ) : null}
-      <Callout>{"Thundi is 18+ only. Your age is shown, your birthday isn't."}</Callout>
+      <Callout>{"Mellocrush is 18+ only. Your age is shown, your birthday isn't."}</Callout>
       <FormError message={error} />
       <div className="mt-auto pt-3">
         <SubmitButton disabled={!adult} loading={pending}>Continue</SubmitButton>

@@ -10,7 +10,7 @@ import sharp from "sharp";
 export const ORDER_REF = "THU-7K4P2M";
 export const BML_ACCOUNT = "7701234567890";
 export const MIB_ACCOUNT = "9001234567890";
-export const HOLDER = "Thundi Pvt Ltd";
+export const HOLDER = "Mellocrush Pvt Ltd";
 
 export const BML_SUCCESS = `Thank you. Your request has been submitted for processing.
 199.00
@@ -20,14 +20,14 @@ Message Thank you. Your request has been submitted for processing.
 Reference BLAZ728811340921
 Transaction date 18/09/2026 14:26
 From AISHATH TEST
-To THUNDI PVT LTD
+To MELLOCRUSH PVT LTD
 ${BML_ACCOUNT}
 Amount MVR 199.00
 Remarks ${ORDER_REF}
 Bank of Maldives`;
 
 export const BML_WRONG_AMOUNT = BML_SUCCESS.replace(/199\.00/g, "150.00");
-export const BML_WRONG_RECIPIENT = BML_SUCCESS.replace(BML_ACCOUNT, "7709876543210").replace("To THUNDI PVT LTD", "To SOME OTHER SHOP");
+export const BML_WRONG_RECIPIENT = BML_SUCCESS.replace(BML_ACCOUNT, "7709876543210").replace("To MELLOCRUSH PVT LTD", "To SOME OTHER SHOP");
 export const BML_PENDING = BML_SUCCESS.replace("Status SUCCESS", "Status PENDING");
 export const BML_FAILED = BML_SUCCESS.replace("Status SUCCESS", "Status FAILED").replace("Message Thank you. Your request has been submitted for processing.", "Message Insufficient funds");
 export const BML_MISSING_REFERENCE = BML_SUCCESS.replace(`Remarks ${ORDER_REF}`, "Remarks N/A");
@@ -41,19 +41,19 @@ Message | Thank you. Your request has been submitted for processing.
 Reference  BLAZ7288 11340921
 Transaction date 18/09/2026  14:26
 From  AISHATH TEST
-To THUNDI  PVT LTD
+To MELLOCRUSH  PVT LTD
 ${BML_ACCOUNT}
 Amount  MVR199.00
 Remarks  THU - 7K4P2M
 Bank of Maldives`;
 
 export const MIB_SUCCESS = `Aishath Test
-Thundi Pvt Ltd
+Mellocrush Pvt Ltd
 MVR 199.00
 Success
 Transaction# 91885003
 From Aishath Test
-To Thundi Pvt Ltd
+To Mellocrush Pvt Ltd
 ${MIB_ACCOUNT}
 Bank Maldives Islamic Bank
 Transaction Type Quick Transfer
@@ -68,16 +68,16 @@ Transaction# 123456789
 Status Processed
 Amount MVR 199.00
 From Aishath Test
-To Thundi Pvt Ltd
+To Mellocrush Pvt Ltd
 ${MIB_ACCOUNT}
 Date 18 Sep 2026
 Remarks ${ORDER_REF}`;
 
 export const MIB_WRONG_AMOUNT = MIB_SUCCESS.replace("MVR 199.00", "MVR 150.00");
-export const MIB_WRONG_RECIPIENT = MIB_SUCCESS.replace(MIB_ACCOUNT, "9009999999999").replace("To Thundi Pvt Ltd", "To Another Person");
+export const MIB_WRONG_RECIPIENT = MIB_SUCCESS.replace(MIB_ACCOUNT, "9009999999999").replace("To Mellocrush Pvt Ltd", "To Another Person");
 /** A cropped screenshot: amount and status only. */
 export const MIB_INCOMPLETE = `Aishath Test
-Thundi Pvt Ltd
+Mellocrush Pvt Ltd
 MVR 199.00
 Success
 MALDIVES ISLAMIC BANK`;

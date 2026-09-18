@@ -1,5 +1,5 @@
 /**
- * Thundi's own payment reference (THU-XXXXXX, alphabet 23456789ABCDEFGHJKLMNPQRSTUVWXYZ) when the customer put it in the
+ * Mellocrush's own payment reference (THU-XXXXXX, alphabet 23456789ABCDEFGHJKLMNPQRSTUVWXYZ) when the customer put it in the
  * remark. Missing is normal: not every bank layout shows remarks, and OCR often loses them. Present and equal is strong
  * supporting evidence; present and different is flagged for the admin.
  */
@@ -7,14 +7,14 @@ import { normalizeOcrText } from "../text";
 
 const ALPHABET = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/;
 
-export interface ThundiReferenceMatch {
+export interface MellocrushReferenceMatch {
   /** Canonical form THU-XXXXXX as read. */
   value: string;
   /** Every character is in the reference alphabet, so this can be compared exactly. */
   wellFormed: boolean;
 }
 
-export function extractThundiReference(text: string): ThundiReferenceMatch | undefined {
+export function extractMellocrushReference(text: string): MellocrushReferenceMatch | undefined {
   const normalized = normalizeOcrText(text).replace(/\n/g, " ");
   const m = /(?<![A-Z0-9])THU\s*[-_:]?\s*([A-Z0-9]{6})(?![A-Z0-9])/.exec(normalized);
   if (!m) return undefined;

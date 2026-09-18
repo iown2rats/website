@@ -110,7 +110,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
             {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>
         ) : null}
-        <p className="text-caption text-text-secondary">Island or atoll only — Thundi never uses distance or GPS.</p>
+        <p className="text-caption text-text-secondary">Island or atoll only — Mellocrush never uses distance or GPS.</p>
       </section>
 
       <section className="flex flex-col gap-2.5">

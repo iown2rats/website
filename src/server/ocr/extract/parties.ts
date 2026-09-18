@@ -33,7 +33,7 @@ export function extractParties(text: string): Parties {
   return parties;
 }
 
-/** Letters only, upper-case, legal-form suffixes dropped, so "Thundi Pvt Ltd" and "THUNDI PRIVATE LIMITED" agree. */
+/** Letters only, upper-case, legal-form suffixes dropped, so "Mellocrush Pvt Ltd" and "MELLOCRUSH PRIVATE LIMITED" agree. */
 export function normalizeName(value: string): string {
   return value
     .toUpperCase()

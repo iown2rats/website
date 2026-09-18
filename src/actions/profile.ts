@@ -17,7 +17,7 @@ function failure(e: unknown): ProfileActionFailure {
     if (e.code === "INVALID_STATE") return { ok: false, code: "UNAVAILABLE", message: e.message };
   }
   console.error("[profile] action failed", e);
-  return { ok: false, code: "ERROR", message: "Thundi couldn't save that right now. Try again." };
+  return { ok: false, code: "ERROR", message: "Mellocrush couldn't save that right now. Try again." };
 }
 
 export async function saveInfo(input: unknown): Promise<{ ok: true; profile: EditProfileData } | ProfileActionFailure> {

@@ -19,7 +19,7 @@ const CHECK_LABELS: Record<CheckKey, string> = {
   amount: "Amount",
   currency: "Currency",
   recipient: "Recipient account",
-  reference: "Thundi reference in remark",
+  reference: "Mellocrush reference in remark",
   transactionId: "Bank transaction number",
   duplicate: "Duplicate transaction",
   date: "Transfer date",

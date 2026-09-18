@@ -31,7 +31,7 @@ export async function confirmAccountDeletion(): Promise<DeletionConfirmResult> {
   } catch (e) {
     if (isDomainError(e)) return { ok: false, code: "ERROR", message: e.message };
     console.error("[account] deletion failed", e);
-    return { ok: false, code: "ERROR", message: "Thundi couldn't delete your account right now. Try again." };
+    return { ok: false, code: "ERROR", message: "Mellocrush couldn't delete your account right now. Try again." };
   }
   if (deleted) {
     await clearSessionCookie();
@@ -41,7 +41,7 @@ export async function confirmAccountDeletion(): Promise<DeletionConfirmResult> {
 }
 
 /**
- * The explicit choice on /auth/deleted: the Google account that just signed in belongs to a deleted Thundi
+ * The explicit choice on /auth/deleted: the Google account that just signed in belongs to a deleted Mellocrush
  * account; start a brand-new one. Nothing from the deleted profile comes back.
  */
 export async function startFreshAccount(): Promise<{ ok: false; message: string } | never> {
@@ -57,7 +57,7 @@ export async function startFreshAccount(): Promise<{ ok: false; message: string 
   } catch (e) {
     if (isDomainError(e)) return { ok: false, message: e.message };
     console.error("[account] fresh account failed", e);
-    return { ok: false, message: "Thundi couldn't create your account right now. Try again." };
+    return { ok: false, message: "Mellocrush couldn't create your account right now. Try again." };
   }
   redirect(ROUTES.onboarding);
 }

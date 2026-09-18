@@ -1,4 +1,4 @@
-# Thundi — Prototype Audit (Phase 1)
+# Mellocrush — Prototype Audit (Phase 1)
 
 Status: complete. No prototype files were modified. This document is the reference the production build must be checked against.
 
@@ -40,10 +40,10 @@ Shared chrome for steps 1–12: back button (44×44, radius 14, bordered surface
 | Step | Title / subtitle | Content | Can continue when |
 | --- | --- | --- | --- |
 | 0 Welcome | "Meet someone closer to home." / "Dating for the Maldives. Private by design, 18+ only." | Full-bleed lagoon gradient (`hsl(186 60% 78%) → hsl(190 62% 52%) → #063B4C`), radial highlight, "LAGOON PHOTOGRAPH" placeholder, white wordmark + wave logo, 32 px hero, white "Get started" (52 px, radius 16, ocean text), ghost "I already have an account". | always |
-| 1 Phone | "What's your number?" / "We'll text you a code. Maldivian numbers only." | Fixed `🇲🇻 +960` chip + `tel` input (52 px, radius 16, 18 px/700, tracking .04em, placeholder "7XX XXXX"), digits only, max 7. Note: "Your number is never shown on your profile. We use it to keep Thundi Maldives-only." | ≥ 7 digits |
+| 1 Phone | "What's your number?" / "We'll text you a code. Maldivian numbers only." | Fixed `🇲🇻 +960` chip + `tel` input (52 px, radius 16, 18 px/700, tracking .04em, placeholder "7XX XXXX"), digits only, max 7. Note: "Your number is never shown on your profile. We use it to keep Mellocrush Maldives-only." | ≥ 7 digits |
 | 2 OTP | "Enter the code" / "A 6-digit code was sent by SMS." | Six 52 px boxes (radius 14, 1.5 px border, active box `--primary` border), "Code sent to +960 … Resend" link, on-screen 3×4 keypad (48 px keys, radius 14, `--bg2`, ⌫). | 6 digits (any value in prototype) |
 | 3 Name | "What's your name?" / "The name people will see." | Single input, note "Shown on your profile. You can't change it later." | trimmed length > 1 |
-| 4 DOB | "When's your birthday?" / "Only your age is shown." | Three native `<select>`s (Day / Month / Year, years from currentYear−18 downward for 83 years), live line "You're N. That's what people will see." (`--primary-dark`) or "You must be 18 or older to use Thundi." (`#C0392B`), info callout (aqua-soft, ocean text): "Thundi is 18+ only. Your age is shown, your birthday isn't." | age ≥ 18 |
+| 4 DOB | "When's your birthday?" / "Only your age is shown." | Three native `<select>`s (Day / Month / Year, years from currentYear−18 downward for 83 years), live line "You're N. That's what people will see." (`--primary-dark`) or "You must be 18 or older to use Thundi." (`#C0392B`), info callout (aqua-soft, ocean text): "Mellocrush is 18+ only. Your age is shown, your birthday isn't." | age ≥ 18 |
 | 5 Gender | "How do you identify?" | Radio cards 52 px: Woman / Man / Prefer not to say. Selected = `--primary` border, `--aqua-soft` bg, filled dot. | chosen |
 | 6 Meet | "Who would you like to meet?" / "You can change this any time." | Women / Men / Everyone. | chosen |
 | 7 Intent | "What are you looking for?" / "Helps us show people who want the same thing." | Serious relationship / Dating / Marriage / Still figuring it out. | chosen |
@@ -92,7 +92,7 @@ Ocean full-screen, two 132×176 photo cards with 3 px white border rotated ∓8�
 ### 3.6 **Likes**
 
 - Segmented control (bg2 track radius 18, 4 px padding; segments 42 px radius 14; active = surface bg + `--shadow`): "Likes You" / "Matches".
-- Likes You, free user: ocean banner "{n} people like you / See who with Thundi Plus." with sand "Unlock" button (40 px, radius 14, `#D9C7A3`, ocean text); grid of 2 columns, 3:4 tiles radius 24, photo blurred 18 px, title "Someone" + verified badge, subtitle "Likes you"; tapping opens Membership.
+- Likes You, free user: ocean banner "{n} people like you / See who with Mellocrush Plus." with sand "Unlock" button (40 px, radius 14, `#D9C7A3`, ocean text); grid of 2 columns, 3:4 tiles radius 24, photo blurred 18 px, title "Someone" + verified badge, subtitle "Likes you"; tapping opens Membership.
 - Likes You, Plus user: unblurred tiles with "Name, age" and island; tapping opens the full profile.
 - Matches: same grid, unblurred, opens the profile. Empty: heart disc, "Your next match could be one swipe away.", "Start swiping".
 - Rule (centralise in build): `blurLikes = !premium && blurLikesYou`.
@@ -108,7 +108,7 @@ Ocean full-screen, two 132×176 photo cards with 3 px white border rotated ∓8�
 
 ### 3.8 **Send intro** sheet (z 45)
 
-Header: 48 px avatar, "Send {name} an intro" 19 px/800, "Delivered with your like. They can reply once they like you back.", PLUS tag. Allowed state: their prompt + answer in a bg2 card, textarea (3 rows, max 140), quota line ("Your 1 free intro this week" / "Unlimited intros with Plus") and counter "n/140", CTA "Like & send intro" (opacity .45 until text). Locked state: ocean card "You've used your free intro this week / Free members get one intro a week. Thundi Plus includes unlimited intros — and yours are seen first.", "See Thundi Plus" (ocean/sand), "Just like instead" (bg2). Sending creates a pending conversation with the intro as the first message, consumes the weekly free intro for non-Plus users, then performs the like.
+Header: 48 px avatar, "Send {name} an intro" 19 px/800, "Delivered with your like. They can reply once they like you back.", PLUS tag. Allowed state: their prompt + answer in a bg2 card, textarea (3 rows, max 140), quota line ("Your 1 free intro this week" / "Unlimited intros with Plus") and counter "n/140", CTA "Like & send intro" (opacity .45 until text). Locked state: ocean card "You've used your free intro this week / Free members get one intro a week. Mellocrush Plus includes unlimited intros — and yours are seen first.", "See Mellocrush Plus" (ocean/sand), "Just like instead" (bg2). Sending creates a pending conversation with the intro as the first message, consumes the weekly free intro for non-Plus users, then performs the like.
 
 ### 3.9 **Community**
 
@@ -158,9 +158,9 @@ Shared chrome: header 56 px + safe-top with back (44 px), title 19 px/800, optio
 - App: Language "English"; Appearance Light/Dark (toggles theme).
 - Support: Help Center, Contact Support → Safety Center; Report a Problem, Terms, Privacy Policy (no-ops).
 - Account management: Pause Dating (toast "Dating paused — you're hidden from Discover"), Log out (→ welcome), Delete Account (red; toast "Account deletion requires confirmation by SMS").
-- Footer "Thundi 1.0 · Made in the Maldives".
+- Footer "Mellocrush 1.0 · Made in the Maldives".
 
-**Membership (Thundi Plus)** — ocean hero with sand "THUNDI PLUS" tag, "More of what matters. Nothing you don't need.", "Dating on Thundi stays free. Plus adds a few quiet advantages." Perk list (36 px check tile): See who liked you, Unlimited likes ("No daily cap"), Rewind, Advanced filters, Incognito mode, Profile boost ("One boost a week"), Unlimited intros, Priority likes. Plans (3 cards, default 3 months selected): 1 month MVR 149/mo, 3 months MVR 119/mo, 12 months MVR 79/mo. CTA ocean/sand "Continue with Plus" ↔ "You're on Plus · Manage" (demo toggles premium instantly). Footer "Billed in MVR. Cancel any time. No upgrade prompts elsewhere in the app."
+**Membership (Mellocrush Plus)** — ocean hero with sand "MELLOCRUSH PLUS" tag, "More of what matters. Nothing you don't need.", "Dating on Mellocrush stays free. Plus adds a few quiet advantages." Perk list (36 px check tile): See who liked you, Unlimited likes ("No daily cap"), Rewind, Advanced filters, Incognito mode, Profile boost ("One boost a week"), Unlimited intros, Priority likes. Plans (3 cards, default 3 months selected): 1 month MVR 149/mo, 3 months MVR 119/mo, 12 months MVR 79/mo. CTA ocean/sand "Continue with Plus" ↔ "You're on Plus · Manage" (demo toggles premium instantly). Footer "Billed in MVR. Cancel any time. No upgrade prompts elsewhere in the app."
 
 **Safety Center** — five accordion cards (numbered aqua tile, chevron rotates): Dating safely, Meeting someone, Protecting your privacy, Reporting someone, Community guidelines (copy in source); "Contact support" card ("Replies within 24 hours. In an emergency, call 119.", "Message support").
 
@@ -168,7 +168,7 @@ Shared chrome: header 56 px + safe-top with back (44 px), title 19 px/800, optio
 
 ### 3.14 Toast
 
-Ocean pill 44 px, radius 22, white 14 px/600, `--shadow-lg`, `popIn .3s`, centred at `bottom:90px+safe`, auto-dismiss 1.8 s, `role=status`. Messages used: Profile saved, Posted to Community, Blocked…, Unmatched., Report sent and profile blocked., Intro sent to {name}, Welcome to Thundi Plus / Plus cancelled, Dating paused… / Dating resumed, Contacts hashed…, Verified…, Account deletion requires confirmation by SMS.
+Ocean pill 44 px, radius 22, white 14 px/600, `--shadow-lg`, `popIn .3s`, centred at `bottom:90px+safe`, auto-dismiss 1.8 s, `role=status`. Messages used: Profile saved, Posted to Community, Blocked…, Unmatched., Report sent and profile blocked., Intro sent to {name}, Welcome to Mellocrush Plus / Plus cancelled, Dating paused… / Dating resumed, Contacts hashed…, Verified…, Account deletion requires confirmation by SMS.
 
 ## 4. Design system extracted from the source
 

@@ -62,7 +62,7 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
           {m.paymentsAvailable && sellable.length > 0 ? (
             <>
               <Button variant="plus" size="lg" fullWidth onClick={buy} loading={pending} disabled={!chosen}>
-                Get Thundi Plus
+                Get Mellocrush Plus
               </Button>
               <p className="text-center text-caption leading-relaxed text-text-secondary">You pay by bank transfer. Plus starts after we confirm your payment, usually within a day.</p>
             </>
@@ -111,7 +111,7 @@ export function CurrentOrderCard({ order }: { order: MembershipDto["currentOrder
         </div>
         {o.status === "SUBMITTED" ? <div>Receipt submitted {formatDateTime(o.submittedAt)}. We check transfers within a day; Plus starts the moment it is confirmed.</div> : null}
         {o.status === "APPROVED" ? <div>Confirmed {formatDateTime(o.decidedAt)}.{o.periodEnd ? ` Plus runs until ${formatDate(o.periodEnd)}.` : ""}</div> : null}
-        {o.status === "REJECTED" ? <div>{o.rejectionReason ? `Reason: ${o.rejectionReason}. ` : ""}If you did transfer, check the reference and amount, then start a new order below. Nothing was charged by Thundi.</div> : null}
+        {o.status === "REJECTED" ? <div>{o.rejectionReason ? `Reason: ${o.rejectionReason}. ` : ""}If you did transfer, check the reference and amount, then start a new order below. Nothing was charged by Mellocrush.</div> : null}
         {attached ? <div>Open the order to see what we read from your receipt and submit it for review. Nothing has been sent yet.</div> : null}
         {o.status === "AWAITING_PAYMENT" && !attached ? <div>Transfer {o.amountLabel} using the reference above, then upload your receipt.</div> : null}
         {o.status === "AWAITING_PAYMENT" || o.status === "SUBMITTED" ? (

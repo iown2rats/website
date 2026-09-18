@@ -120,12 +120,12 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
         {visibility === "invisible" || privacy.invisibleMode.enabled ? (
           <Callout tone={privacy.invisibleMode.suspended ? "warning" : "ocean"} title={privacy.invisibleMode.suspended ? "Your Invisible Mode is still on." : "Invisible Mode"} className="mt-0.5">
             {privacy.invisibleMode.suspended
-              ? "Thundi Plus has ended, so you stay hidden from Discover until you renew Plus or turn Invisible Mode off. You are never shown to new people without your say. Your matches, chats and Community are unchanged."
+              ? "Mellocrush Plus has ended, so you stay hidden from Discover until you renew Plus or turn Invisible Mode off. You are never shown to new people without your say. Your matches, chats and Community are unchanged."
               : "Only people you like can find you in Discover. It doesn't affect your existing matches or chats."}{" "}
             {INVISIBLE_MODE_DISCLOSURE}
             {privacy.invisibleMode.suspended ? (
               <span className="mt-2.5 flex gap-2">
-                <Link href="/settings/membership" className="inline-flex h-9 items-center rounded-md bg-primary px-3.5 text-caption font-bold text-on-primary">Renew Thundi Plus</Link>
+                <Link href="/settings/membership" className="inline-flex h-9 items-center rounded-md bg-primary px-3.5 text-caption font-bold text-on-primary">Renew Mellocrush Plus</Link>
                 <Button size="sm" variant="secondary" className="h-9 rounded-md px-3.5 text-caption" onClick={() => void chooseVisibility("everyone")} loading={busy === "visibility"}>Turn Invisible Mode off</Button>
               </span>
             ) : null}
@@ -172,10 +172,10 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
 
       <ResponsiveDialog open={plusOpen} onClose={() => setPlusOpen(false)} labelledBy={plusTitleId}>
         <div className="flex items-center gap-2"><PlusTag size="md" /></div>
-        <DialogTitle id={plusTitleId} className="text-[22px]">Invisible Mode is part of Thundi Plus</DialogTitle>
+        <DialogTitle id={plusTitleId} className="text-[22px]">Invisible Mode is part of Mellocrush Plus</DialogTitle>
         <DialogDescription>With Plus, only people you like can find you in Discover. {INVISIBLE_MODE_DISCLOSURE}</DialogDescription>
         <div className="flex flex-col gap-2.5 pt-1">
-          <Link href="/settings/membership" className="flex h-13 items-center justify-center rounded-lg bg-primary text-body font-bold text-on-primary">See Thundi Plus</Link>
+          <Link href="/settings/membership" className="flex h-13 items-center justify-center rounded-lg bg-primary text-body font-bold text-on-primary">See Mellocrush Plus</Link>
           <Button variant="muted" size="md" onClick={() => setPlusOpen(false)} fullWidth>Not now</Button>
         </div>
       </ResponsiveDialog>

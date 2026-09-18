@@ -14,7 +14,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderId:
   const order = await getOrderForActor(actor, orderId).catch(() => null);
   if (!order) notFound();
   return (
-    <PageOverlay title="Thundi Plus" backHref="/settings/membership">
+    <PageOverlay title="Mellocrush Plus" backHref="/settings/membership">
       <OrderClient initialOrder={order} />
     </PageOverlay>
   );

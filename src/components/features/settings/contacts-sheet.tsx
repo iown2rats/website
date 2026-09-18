@@ -13,7 +13,7 @@ import type { PrivacySettingsDto } from "@/server/privacy/settings";
  * what browsers actually support: the Contact Picker where available (Chrome on Android) and typing or pasting
  * numbers everywhere. Numbers are normalised and hashed here, in the browser, with WebCrypto HMAC-SHA-256 and the
  * public salt; only 32-byte digests reach the server. The count shown is the size of the user's own list, never
- * how many of them are on Thundi.
+ * how many of them are on Mellocrush.
  */
 type ContactsNavigator = Navigator & { contacts?: { select: (props: string[], opts: { multiple: boolean }) => Promise<{ tel?: string[] }[]> } };
 
@@ -69,13 +69,13 @@ export function ContactsSheet({ open, onClose, privacy, onChange }: { open: bool
     <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId} dismissible={!busy}>
       <DialogTitle id={titleId} className="text-[22px]">Blocked contacts</DialogTitle>
       <DialogDescription>
-        People whose numbers you add here won&apos;t see your dating profile, and you won&apos;t see theirs. Numbers are hashed on this device — Thundi never receives or stores them in plain text.
+        People whose numbers you add here won&apos;t see your dating profile, and you won&apos;t see theirs. Numbers are hashed on this device — Mellocrush never receives or stores them in plain text.
       </DialogDescription>
       <p className="text-body-sm font-semibold text-text">{privacy.contactHashCount} number{privacy.contactHashCount === 1 ? "" : "s"} on your list</p>
       {pickerSupported ? (
         <Button variant="secondary" size="md" onClick={() => void pick()} disabled={busy} fullWidth>Choose from contacts</Button>
       ) : (
-        <p className="text-caption text-text-secondary">This browser can&apos;t open your address book. Type or paste numbers below; full address-book blocking is available in the Thundi app.</p>
+        <p className="text-caption text-text-secondary">This browser can&apos;t open your address book. Type or paste numbers below; full address-book blocking is available in the Mellocrush app.</p>
       )}
       <div className="flex flex-col gap-2">
         <label htmlFor={`${titleId}-numbers`} className="text-body-sm font-semibold text-text">Add numbers to hide from</label>

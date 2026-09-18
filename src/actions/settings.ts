@@ -20,12 +20,12 @@ export type SettingsFailure = { ok: false; code: "VALIDATION" | "ENTITLEMENT" | 
 function failure(e: unknown): SettingsFailure {
   if (isDomainError(e)) {
     if (e.code === "VALIDATION") return { ok: false, code: "VALIDATION", message: e.message };
-    if (e.code === "ENTITLEMENT_REQUIRED") return { ok: false, code: "ENTITLEMENT", message: "Invisible Mode is part of Thundi Plus." };
+    if (e.code === "ENTITLEMENT_REQUIRED") return { ok: false, code: "ENTITLEMENT", message: "Invisible Mode is part of Mellocrush Plus." };
     if (e.code === "NOT_FOUND") return { ok: false, code: "NOT_FOUND", message: "That's no longer available." };
     if (e.code === "INVALID_STATE") return { ok: false, code: "VALIDATION", message: e.message };
   }
   console.error("[settings] action failed", e);
-  return { ok: false, code: "ERROR", message: "Thundi couldn't save that right now. Try again." };
+  return { ok: false, code: "ERROR", message: "Mellocrush couldn't save that right now. Try again." };
 }
 
 type PrivacyResult = { ok: true; privacy: PrivacySettingsDto } | SettingsFailure;

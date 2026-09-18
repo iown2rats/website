@@ -54,7 +54,7 @@ function failure(e: unknown, availability?: AvailabilityDto): MessagingFailure {
     }
   }
   console.error("[messaging] action failed", e);
-  return { ok: false, code: "ERROR", message: "Thundi couldn't send that right now. Try again.", serverNow };
+  return { ok: false, code: "ERROR", message: "Mellocrush couldn't send that right now. Try again.", serverNow };
 }
 
 export async function sendChatMessage(input: unknown): Promise<{ ok: true; message: MessageDto; availability: AvailabilityDto; serverNow: string } | MessagingFailure> {

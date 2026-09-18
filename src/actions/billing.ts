@@ -19,7 +19,7 @@ function failure(e: unknown): BillingFailure {
     if (e.code === "NOT_FOUND") return { ok: false, code: "NOT_FOUND", message: "That order isn't available." };
   }
   console.error("[billing] action failed", e);
-  return { ok: false, code: "ERROR", message: "Thundi couldn't start that right now. Try again." };
+  return { ok: false, code: "ERROR", message: "Mellocrush couldn't start that right now. Try again." };
 }
 
 export async function startPlusOrder(input: { planId: string }): Promise<BillingFailure | { ok: true; order: OrderDto }> {

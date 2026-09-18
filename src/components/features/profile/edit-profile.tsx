@@ -87,7 +87,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
       result = await saveAboutSection({ bio, intent, interestIds: selected, prompts: answered.map(([promptId, answer]) => ({ promptId, answer: answer.trim() })) }).catch(() => null);
     }
     setSaving(false);
-    if (!result) { setError("Thundi couldn't reach the server. Check your connection and try again."); return; }
+    if (!result) { setError("Mellocrush couldn't reach the server. Check your connection and try again."); return; }
     if (!result.ok) { setError(result.message); return; }
     setProfile(result.profile);
     setInfo(infoDraft(result.profile));

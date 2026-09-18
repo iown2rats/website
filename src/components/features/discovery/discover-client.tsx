@@ -141,7 +141,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
           toast.show("That profile isn't available any more.");
         } else {
           restore(card);
-          toast.show("Couldn't reach Thundi. Try again.");
+          toast.show("Couldn't reach Mellocrush. Try again.");
         }
         return;
       }
@@ -165,7 +165,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         applyFailure(result);
         if (result.code !== "NOT_FOUND") {
           restore(card);
-          toast.show("Couldn't reach Thundi. Try again.");
+          toast.show("Couldn't reach Mellocrush. Try again.");
         }
         return;
       }
@@ -181,9 +181,9 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     setUndoBusy(false);
     if (!result.ok) {
       applyFailure(result);
-      if (result.code === "ENTITLEMENT") setLock({ feature: "Undo your last pass", description: "Thundi Plus lets you bring back the person you just passed on, once, straight away." });
+      if (result.code === "ENTITLEMENT") setLock({ feature: "Undo your last pass", description: "Mellocrush Plus lets you bring back the person you just passed on, once, straight away." });
       else if (result.code === "UNDO_UNAVAILABLE") toast.show(result.message);
-      else toast.show("Couldn't reach Thundi. Try again.");
+      else toast.show("Couldn't reach Mellocrush. Try again.");
       return;
     }
     sync(result.serverNow);
@@ -241,7 +241,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         actions={
           <>
             <AllowancePill allowance={allowance} msUntilReset={msUntilReset} onClick={() => likesExhausted && setLimitOpen(true)} />
-            <BoostControl boost={boost} tier={capabilities.tier} serverTime={serverTime} onSync={sync} onBoosted={setBoost} onLocked={() => setLock({ feature: "Boost your profile", description: "A Boost puts your profile first in Discover for 30 minutes so more people see you sooner. Thundi Plus includes 2 Boosts a week." })} />
+            <BoostControl boost={boost} tier={capabilities.tier} serverTime={serverTime} onSync={sync} onBoosted={setBoost} onLocked={() => setLock({ feature: "Boost your profile", description: "A Boost puts your profile first in Discover for 30 minutes so more people see you sooner. Mellocrush Plus includes 2 Boosts a week." })} />
             <IconButton aria-label="Filters" onClick={() => setFiltersOpen(true)}>
               <FilterIcon size={20} />
             </IconButton>
@@ -303,7 +303,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         saving={filtersSaving}
         error={filtersError}
         onApply={onApplyFilters}
-        onLockedAdvanced={() => setLock({ feature: "Advanced filters", description: "Filter by height and education, on top of the basic filters everyone has. Part of Thundi Plus." })}
+        onLockedAdvanced={() => setLock({ feature: "Advanced filters", description: "Filter by height and education, on top of the basic filters everyone has. Part of Mellocrush Plus." })}
       />
       <PlusLockSheet open={lock != null} onClose={() => setLock(null)} feature={lock?.feature ?? ""} description={lock?.description ?? ""} />
     </AppScreen>

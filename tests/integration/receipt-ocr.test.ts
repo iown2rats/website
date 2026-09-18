@@ -111,7 +111,7 @@ describe("reading a receipt at upload", () => {
     expect(await storage.read(row.receiptKey!)).not.toBeNull();
   });
 
-  it("13 · a missing Thundi reference does not fail the check", async () => {
+  it("13 · a missing Mellocrush reference does not fail the check", async () => {
     const { plan } = await shop();
     const customer = await createUser(db, { now: T0 });
     const order = await createOrder(customer, { planId: plan.id }, { db, now: T0 });

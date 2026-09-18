@@ -11,7 +11,7 @@ export const metadata = { title: "Membership" };
 export const dynamic = "force-dynamic";
 
 /*
- * Prototype "Membership": ocean hero with the THUNDI PLUS tag, a perks list, plan cards and a CTA. Perks are the
+ * Prototype "Membership": ocean hero with the MELLOCRUSH PLUS tag, a perks list, plan cards and a CTA. Perks are the
  * approved entitlements (docs/ARCHITECTURE.md §12.1). Plans, prices and whether anything is for sale come from the
  * admin-managed rows (§12.10); buying is a bank transfer confirmed by an admin (§12.11), so the CTA creates an order
  * and nothing on this screen can grant Plus.
@@ -33,18 +33,18 @@ export default async function MembershipPage() {
     <PageOverlay title="Membership" backHref="/profile">
       <OceanCard premium>
         <div><PlusHeroTag /></div>
-        <h2 className="text-[24px] font-extrabold leading-[1.15] tracking-[-.025em] text-text">{m.tier === "PLUS" ? "You're on Thundi Plus." : "More of what matters. Nothing you don't need."}</h2>
+        <h2 className="text-[24px] font-extrabold leading-[1.15] tracking-[-.025em] text-text">{m.tier === "PLUS" ? "You're on Mellocrush Plus." : "More of what matters. Nothing you don't need."}</h2>
         <p className="text-body-sm leading-normal text-text-secondary">
           {m.tier === "PLUS"
             ? periodEnd
               ? `${m.cancelAtPeriodEnd ? "Plus ends" : "Renews"} on ${periodEnd}${m.planName ? ` · ${m.planName}` : ""}.`
               : "Plus is active on your account."
-            : "Dating on Thundi stays free. Plus adds a few quiet advantages."}
+            : "Dating on Mellocrush stays free. Plus adds a few quiet advantages."}
         </p>
       </OceanCard>
 
       <section aria-labelledby="compare-heading" className="flex flex-col gap-2">
-        <SectionLabel id="compare-heading">Thundi Free and Thundi Plus</SectionLabel>
+        <SectionLabel id="compare-heading">Mellocrush Free and Mellocrush Plus</SectionLabel>
         <div className="overflow-hidden rounded-3xl glass-card">
           <table className="w-full table-fixed border-collapse text-caption">
             <thead>

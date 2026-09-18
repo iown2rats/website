@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 
 /**
- * Thundi icon set — line icons on a 24 grid with round caps, stroke 2–2.4, from the prototype.
+ * Mellocrush icon set — line icons on a 24 grid with round caps, stroke 2–2.4, from the prototype.
  * Every icon is decorative by default (aria-hidden); pass `title` for a labelled standalone icon.
  */
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "strokeWidth"> {
@@ -201,12 +201,3 @@ export function VerifiedBadge({ size = 20, className, title = "Photo verified" }
   );
 }
 
-/** Thundi wordmark logo: wave + island ellipse. */
-export function ThundiLogo({ size = 24, color = "var(--accent)", className }: { size?: number; color?: string; className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 26 26" fill="none" className={className} aria-hidden="true">
-      <path d="M3 16c4-6 8-6 10 0s6 6 10 0" stroke={color} strokeWidth="2.6" strokeLinecap="round" />
-      <ellipse cx="9" cy="9" rx="4" ry="2.2" fill={color} opacity=".9" />
-    </svg>
-  );
-}

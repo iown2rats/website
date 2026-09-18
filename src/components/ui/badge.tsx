@@ -78,11 +78,11 @@ export function PlusTag({ size = "sm", className, label = "Plus" }: { size?: "xs
   );
 }
 
-/** Larger label chip "THUNDI PLUS" on the Plus hero (26 px, gold background, plum text). */
+/** Larger label chip "MELLOCRUSH PLUS" on the Plus hero (26 px, gold background, plum text). */
 export function PlusHeroTag({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center h-6.5 px-2.5 rounded-xs bg-sand text-on-sand text-micro font-extrabold tracking-[.04em] uppercase", className)}>
-      Thundi Plus
+      Mellocrush Plus
     </span>
   );
 }

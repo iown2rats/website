@@ -39,7 +39,7 @@ export function EmptyState({ icon, title, description, actions, className, frame
 
 export function ErrorState({
   title = "Something went wrong",
-  description = "Thundi couldn't load this right now. Try again in a moment.",
+  description = "Mellocrush couldn't load this right now. Try again in a moment.",
   onRetry,
   className,
 }: {

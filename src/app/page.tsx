@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { ContinueWithGoogle } from "@/components/features/auth/google-button";
-import { ThundiLogo } from "@/components/ui/icons";
+import { Wordmark } from "@/components/brand/logo";
 import { getAuthState } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
 
 /*
- * Welcome screen: one full-screen photograph (a Maldivian beach at night under the Milky Way, a couple on the sand),
+ * Mellocrush welcome screen: one full-screen photograph (a Maldivian beach at night under the Milky Way, a couple on the sand),
  * the wordmark, one headline and Continue with Google. Nothing else — the picture does the storytelling.
  *
  * The hero is served as pre-rendered static files (public/hero, made by scripts/render-hero.mjs from the master in
@@ -62,9 +62,9 @@ export default async function WelcomePage() {
         style={{ paddingTop: "calc(28px + var(--safe-top))", paddingBottom: "calc(24px + var(--safe-bottom))" }}
       >
         <div className="flex w-full max-w-[var(--onboarding-max)] flex-col gap-3 self-center md:gap-4 md:self-start">
-          <div className="flex items-center gap-2 text-h3">
-            <ThundiLogo size={26} color="#fff" />
-            thundi
+          {/* The artwork is cocoa on transparent, so over the night photograph it sits on a small warm-white glass tile. */}
+          <div className="inline-flex self-start items-center rounded-lg px-3 py-2 glass-card">
+            <Wordmark height={22} priority />
           </div>
           <h1 className="text-hero md:text-[44px] md:leading-[1.04]">Meet someone closer to home.</h1>
         </div>

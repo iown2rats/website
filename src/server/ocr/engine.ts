@@ -1,6 +1,6 @@
 /**
  * The OCR engine boundary. Everything above this file works on text; only this file knows what turned a picture into
- * text. Tesseract.js runs SERVER-SIDE in a Node worker thread: the receipt never leaves Thundi, no third party is
+ * text. Tesseract.js runs SERVER-SIDE in a Node worker thread: the receipt never leaves Mellocrush, no third party is
  * called, and the wasm core plus the English model ship inside the deployment (docs/DEPLOYMENT.md §7). Swapping the
  * engine means one new `OcrEngine`; the parsers and their tests do not change.
  */

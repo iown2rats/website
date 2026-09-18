@@ -9,7 +9,7 @@ import { formatDuration } from "@/lib/time";
 /*
  * Like allowance reached (Phase 6 §25–27). Copy is exact: "You've used today's 30 likes." The countdown is
  * computed from server time; when it reaches zero the owner refreshes the allowance from the server.
- * Free: Get Thundi Plus / Maybe later. Plus (90): reset time only — Plus is not unlimited and there is no further tier.
+ * Free: Get Mellocrush Plus / Maybe later. Plus (90): reset time only — Plus is not unlimited and there is no further tier.
  */
 export interface LikeLimitDialogProps {
   open: boolean;
@@ -54,11 +54,11 @@ export function LikeLimitDialog({ open, onClose, limit, tier, resetsAt, serverTi
           {remaining != null ? <>Your likes refresh in <b className="tabular-nums text-text">{formatDuration(remaining)}</b>.</> : "Your likes refresh over the next 24 hours."}
           {" "}You can keep browsing and passing.
         </DialogDescription>
-        {tier === "FREE" ? <p className="text-caption text-text-secondary">Thundi Plus comes with 90 likes a day.</p> : null}
+        {tier === "FREE" ? <p className="text-caption text-text-secondary">Mellocrush Plus comes with 90 likes a day.</p> : null}
       </div>
       <div className="flex flex-col gap-2.5 pt-1">
         {tier === "FREE" ? (
-          <Button variant="plus" onClick={onGetPlus} fullWidth>Get Thundi Plus</Button>
+          <Button variant="plus" onClick={onGetPlus} fullWidth>Get Mellocrush Plus</Button>
         ) : null}
         <Button variant={tier === "FREE" ? "muted" : "primary"} size="md" onClick={onClose} fullWidth>
           {tier === "FREE" ? "Maybe later" : "Keep browsing"}

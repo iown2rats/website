@@ -1,5 +1,5 @@
 /**
- * Maldivian phone numbers. Thundi accepts +960 mobile numbers only.
+ * Maldivian phone numbers. Mellocrush accepts +960 mobile numbers only.
  * Local mobile numbers are 7 digits starting with 7 or 9. Everything is normalised to E.164 `+960XXXXXXX`
  * so one number can never produce two accounts because of formatting.
  */

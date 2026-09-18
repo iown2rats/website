@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { IconButton } from "@/components/ui/button";
-import { ChevronLeftIcon, ThundiLogo } from "@/components/ui/icons";
+import { ChevronLeftIcon } from "@/components/ui/icons";
+import { BrandMark, Wordmark } from "@/components/brand/logo";
 
 /*
  * Header patterns from the prototype:
@@ -11,7 +12,7 @@ import { ChevronLeftIcon, ThundiLogo } from "@/components/ui/icons";
  */
 
 /**
- * Tab-level header. `compactLogo` keeps only the logo mark on the narrowest phones (< 390 px) when the actions
+ * Tab-level header. `compactLogo` keeps only the linked "oo" mark on the narrowest phones (< 390 px) when the actions
  * area is temporarily wider than usual (e.g. Discover while a Boost countdown is showing), so nothing wraps or clips.
  */
 export function TabHeader({ title, logo = false, compactLogo = false, actions, className }: { title?: string; logo?: boolean; compactLogo?: boolean; actions?: ReactNode; className?: string }) {
@@ -19,8 +20,8 @@ export function TabHeader({ title, logo = false, compactLogo = false, actions, c
     <header className={cn("flex h-12 shrink-0 items-center justify-between gap-2", className)}>
       {logo ? (
         <div className="flex min-w-0 items-center gap-2 text-h3 text-text">
-          <ThundiLogo size={24} className="shrink-0" />
-          <span className={cn("truncate", compactLogo && "max-[389px]:sr-only")}>thundi</span>
+          <Wordmark height={24} className={cn(compactLogo && "max-[389px]:hidden")} />
+          {compactLogo ? <BrandMark size={28} className="min-[390px]:hidden" /> : null}
           {title ? <span className="sr-only">{title}</span> : null}
         </div>
       ) : (

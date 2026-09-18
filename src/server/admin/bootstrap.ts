@@ -37,7 +37,7 @@ export async function changeUserRole(admin: AdminActor, targetUserId: string, in
   if (target.role === input.role) return { userId: target.id, role: target.role };
   const updated = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('admin:roles'))`;
-    if (target.role === "ADMIN" && (await countAdmins(tx)) <= 1) throw new InvalidStateError("Thundi needs at least one administrator");
+    if (target.role === "ADMIN" && (await countAdmins(tx)) <= 1) throw new InvalidStateError("Mellocrush needs at least one administrator");
     const row = await tx.user.update({ where: { id: target.id }, data: { role: input.role }, select: { id: true, role: true } });
     await writeAudit(tx, { actorId: admin.userId, action: AUDIT_ACTIONS.adminRoleChanged, targetType: "User", targetId: target.id, data: { reason, before: { role: target.role }, after: { role: row.role } }, now });
     return row;

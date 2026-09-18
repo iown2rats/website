@@ -49,7 +49,7 @@ export class InvalidStateError extends DomainError {
 export class EntitlementRequiredError extends DomainError {
   readonly feature: string;
   constructor(feature: string) {
-    super("ENTITLEMENT_REQUIRED", `${feature} requires Thundi Plus`);
+    super("ENTITLEMENT_REQUIRED", `${feature} requires Mellocrush Plus`);
     this.name = "EntitlementRequiredError";
     this.feature = feature;
   }

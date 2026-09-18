@@ -7,7 +7,7 @@ import { compareAccounts, extractRecipientAccount, normalizeAccount } from "@/se
 import { extractAmount, toMinorUnits } from "@/server/ocr/extract/amount";
 import { extractTransactionDate, parseMaldivesDate } from "@/server/ocr/extract/date";
 import { extractParties, namesAgree } from "@/server/ocr/extract/parties";
-import { compareReferences, extractThundiReference } from "@/server/ocr/extract/reference";
+import { compareReferences, extractMellocrushReference } from "@/server/ocr/extract/reference";
 import { extractStatus } from "@/server/ocr/extract/status";
 import { extractTransactionId, normalizeTransactionId } from "@/server/ocr/extract/transaction-id";
 import { detectBank, parseReceiptText } from "@/server/ocr/banks";
@@ -104,32 +104,32 @@ describe("recipient account", () => {
     expect(extractRecipientAccount(F.BML_WRONG_RECIPIENT)?.value).toBe("7709876543210");
   });
   it("recipient names are supporting evidence with legal suffixes ignored", () => {
-    expect(extractParties(F.MIB_SUCCESS)).toEqual({ senderName: "AISHATH TEST", recipientName: "THUNDI PVT LTD" });
-    expect(namesAgree("THUNDI PVT LTD", "Thundi Private Limited")).toBe(true);
-    expect(namesAgree("SOME OTHER SHOP", "Thundi Pvt Ltd")).toBe(false);
+    expect(extractParties(F.MIB_SUCCESS)).toEqual({ senderName: "AISHATH TEST", recipientName: "MELLOCRUSH PVT LTD" });
+    expect(namesAgree("MELLOCRUSH PVT LTD", "Mellocrush Private Limited")).toBe(true);
+    expect(namesAgree("SOME OTHER SHOP", "Mellocrush Pvt Ltd")).toBe(false);
   });
 });
 
-describe("Thundi reference in the remark", () => {
+describe("Mellocrush reference in the remark", () => {
   it("12 · a matching reference is found, with separators and case tolerated", () => {
-    expect(extractThundiReference(F.BML_SUCCESS)).toEqual({ value: F.ORDER_REF, wellFormed: true });
-    expect(extractThundiReference(F.BML_NOISY)?.value).toBe(F.ORDER_REF);
-    expect(extractThundiReference("remarks thu7k4p2m")?.value).toBe(F.ORDER_REF);
+    expect(extractMellocrushReference(F.BML_SUCCESS)).toEqual({ value: F.ORDER_REF, wellFormed: true });
+    expect(extractMellocrushReference(F.BML_NOISY)?.value).toBe(F.ORDER_REF);
+    expect(extractMellocrushReference("remarks thu7k4p2m")?.value).toBe(F.ORDER_REF);
     expect(compareReferences("THU 7K4P2M", F.ORDER_REF)).toBe("MATCH");
   });
   it("13 · a missing reference is simply absent", () => {
-    expect(extractThundiReference(F.BML_MISSING_REFERENCE)).toBeUndefined();
-    expect(extractThundiReference(F.MIB_INCOMPLETE)).toBeUndefined();
+    expect(extractMellocrushReference(F.BML_MISSING_REFERENCE)).toBeUndefined();
+    expect(extractMellocrushReference(F.MIB_INCOMPLETE)).toBeUndefined();
   });
   it("14 · a different reference is a mismatch; one character off is uncertain", () => {
     expect(compareReferences("THU-9XY2QF", F.ORDER_REF)).toBe("MISMATCH");
     expect(compareReferences("THU-7K4P2N", F.ORDER_REF)).toBe("UNCERTAIN");
-    expect(extractThundiReference(F.BML_WRONG_REFERENCE)?.value).toBe("THU-9XY2QF");
+    expect(extractMellocrushReference(F.BML_WRONG_REFERENCE)?.value).toBe("THU-9XY2QF");
   });
 });
 
 describe("bank transaction number", () => {
-  it("15 · extracted on both banks, normalised, and never a Thundi reference, an amount, a date or an account", () => {
+  it("15 · extracted on both banks, normalised, and never a Mellocrush reference, an amount, a date or an account", () => {
     expect(extractTransactionId(F.BML_SUCCESS)).toMatchObject({ value: "BLAZ728811340921", confidence: "high" });
     expect(extractTransactionId(F.MIB_SUCCESS)).toMatchObject({ value: "91885003", confidence: "high" });
     expect(extractTransactionId(F.MIB_PROCESSED)?.value).toBe("123456789");

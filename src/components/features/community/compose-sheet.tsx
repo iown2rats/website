@@ -94,7 +94,7 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
       setProgress(0);
       xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100)); };
     }
-    xhr.onerror = () => { setBusy(false); setProgress(null); setError("Couldn't reach Thundi. Check your connection and try again."); };
+    xhr.onerror = () => { setBusy(false); setProgress(null); setError("Couldn't reach Mellocrush. Check your connection and try again."); };
     xhr.onload = () => {
       xhrRef.current = null;
       setBusy(false);

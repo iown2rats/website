@@ -12,7 +12,7 @@ import { FormError, SubmitButton } from "./submit-button";
 /*
  * Prototype step 11 "Privacy first": ocean "Block my contacts" card, then toggles "Hide my location" and "Hide my age".
  * Honest web UX (docs/CONTACT_BLOCKING.md §2, §7): the browser cannot read an address book, so the card records the
- * preference and explains that full contact blocking arrives with the Thundi app; no fake permission dialog and no
+ * preference and explains that full contact blocking arrives with the Mellocrush app; no fake permission dialog and no
  * fabricated counts. Invisible Mode is Plus-only and is mentioned, not offered, here.
  */
 export function PrivacyForm({ initial }: { initial: { hideLocation: boolean; hideAge: boolean; blockContacts: boolean } }) {
@@ -34,7 +34,7 @@ export function PrivacyForm({ initial }: { initial: { hideLocation: boolean; hid
           {"People you block from your contacts won't be shown your dating profile, and you won't see theirs. Numbers are hashed on your device and never stored in plain text."}
         </p>
         <p className="text-caption text-text-secondary">
-          Full address-book blocking is available in the Thundi app. On the web you can add numbers to hide from later in Privacy &amp; Safety.
+          Full address-book blocking is available in the Mellocrush app. On the web you can add numbers to hide from later in Privacy &amp; Safety.
         </p>
         <Button type="button" variant={blockContacts ? "secondary" : "primary"} size="md" className="h-13 text-body font-bold" onClick={() => setBlockContacts((v) => !v)} aria-pressed={blockContacts}>
           {blockContacts ? "Contact blocking on ✓" : "Turn on contact blocking"}
@@ -53,7 +53,7 @@ export function PrivacyForm({ initial }: { initial: { hideLocation: boolean; hid
         <span className="grid size-9 shrink-0 place-items-center rounded-sm bg-aqua-soft text-on-aqua-soft"><EyeOffIcon size={18} /></span>
         <div className="min-w-0 flex-1">
           <div className="text-body font-bold">Invisible Mode</div>
-          <div className="text-caption-sm text-text-secondary">Only people you like can discover you. Available with Thundi Plus.</div>
+          <div className="text-caption-sm text-text-secondary">Only people you like can discover you. Available with Mellocrush Plus.</div>
         </div>
         <PlusTag />
       </div>

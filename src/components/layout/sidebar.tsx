@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { CounterBadge } from "@/components/ui/badge";
-import { ThundiLogo } from "@/components/ui/icons";
+import { Wordmark } from "@/components/brand/logo";
 import { NAV_ITEMS, activeNavKey, type NavBadges } from "./nav-items";
 import { ThemeToggleButton } from "./theme-toggle";
 
@@ -17,9 +17,8 @@ export function Sidebar({ badges = {} }: { badges?: NavBadges }) {
   const active = activeNavKey(pathname);
   return (
     <nav aria-label="Primary" className="hidden desktop:flex w-[var(--sidebar-width)] shrink-0 flex-col gap-1.5 border-r border-border px-4.5 py-7">
-      <Link href="/discover" className="flex items-center gap-2 px-3 pb-6 text-h3 text-text" aria-label="Thundi home">
-        <ThundiLogo size={26} />
-        <span>thundi</span>
+      <Link href="/discover" className="flex items-center gap-2 px-3 pb-6 text-h3 text-text" aria-label="Mellocrush home">
+        <Wordmark height={26} />
       </Link>
       {NAV_ITEMS.map(({ key, label, href, Icon }) => {
         const isActive = active === key;

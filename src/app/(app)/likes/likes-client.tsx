@@ -134,7 +134,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
 
       {open ? <FullProfile profile={open} onClose={() => setOpen(null)} onPass={() => void act(open, "pass")} onLike={() => void act(open, "like")} /> : null}
       <MatchOverlay open={match != null} name={match?.name ?? ""} theirPhoto={match?.photo ?? null} myPhoto={myPhoto} onSayHello={() => { const id = match?.conversationId; setMatch(null); router.push(id ? `/chats/${id}` : "/chats"); }} onKeepSwiping={() => setMatch(null)} />
-      <PlusLockSheet open={lockOpen} onClose={() => setLockOpen(false)} feature="See who likes you" description="Thundi Plus shows the profiles of everyone who liked you, so you can like them back straight away. Free shows how many people like you." />
+      <PlusLockSheet open={lockOpen} onClose={() => setLockOpen(false)} feature="See who likes you" description="Mellocrush Plus shows the profiles of everyone who liked you, so you can like them back straight away. Free shows how many people like you." />
     </>
   );
 }

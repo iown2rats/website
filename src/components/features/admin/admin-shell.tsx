@@ -6,7 +6,8 @@ import { useState, type ComponentType, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { CounterBadge } from "@/components/ui/badge";
 import { BottomSheet, DialogTitle } from "@/components/ui/dialog";
-import { BoltIcon, CheckIcon, InfoIcon, LockIcon, MoreIcon, PeopleIcon, PinIcon, SendIcon, ShieldIcon, ThundiLogo, WavesIcon, type IconProps } from "@/components/ui/icons";
+import { BrandMark, Wordmark } from "@/components/brand/logo";
+import { BoltIcon, CheckIcon, InfoIcon, LockIcon, MoreIcon, PeopleIcon, PinIcon, SendIcon, ShieldIcon, WavesIcon, type IconProps } from "@/components/ui/icons";
 import { ThemeToggleButton } from "@/components/layout/theme-toggle";
 import { hasPermission, type AdminRole, type Permission } from "@/server/admin/permissions";
 
@@ -93,21 +94,20 @@ export function AdminShell({ role, badges = {}, children }: { role: AdminRole; b
   return (
     <div className="fixed inset-0 flex bg-background text-text">
       <aside className="hidden desktop:flex w-[var(--sidebar-width)] shrink-0 flex-col gap-5 overflow-y-auto border-r border-border px-4 py-6">
-        <Link href="/admin" className="flex items-center gap-2 px-3 text-h4 text-text" aria-label="Thundi admin home">
-          <ThundiLogo size={24} />
-          <span>thundi</span>
+        <Link href="/admin" className="flex items-center gap-2 px-3 text-h4 text-text" aria-label="Mellocrush admin home">
+          <Wordmark height={22} />
           <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-on-ocean">Admin</span>
         </Link>
         <NavList role={role} badges={badges} pathname={pathname} />
         <div className="mt-auto flex flex-col gap-2">
-          <Link href="/discover" className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-semibold text-text-secondary hover:bg-surface-muted">‹ Back to Thundi</Link>
+          <Link href="/discover" className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-semibold text-text-secondary hover:bg-surface-muted">‹ Back to Mellocrush</Link>
           <ThemeToggleButton className="h-11 rounded-md" />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 desktop:hidden" style={{ height: "calc(var(--page-header-height) + var(--safe-top))", paddingTop: "var(--safe-top)" }}>
           <Link href="/admin" className="flex items-center gap-1.5 text-body font-extrabold" aria-label="Admin home">
-            <ThundiLogo size={20} />
+            <BrandMark size={24} />
             <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-on-ocean">Admin</span>
           </Link>
           <span className="min-w-0 flex-1 truncate text-body-sm font-semibold text-text-secondary">{current?.label ?? "Admin"}</span>
@@ -123,7 +123,7 @@ export function AdminShell({ role, badges = {}, children }: { role: AdminRole; b
         <DialogTitle>Admin</DialogTitle>
         <NavList role={role} badges={badges} pathname={pathname} onNavigate={() => setMenuOpen(false)} dense />
         <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
-          <Link href="/discover" onClick={() => setMenuOpen(false)} className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-semibold text-text-secondary hover:bg-surface-muted">‹ Back to Thundi</Link>
+          <Link href="/discover" onClick={() => setMenuOpen(false)} className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-semibold text-text-secondary hover:bg-surface-muted">‹ Back to Mellocrush</Link>
           <ThemeToggleButton className="h-11 rounded-md" />
         </div>
       </BottomSheet>

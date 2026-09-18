@@ -1,5 +1,5 @@
 /**
- * Thundi product rules — the single source of truth for monetization limits.
+ * Mellocrush product rules — the single source of truth for monetization limits.
  * Approved 2026-09-17. See docs/ARCHITECTURE.md §12.
  *
  * Nothing outside src/server/entitlements should read these tables directly;

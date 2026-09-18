@@ -1,4 +1,4 @@
-# Thundi
+# Mellocrush
 
 Meet someone closer to home. Dating for the Maldives. 18+.
 

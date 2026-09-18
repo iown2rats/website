@@ -50,7 +50,7 @@ export interface ParsedReceipt {
   recipientAccount: string | null;
   /** Remark / purpose text as read, trimmed. */
   remarks: string | null;
-  /** A Thundi payment reference (THU-XXXXXX) found anywhere on the receipt. */
+  /** A Mellocrush payment reference (THU-XXXXXX) found anywhere on the receipt. */
   thundiReference: string | null;
 }
 

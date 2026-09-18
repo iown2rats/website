@@ -41,7 +41,7 @@ export default async function DevGoogleAuthorize({ searchParams }: { searchParam
         <div className="flex flex-col gap-1">
           <span className="inline-flex w-fit items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">Development identity provider</span>
           <h1 className="text-[22px] font-semibold">Choose an account</h1>
-          <p className="text-[14px] text-[#5f6368]">to continue to <span className="font-semibold text-[#1f1f1f]">Thundi (local)</span>. This screen stands in for Google and does not exist in production.</p>
+          <p className="text-[14px] text-[#5f6368]">to continue to <span className="font-semibold text-[#1f1f1f]">Mellocrush (local)</span>. This screen stands in for Google and does not exist in production.</p>
         </div>
         <ul className="m-0 flex list-none flex-col divide-y divide-[#e8eaed] overflow-hidden rounded-xl border border-[#dadce0] p-0">
           {identities.map((i) => {

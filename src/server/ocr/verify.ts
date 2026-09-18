@@ -69,11 +69,11 @@ function recipientCheck(tx: NormalizedTransaction, o: OrderExpectation): Receipt
 }
 
 function referenceCheck(tx: NormalizedTransaction, o: OrderExpectation): ReceiptCheck {
-  if (!tx.thundiReference) return { state: "NOT_FOUND", detected: null, expected: o.reference, note: "No Thundi reference was read from the remark. Many receipts do not show remarks; this alone is not a problem." };
+  if (!tx.thundiReference) return { state: "NOT_FOUND", detected: null, expected: o.reference, note: "No Mellocrush reference was read from the remark. Many receipts do not show remarks; this alone is not a problem." };
   const state = compareReferences(tx.thundiReference, o.reference);
   if (state === "MATCH") return { state, detected: tx.thundiReference, expected: o.reference };
   if (state === "UNCERTAIN") return { state, detected: tx.thundiReference, expected: o.reference, note: "One character differs; likely an OCR misread." };
-  return { state: "MISMATCH", detected: tx.thundiReference, expected: o.reference, note: "The remark carries a different Thundi reference." };
+  return { state: "MISMATCH", detected: tx.thundiReference, expected: o.reference, note: "The remark carries a different Mellocrush reference." };
 }
 
 function transactionIdCheck(tx: NormalizedTransaction): ReceiptCheck {

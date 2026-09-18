@@ -33,7 +33,7 @@ function failure(e: unknown): CommunityFailure {
     if (e.code === "INVALID_STATE") return { ok: false, code: "UNAVAILABLE", message: e.message };
   }
   console.error("[community] action failed", e);
-  return { ok: false, code: "ERROR", message: "Thundi couldn't do that right now. Try again." };
+  return { ok: false, code: "ERROR", message: "Mellocrush couldn't do that right now. Try again." };
 }
 
 export async function loadFeed(input: unknown): Promise<({ ok: true } & FeedPage) | CommunityFailure> {

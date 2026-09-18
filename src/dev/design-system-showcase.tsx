@@ -129,7 +129,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
             <Button variant="ghost">Maybe later</Button>
             <Button variant="destructive">Unmatch</Button>
             <Button variant="ocean">Submit report</Button>
-            <Button variant="plus">Get Thundi Plus</Button>
+            <Button variant="plus">Get Mellocrush Plus</Button>
             <Button variant="muted">Cancel</Button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -250,10 +250,10 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
                 <div className="text-body font-semibold">Bring good hedhikaa and a strong opinion about football.</div>
               </Surface>
               <Divider />
-              <Callout>{"Thundi is 18+ only. Your age is shown, your birthday isn't."}</Callout>
+              <Callout>{"Mellocrush is 18+ only. Your age is shown, your birthday isn't."}</Callout>
               <Callout tone="ocean" icon={<ShieldIcon size={26} />}>You control exactly who sees you. Your phone number, email and exact location are never shown to anyone.</Callout>
               <Callout tone="warning" icon={<LockIcon size={18} />}>Development pricing — not production pricing.</Callout>
-              <Callout tone="danger">You must be 18 or older to use Thundi.</Callout>
+              <Callout tone="danger">You must be 18 or older to use Mellocrush.</Callout>
             </div>
           </div>
         </Section>
@@ -269,7 +269,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
           </div>
         </Section>
 
-        <Section id="states" title="States" note="Loading, empty, error, offline, success — in Thundi's language.">
+        <Section id="states" title="States" note="Loading, empty, error, offline, success — in Mellocrush's language.">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="relative h-72"><SkeletonCard /></div>
             <div className="flex flex-col gap-2"><SkeletonRow /><SkeletonRow /><SkeletonText lines={3} className="px-1.5" /><div className="grid grid-cols-2 gap-3"><SkeletonTile /><SkeletonTile /></div></div>
@@ -281,7 +281,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
                 icon={<HeartIcon />}
                 title="You've used today's 30 likes."
                 description="More available in 4h 12m."
-                actions={<><Button variant="plus" size="md">Get Thundi Plus</Button><Button variant="ghost" size="md">Maybe later</Button></>}
+                actions={<><Button variant="plus" size="md">Get Mellocrush Plus</Button><Button variant="ghost" size="md">Maybe later</Button></>}
               />
             </Card>
           </div>
@@ -294,7 +294,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
             <Button variant="secondary" size="md" onClick={() => setConfirm(true)}>Confirmation</Button>
             <Button variant="secondary" size="md" onClick={() => setActions(true)}>Action sheet</Button>
             <Button variant="secondary" size="md" onClick={() => toast.show("Profile saved")}>Toast</Button>
-            <Button variant="secondary" size="md" onClick={() => toast.show("Welcome to Thundi Plus", { tone: "success" })}>Success toast</Button>
+            <Button variant="secondary" size="md" onClick={() => toast.show("Welcome to Mellocrush Plus", { tone: "success" })}>Success toast</Button>
           </div>
           <BottomSheet open={sheet} onClose={() => setSheet(false)} labelledBy="ds-sheet-title">
             <div className="flex items-center justify-between"><DialogTitle id="ds-sheet-title">Filters</DialogTitle><Button variant="ghost" size="sm" className="text-primary-ink" onClick={() => setSheet(false)}>Reset</Button></div>
@@ -316,7 +316,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
             <OceanCard premium>
               <PlusHeroTag className="self-start" />
               <div className="text-h2 text-on-ocean">{"More of what matters. Nothing you don't need."}</div>
-              <p className="text-body-sm text-on-ocean-muted">Dating on Thundi stays free. Plus adds a few quiet advantages.</p>
+              <p className="text-body-sm text-on-ocean-muted">Dating on Mellocrush stays free. Plus adds a few quiet advantages.</p>
             </OceanCard>
             <div className="flex flex-col gap-3">
               <OceanCard className="gap-2">
@@ -343,7 +343,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
                 <li key={b} className="flex items-center gap-2.5"><span className="grid size-6 place-items-center rounded-full bg-aqua-soft text-on-aqua-soft"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg></span>{b}</li>
               ))}
             </ul>
-            <Button variant="plus" onClick={() => setPlusSheet(false)}>Get Thundi Plus</Button>
+            <Button variant="plus" onClick={() => setPlusSheet(false)}>Get Mellocrush Plus</Button>
             <Button variant="ghost" size="md" onClick={() => setPlusSheet(false)}>Maybe later</Button>
           </BottomSheet>
         </Section>

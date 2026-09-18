@@ -1,6 +1,6 @@
 /*
- * Thundi design tokens (see docs/DESIGN_SYSTEM.md §2). Colours follow the warm-white glass identity; geometry,
- * spacing and motion still follow prototype/Thundi.dc.html.
+ * Mellocrush design tokens (see docs/DESIGN_SYSTEM.md §2). Colours follow the warm-white glass identity; geometry,
+ * spacing and motion still follow the original prototype (prototype/Thundi.dc.html).
  * Components consume these through Tailwind utilities mapped in globals.css; raw hex never appears in components.
  */
 :root {
@@ -38,7 +38,7 @@
   --success: #237a4b;
   --warning: #a86d17;
   --danger: #b3393f;
-  /* Thundi Plus gold. */
+  /* Mellocrush Plus gold. */
   --sand: #c6a962;
   --on-sand: #3b2f2a;
   --glass: rgba(255, 251, 241, 0.68);
@@ -99,7 +99,7 @@
 }
 
 /* Dark mode is opt-in (Profile → appearance): black with near-black glass, the same coral and gold accents.
-   Light is the Thundi experience and never follows the system setting. */
+   Light is the Mellocrush experience and never follows the system setting. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --background: #000000;

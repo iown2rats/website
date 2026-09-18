@@ -42,7 +42,7 @@ function failure(e: unknown, extra: Partial<ActionFailure> = {}): ActionFailure 
     }
   }
   console.error("[discovery] action failed", e);
-  return { ok: false, code: "ERROR", message: "Thundi couldn't do that right now. Try again.", serverNow, ...extra };
+  return { ok: false, code: "ERROR", message: "Mellocrush couldn't do that right now. Try again.", serverNow, ...extra };
 }
 
 export async function loadDeck(input: unknown): Promise<({ ok: true } & DeckPage) | ActionFailure> {

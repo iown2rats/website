@@ -128,7 +128,7 @@ export async function saveDateOfBirth(actor: Actor, input: unknown, deps: { db?:
   const { day, month, year } = parse(dobSchema.safeParse(input));
   const dob = new Date(Date.UTC(year, month - 1, day));
   if (dob.getTime() > now.getTime()) throw new ValidationError("That date is in the future");
-  if (!isAdult(dob, now)) throw new ValidationError(`You must be ${MINIMUM_AGE} or older to use Thundi.`);
+  if (!isAdult(dob, now)) throw new ValidationError(`You must be ${MINIMUM_AGE} or older to use Mellocrush.`);
   await db.user.update({ where: { id: actor.userId }, data: { dateOfBirth: dob } });
   await advance(db, actor.userId, "DOB");
   return { age: ageFromDateOfBirth(dob, now) };
@@ -216,7 +216,7 @@ export async function completeOnboarding(actor: Actor, deps: { db?: Db; now?: Da
   const data = await getOnboardingData(actor, { db });
   if (!data.completion.requiredComplete) throw new ValidationError(`Please finish: ${data.completion.missingRequired.join(", ")}`);
   const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { dateOfBirth: true, status: true, onboardingCompletedAt: true } });
-  if (!user.dateOfBirth || !isAdult(user.dateOfBirth, now)) throw new ValidationError(`You must be ${MINIMUM_AGE} or older to use Thundi.`);
+  if (!user.dateOfBirth || !isAdult(user.dateOfBirth, now)) throw new ValidationError(`You must be ${MINIMUM_AGE} or older to use Mellocrush.`);
   if (user.status !== "ONBOARDING" && user.status !== "ACTIVE") throw new InvalidStateError("This account can't be activated");
   await db.user.update({
     where: { id: actor.userId },

@@ -169,7 +169,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
     setDraft("");
     stickToBottom.current = true;
     setPending((p) => [...p.filter((x) => x.clientId !== clientId), { clientId, body, at: new Date(serverTime()).toISOString(), state: "sending" }]);
-    const result = await sendChatMessage({ conversationId: header.id, body }).catch((): MessagingFailure => ({ ok: false, code: "ERROR", message: "Couldn't reach Thundi. Try again.", serverNow: new Date().toISOString() }));
+    const result = await sendChatMessage({ conversationId: header.id, body }).catch((): MessagingFailure => ({ ok: false, code: "ERROR", message: "Couldn't reach Mellocrush. Try again.", serverNow: new Date().toISOString() }));
     setSending(false);
     if (result.ok) {
       sync(result.serverNow);
@@ -289,9 +289,9 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
           {showCooldown ? (
             <div className="flex items-center justify-between gap-3 px-4 pt-2.5 text-[13px] text-text-secondary" data-testid="cooldown-note">
               <span>
-                Next free message in <b className="tabular-nums text-text">{mmss(waitingMs)}</b>. Chat anytime with Thundi Plus.
+                Next free message in <b className="tabular-nums text-text">{mmss(waitingMs)}</b>. Chat anytime with Mellocrush Plus.
               </span>
-              <Link href="/settings/membership" className="shrink-0 text-[13px] font-bold text-primary-ink">Get Thundi Plus</Link>
+              <Link href="/settings/membership" className="shrink-0 text-[13px] font-bold text-primary-ink">Get Mellocrush Plus</Link>
             </div>
           ) : null}
           <form

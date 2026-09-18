@@ -3,7 +3,7 @@
  *
  * A receipt is FULL of numbers: the amount, the balance, the account it came from, the date, a phone number. Picking
  * one at random would be worse than finding nothing, because duplicate detection would then key on garbage. So a
- * candidate must be introduced by a label, and anything that looks like money, a date, a time or a Thundi payment
+ * candidate must be introduced by a label, and anything that looks like money, a date, a time or a Mellocrush payment
  * reference is thrown out even when it is. (Rules proven on real BML and MIB slips in the AVITO codebase.)
  */
 import { digitsIn, lettersOnly, normalizeOcrText } from "../text";
@@ -42,8 +42,8 @@ function looksLikeAmount(value: string): boolean {
 function looksLikeTime(value: string): boolean {
   return /^\d{1,2}:\d{2}(?::\d{2})?$/.test(value);
 }
-/** Thundi's own payment reference is not a bank transaction number, even when the customer typed it into remarks. */
-export function isThundiReference(value: string): boolean {
+/** Mellocrush's own payment reference is not a bank transaction number, even when the customer typed it into remarks. */
+export function isMellocrushReference(value: string): boolean {
   return /^THU-?[A-Z0-9]{6}$/.test(value.replace(/\s/g, ""));
 }
 
@@ -51,7 +51,7 @@ function plausible(value: string): boolean {
   if (value.length < 5 || value.length > 32) return false;
   if (digitsIn(value) < 4) return false;
   if (looksLikeDate(value) || looksLikeAmount(value) || looksLikeTime(value)) return false;
-  if (isThundiReference(value)) return false;
+  if (isMellocrushReference(value)) return false;
   if (/^(?:19|20)\d{2}$/.test(value)) return false;
   return true;
 }

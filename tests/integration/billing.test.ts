@@ -35,7 +35,7 @@ async function makeAdmin(role: "ADMIN" | "MODERATOR" = "ADMIN"): Promise<AdminAc
 }
 
 const PLAN = { code: "MONTHLY", name: "1 month", intervalDays: 30, priceMinor: 14_900, currency: "MVR", active: true, isPlaceholderPrice: false, sortOrder: 1 };
-const METHOD = { label: "Main account", bankName: "Test Bank", accountHolder: "Thundi Pvt Ltd", accountNumber: "7701234567890", currency: "MVR", instructions: "Use the reference as the remark.", enabled: true, sortOrder: 0 };
+const METHOD = { label: "Main account", bankName: "Test Bank", accountHolder: "Mellocrush Pvt Ltd", accountNumber: "7701234567890", currency: "MVR", instructions: "Use the reference as the remark.", enabled: true, sortOrder: 0 };
 
 async function setUpShop(admin: AdminActor) {
   const plan = await createPlan(admin, PLAN, { db, now: T0 });
@@ -102,7 +102,7 @@ describe("orders", () => {
     const weekly = await createPlan(admin, { ...PLAN, code: "WEEKLY", name: "1 week", intervalDays: 7, priceMinor: 4_900, sortOrder: 0 }, { db, now: T0 });
     const customer = await createUser(db, { now: T0 });
     const order = await createOrder(customer, { planId: plan.id }, { db, now: T0 });
-    expect(order).toMatchObject({ status: "AWAITING_PAYMENT", planName: "1 month", amountMinor: 14_900, amountLabel: "MVR 149", currency: "MVR", durationDays: 30, method: { bankName: "Test Bank", accountNumber: method.accountNumber, accountHolder: "Thundi Pvt Ltd" }, hasReceipt: false, receiptUrl: null, check: null, receiptAttachedAt: null });
+    expect(order).toMatchObject({ status: "AWAITING_PAYMENT", planName: "1 month", amountMinor: 14_900, amountLabel: "MVR 149", currency: "MVR", durationDays: 30, method: { bankName: "Test Bank", accountNumber: method.accountNumber, accountHolder: "Mellocrush Pvt Ltd" }, hasReceipt: false, receiptUrl: null, check: null, receiptAttachedAt: null });
     expect(order.reference).toMatch(/^THU-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
     expect(new Date(order.expiresAt).getTime()).toBe(T0.getTime() + ORDER_RULES.awaitingPaymentTtlMs);
     const again = await createOrder(customer, { planId: plan.id }, { db, now: at(T0, 1000) });

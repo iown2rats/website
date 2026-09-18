@@ -48,7 +48,7 @@ describe("outcomes", () => {
     expect(oneOff.outcome).toBe("REVIEW_REQUIRED");
     expect(oneOff.checks.recipient.state).toBe("UNCERTAIN");
     const nameOnly = verifyAgainstOrder(read(F.BML_SUCCESS, { recipientAccount: null }), ORDER, NONE, NOW);
-    expect(nameOnly.checks.recipient).toMatchObject({ state: "UNCERTAIN", detected: "THUNDI PVT LTD" });
+    expect(nameOnly.checks.recipient).toMatchObject({ state: "UNCERTAIN", detected: "MELLOCRUSH PVT LTD" });
     expect(nameOnly.outcome).toBe("REVIEW_REQUIRED");
   });
   it("5/6 · pending needs review, failed is a mismatch, even when everything else matches", () => {

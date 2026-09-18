@@ -2,7 +2,7 @@
   "name": "thundi",
   "version": "0.1.0",
   "private": true,
-  "description": "Thundi — dating for the Maldives",
+  "description": "Mellocrush — dating for the Maldives",
   "engines": {
     "node": ">=22.18.0"
   },

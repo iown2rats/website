@@ -50,6 +50,8 @@ Integration tests run against a real Postgres and include concurrency tests for 
 
 Migrations are **not** applied to the hosted Supabase project automatically. See `docs/ARCHITECTURE.md` §5 for the connection strategy; apply with `npm run db:deploy` against `DIRECT_DATABASE_URL` only when instructed. Before switching `STORAGE_PROVIDER=supabase`, a private bucket named by `SUPABASE_STORAGE_BUCKET_PHOTOS` (`profile-photos`) must exist and `SUPABASE_SECRET_KEY` must be set on the server only.
 
+The staging environment (Vercel project `thundi` at `https://thundi.vercel.app`, Supabase project `Thundi`) and its procedures are recorded in `docs/DEPLOYMENT.md`.
+
 ## Layout
 
 ```

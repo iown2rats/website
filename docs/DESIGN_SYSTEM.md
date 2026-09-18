@@ -401,8 +401,12 @@ a coral Continue pill, then "Create account" and "Forgot password?" on one row. 
 "forgot password" and "reset password" are separate screens rendered by the same `AuthShell`, so the whole flow is
 one place: the same photograph, the same 28 px glass card, the same white wordmark.
 
-Fields match the provider buttons rather than the member app's warm inputs: 52 px tall, fully rounded, the card's
-content width, a translucent white surface with a white hairline, white text and a 55 %-white placeholder. The focus
+Every control on the card shares one surface: 52 px tall, fully rounded, the card's content width, a translucent
+white surface (10 % white) with a 25 %-white hairline, white text and a 55 %-white placeholder. That includes the two
+provider buttons, which no longer carry their own brand colours — a white Google pill beside a Telegram-blue one made
+the card read as two brands competing rather than one set of choices. The four-colour Google G stays, because it is
+the part people recognise and Google's guidelines allow the mark on a dark surface; Telegram uses the plain white
+plane. The coral Continue pill is the only filled control, which is what marks it as the primary action. The focus
 ring is the white outline used across the card. The password toggle is a real button with an eye icon and an
 `aria-pressed` state, and it names what it does for screen readers.
 

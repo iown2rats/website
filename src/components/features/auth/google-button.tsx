@@ -40,8 +40,14 @@ export function TelegramMark({ size = 20, plain = false }: { size?: number; plai
 }
 
 export type SignInButtonProvider = "google" | "telegram";
-/** `white`: the shared white surface with the provider's mark. `brand`: the provider's own colour (Telegram blue pill with a white plane; Google stays white by its guidelines). */
-export type SignInButtonAppearance = "white" | "brand";
+/**
+ * `white`: the shared white surface with the provider's mark, for light backgrounds.
+ * `brand`: the provider's own colour (a Telegram-blue pill; Google stays white by its guidelines).
+ * `glass`: the translucent surface the auth card's own fields use, so every control on the card reads as one set
+ *   rather than two brands competing. Google's guidelines allow its mark on a dark surface, so the four-colour G is
+ *   kept — it is the part people recognise, and it is the only colour on the card.
+ */
+export type SignInButtonAppearance = "white" | "brand" | "glass";
 
 const LABELS: Record<SignInButtonProvider, string> = { google: "Continue with Google", telegram: "Continue with Telegram" };
 
@@ -53,8 +59,13 @@ export function ContinueWith({ provider, className, label, purpose = "login", re
   const start = signInRoute(provider);
   const href = purpose === "reauth" ? `${start}?purpose=reauth${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}` : start;
   const brandBlue = appearance === "brand" && provider === "telegram";
-  const surface = brandBlue ? "bg-[#0AA0F4] text-white" : "bg-white text-[#1f1f1f]";
-  const mark = provider === "google" ? <GoogleMark size={markSize} /> : <TelegramMark size={markSize} plain={brandBlue} />;
+  const glass = appearance === "glass";
+  const surface = glass
+    ? "border border-white/25 bg-white/10 text-white hover:bg-white/15"
+    : brandBlue
+      ? "bg-[#0AA0F4] text-white"
+      : "bg-white text-[#1f1f1f]";
+  const mark = provider === "google" ? <GoogleMark size={markSize} /> : <TelegramMark size={markSize} plain={brandBlue || glass} />;
   // Radius is a prop, not a class the caller appends: `cn` only joins, so two radius utilities would be settled by
   // stylesheet order rather than by the caller's intent.
   const radius = shape === "pill" ? "rounded-full" : "rounded-lg";

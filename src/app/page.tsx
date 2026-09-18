@@ -29,9 +29,11 @@ export default async function WelcomePage() {
     <AuthShell labelledBy="welcome-title" priority>
       <AuthHeading id="welcome-title" />
       <AuthTagline />
+      {/* One surface for every control on the card: the provider buttons use the same translucent glass as the email
+          fields below them, so nothing shouts. The four-colour G is the only brand colour left (DESIGN_SYSTEM §27). */}
       <div className="mt-7 flex w-full flex-col gap-3">
-        <ContinueWithGoogle shape="pill" className="h-13 text-[17px] shadow-[0_8px_24px_rgba(0,0,0,0.25)]" markSize={24} />
-        {telegram ? <ContinueWithTelegram shape="pill" appearance="brand" className="h-13 text-[17px] shadow-[0_8px_24px_rgba(0,0,0,0.25)]" markSize={26} /> : null}
+        <ContinueWithGoogle shape="pill" appearance="glass" className="h-13 text-[17px]" markSize={22} />
+        {telegram ? <ContinueWithTelegram shape="pill" appearance="glass" className="h-13 text-[17px]" markSize={22} /> : null}
       </div>
       {emailAuth ? (
         <>

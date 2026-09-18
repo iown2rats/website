@@ -2,19 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { cancelPlusOrder } from "@/actions/billing";
+import { cancelPlusOrder, submitPlusOrder } from "@/actions/billing";
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { OrderDto } from "@/server/billing/orders";
+import type { ReceiptCheckDto } from "@/server/billing/receipt-dto";
 import { Callout } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, Spinner } from "@/components/ui/button";
 import { ConfirmationDialog, DialogDescription, DialogTitle, ResponsiveDialog } from "@/components/ui/dialog";
 import { ListGroup } from "@/components/ui/surface";
 import { useToast } from "@/components/ui/toast";
+import { ReceiptCheckCard } from "./receipt-check-card";
 
 /*
- * Order screen (docs/ARCHITECTURE.md §12.11): bank instructions with copy controls, "I've made the transfer" →
- * receipt upload (which submits the order), then the review / approved / rejected states. The customer never
- * sets a status; every state shown here is read back from the server after each action.
+ * Order screen (docs/ARCHITECTURE.md §12.11, §12.14): bank instructions with copy controls; "I've made the transfer"
+ * → receipt upload → "Checking transfer details…" → the check result with Replace slip / Submit for review; then the
+ * review / approved / rejected states. The customer never sets a status or a check result; every state shown here is
+ * read back from the server after each action. OCR failure never blocks submitting.
  */
 function CopyRow({ label, value, mono = true }: { label: string; value: string; mono?: boolean }) {
   const toast = useToast();
@@ -41,16 +44,22 @@ function CopyRow({ label, value, mono = true }: { label: string; value: string; 
 
 const ACCEPT = "image/jpeg,image/png,image/webp";
 
-function upload(orderId: string, file: File, onProgress: (pct: number) => void): Promise<OrderDto> {
+type UploadPhase = { kind: "idle" } | { kind: "uploading"; pct: number } | { kind: "checking" };
+
+function upload(orderId: string, file: File, onPhase: (p: UploadPhase) => void): Promise<{ order: OrderDto; check: ReceiptCheckDto }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/payments/${encodeURIComponent(orderId)}/receipt`);
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onPhase({ kind: "uploading", pct: Math.round((e.loaded / e.total) * 100) });
+    };
+    // Bytes are in; the server is now re-encoding, storing and reading the receipt.
+    xhr.upload.onload = () => onPhase({ kind: "checking" });
     xhr.onerror = () => reject(new Error("Upload failed. Check your connection and try again."));
     xhr.onload = () => {
       try {
-        const body = JSON.parse(xhr.responseText) as { order?: OrderDto; error?: string };
-        if (xhr.status >= 200 && xhr.status < 300 && body.order) resolve(body.order);
+        const body = JSON.parse(xhr.responseText) as { order?: OrderDto; check?: ReceiptCheckDto; error?: string };
+        if (xhr.status >= 200 && xhr.status < 300 && body.order && body.check) resolve({ order: body.order, check: body.check });
         else reject(new Error(body.error ?? "We couldn't save that receipt. Try again."));
       } catch {
         reject(new Error("We couldn't save that receipt. Try again."));
@@ -68,27 +77,37 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
   const [order, setOrder] = useState(initialOrder);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
+  const [phase, setPhase] = useState<UploadPhase>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploading = phase.kind !== "idle";
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     setError(null);
-    setProgress(0);
+    setPhase({ kind: "uploading", pct: 0 });
     try {
-      const next = await upload(order.id, file, setProgress);
-      setOrder(next);
+      const next = await upload(order.id, file, setPhase);
+      setOrder(next.order);
       setUploadOpen(false);
-      toast.show("Receipt sent · payment under review");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "We couldn't save that receipt. Try again.");
     } finally {
-      setProgress(null);
+      setPhase({ kind: "idle" });
       if (inputRef.current) inputRef.current.value = "";
     }
+  };
+
+  const submit = async () => {
+    setBusy(true);
+    const r = await submitPlusOrder({ orderId: order.id }).catch(() => null);
+    setBusy(false);
+    if (!r || !r.ok) return toast.show(r && !r.ok ? r.message : "Couldn't submit that. Try again.");
+    setOrder(r.order);
+    toast.show("Receipt sent · payment under review");
+    router.refresh();
   };
 
   const cancel = async () => {
@@ -103,9 +122,10 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
   };
 
   const expired = order.status === "EXPIRED";
+  const attached = order.status === "AWAITING_PAYMENT" && order.hasReceipt && order.check;
   return (
     <>
-      {order.status === "AWAITING_PAYMENT" ? (
+      {order.status === "AWAITING_PAYMENT" && !attached ? (
         <>
           <Callout tone="ocean" title={`Transfer ${order.amountLabel} for ${order.planName}`}>
             Send the exact amount from your bank app and put the payment reference in the remark. Plus activates after we confirm the transfer, usually within a day. This order is valid until {formatDate(order.expiresAt)}.
@@ -122,6 +142,34 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
             I&apos;ve made the transfer
           </Button>
           <Button variant="ghost" size="md" fullWidth onClick={() => setCancelOpen(true)}>
+            Cancel this order
+          </Button>
+        </>
+      ) : null}
+
+      {attached && order.check ? (
+        <>
+          <ReceiptCheckCard
+            check={order.check}
+            actions={
+              <>
+                <Button variant="ocean" size="lg" fullWidth onClick={submit} loading={busy}>
+                  Submit for review
+                </Button>
+                <Button variant="muted" size="md" fullWidth onClick={() => setUploadOpen(true)} disabled={busy}>
+                  Replace slip
+                </Button>
+              </>
+            }
+          />
+          <p className="px-1 text-caption leading-relaxed text-text-secondary">
+            Every transfer is confirmed by our team before Plus starts, whatever the automatic check says. Receipt attached {formatDateTime(order.receiptAttachedAt)}; nothing has been sent for review yet.
+          </p>
+          <ListGroup>
+            <CopyRow label="Payment reference" value={order.reference} />
+            <CopyRow label="Account number" value={order.method.accountNumber} />
+          </ListGroup>
+          <Button variant="ghost" size="md" fullWidth onClick={() => setCancelOpen(true)} disabled={busy}>
             Cancel this order
           </Button>
         </>
@@ -154,16 +202,21 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
         <div><dt>Amount</dt><dd className="text-text">{order.amountLabel}</dd></div>
       </dl>
 
-      <ResponsiveDialog open={uploadOpen} onClose={() => (progress === null ? setUploadOpen(false) : undefined)} label="Upload your receipt" dismissible={progress === null}>
-        <DialogTitle>Upload your receipt</DialogTitle>
-        <DialogDescription>A screenshot or photo of the transfer confirmation showing the amount and reference. JPG, PNG or WebP, up to 8 MB. Sending it submits your payment for review.</DialogDescription>
+      <ResponsiveDialog open={uploadOpen} onClose={() => (uploading ? undefined : setUploadOpen(false))} label={attached ? "Replace your receipt" : "Upload your receipt"} dismissible={!uploading}>
+        <DialogTitle>{attached ? "Replace your receipt" : "Upload your receipt"}</DialogTitle>
+        <DialogDescription>A screenshot or photo of the transfer confirmation from your bank app, showing the amount and the reference. JPG, PNG or WebP, up to 8 MB. We read it automatically and show you what we found before you submit.</DialogDescription>
         <input ref={inputRef} type="file" accept={ACCEPT} className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
         {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+        {phase.kind === "checking" ? (
+          <div className="flex items-center gap-2.5 rounded-xl bg-aqua-soft px-4 py-3 text-caption font-semibold text-on-aqua-soft" role="status" aria-live="polite">
+            <Spinner size={16} /> Checking transfer details…
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2.5 pt-1">
-          <Button variant="ocean" fullWidth onClick={() => inputRef.current?.click()} loading={progress !== null}>
-            {progress !== null ? `Uploading ${progress}%` : "Choose screenshot or photo"}
+          <Button variant="ocean" fullWidth onClick={() => inputRef.current?.click()} loading={uploading}>
+            {phase.kind === "uploading" ? `Uploading ${phase.pct}%` : phase.kind === "checking" ? "Checking…" : "Choose screenshot or photo"}
           </Button>
-          <Button variant="muted" fullWidth onClick={() => setUploadOpen(false)} disabled={progress !== null}>
+          <Button variant="muted" fullWidth onClick={() => setUploadOpen(false)} disabled={uploading}>
             Not yet
           </Button>
         </div>

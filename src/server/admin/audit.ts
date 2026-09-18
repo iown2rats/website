@@ -15,6 +15,7 @@ export const AUDIT_ACTIONS = {
   verificationDecided: "verification.decided",
   paymentApproved: "payment.approved",
   paymentRejected: "payment.rejected",
+  receiptReprocessed: "receipt.reprocessed",
   subscriptionAdjusted: "subscription.adjusted",
   paymentMethodCreated: "payment_method.created",
   paymentMethodUpdated: "payment_method.updated",

@@ -25,12 +25,14 @@
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@supabase/supabase-js": "^2.116.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "blurhash": "^2.0.5",
     "next": "16.3.5",
     "pg": "8.23.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "sharp": "^0.35.4",
+    "tesseract.js": "^7.0.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

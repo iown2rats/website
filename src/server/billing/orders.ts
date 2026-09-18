@@ -5,7 +5,8 @@
  *    rewrites them.
  *  - One open order per customer (AWAITING_PAYMENT or SUBMITTED). Asking again for the same plan returns it;
  *    asking for a different plan replaces an unpaid order; a submitted order is never replaced.
- *  - The receipt upload IS the submission: one atomic step from AWAITING_PAYMENT to SUBMITTED.
+ *  - Paying is two steps (§12.14): attachReceipt stores the image and runs the OCR check while the order stays
+ *    AWAITING_PAYMENT, then submitOrder moves it to SUBMITTED. `submitReceipt` does both for callers that want one step.
  *  - Nothing here grants Plus. Only src/server/billing/approval.ts (admin) creates a Subscription.
  */
 import { Prisma } from "@/generated/prisma/client";
@@ -15,12 +16,15 @@ import { formatMoney } from "@/lib/money";
 import { getStorageProvider } from "@/lib/storage";
 import type { StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
-import { processImage } from "@/server/media/process-image";
+import type { OcrEngine } from "@/server/ocr/engine";
 import { getCheckoutPaymentMethod } from "./payment-methods";
 import { isPlanForSale } from "./plans";
+import { toCustomerCheckDto, type ReceiptCheckDto } from "./receipt-dto";
+import { attachReceipt, submitOrder, type ReceiptUpload } from "./receipts";
 import { generateReference } from "./reference";
 import { assertTransition, OPEN_ORDER_STATUSES, type OrderStatus } from "./state";
+
+export type { ReceiptUpload } from "./receipts";
 
 export const ORDER_RULES = {
   /** Unpaid orders lapse after this long. */
@@ -49,13 +53,17 @@ export interface OrderDto {
   decidedAt: string | null;
   rejectionReason: string | null;
   hasReceipt: boolean;
+  /** When the current receipt was attached (the latest OCR pass), or null. */
+  receiptAttachedAt: string | null;
+  /** The customer-safe summary of the latest OCR check on the attached receipt, or null (§12.14). */
+  check: ReceiptCheckDto | null;
   /** Short-lived signed URL, only when the caller asked for it. */
   receiptUrl: string | null;
   /** When the activated subscription period ends (APPROVED only). */
   periodEnd: string | null;
 }
 
-export const orderInclude = { subscription: { select: { currentPeriodEnd: true } } } as const;
+export const orderInclude = { subscription: { select: { currentPeriodEnd: true } }, verifications: { orderBy: { createdAt: "desc" as const }, take: 1 } } as const;
 type OrderRow = Prisma.SubscriptionOrderGetPayload<{ include: typeof orderInclude }>;
 
 export async function buildOrderDto(row: OrderRow, options: { storage?: StorageProvider; withReceipt?: boolean } = {}): Promise<OrderDto> {
@@ -76,6 +84,8 @@ export async function buildOrderDto(row: OrderRow, options: { storage?: StorageP
     decidedAt: row.decidedAt?.toISOString() ?? null,
     rejectionReason: row.rejectionReason,
     hasReceipt: Boolean(row.receiptKey),
+    receiptAttachedAt: row.receiptKey ? (row.verifications[0]?.createdAt.toISOString() ?? null) : null,
+    check: row.receiptKey && row.verifications[0] ? toCustomerCheckDto(row.verifications[0]) : null,
     receiptUrl,
     periodEnd: row.subscription?.currentPeriodEnd.toISOString() ?? null,
   };
@@ -208,44 +218,30 @@ export async function cancelOrder(actor: Actor, orderId: string, deps: { db?: Db
   return buildOrderDto(row);
 }
 
-export interface ReceiptUpload {
-  bytes: Uint8Array;
-  size: number;
-}
-
 /**
- * "I've made the transfer": stores the receipt image privately and moves the order to SUBMITTED in one step.
- * The image is re-encoded (metadata dropped) and stored under a key only the server chooses; the browser never
- * receives the key, only short-lived signed URLs. Submitting twice returns the already-submitted order.
+ * One-step "attach and submit": stores the receipt (running the OCR check) and moves the order to SUBMITTED. The order
+ * screen uses the two steps separately so the customer sees the check before submitting; this exists for callers that
+ * want the whole thing at once. Submitting twice returns the already-submitted order.
  */
-export async function submitReceipt(actor: Actor, orderId: string, file: ReceiptUpload, deps: { db?: Db; storage?: StorageProvider; now?: Date } = {}): Promise<OrderDto> {
+export async function submitReceipt(actor: Actor, orderId: string, file: ReceiptUpload, deps: { db?: Db; storage?: StorageProvider; now?: Date; engine?: OcrEngine } = {}): Promise<OrderDto> {
   const db = deps.db ?? getDb();
-  const storage = deps.storage ?? getStorageProvider();
-  const now = deps.now ?? new Date();
-  if (file.size > ORDER_RULES.receiptMaxBytes || file.bytes.byteLength > ORDER_RULES.receiptMaxBytes) throw new ValidationError("That receipt is too large. Choose an image under 8 MB.");
-  if (file.bytes.byteLength === 0) throw new ValidationError("That file is empty.");
-
   const current = await ownedOrder(db, actor, orderId);
   if (current.status === "SUBMITTED") return buildOrderDto(current);
-  if (current.status === "AWAITING_PAYMENT" && current.expiresAt.getTime() <= now.getTime()) {
-    await expireStaleOrders(db, now, actor.userId);
-    throw new InvalidStateError("This order has expired. Start a new one from Membership.");
-  }
-  assertTransition(current.status, "SUBMITTED");
+  await attachReceipt(actor, orderId, file, deps);
+  const { id } = await submitOrder(actor, orderId, { db, now: deps.now });
+  return buildOrderDto(await ownedOrder(db, actor, id));
+}
 
-  const limit = await consumeRateLimit(db, `billing:receipt:${actor.userId}`, ORDER_RULES.receiptUploadsPerHour, 3_600_000, now);
-  if (!limit.allowed) throw new ValidationError("Too many uploads. Try again in a while.");
+/** attachReceipt, then the fresh order DTO the screen needs (§12.14). */
+export async function attachReceiptToOrder(actor: Actor, orderId: string, file: ReceiptUpload, deps: { db?: Db; storage?: StorageProvider; now?: Date; engine?: OcrEngine } = {}): Promise<{ order: OrderDto; check: ReceiptCheckDto }> {
+  const db = deps.db ?? getDb();
+  const { id, check } = await attachReceipt(actor, orderId, file, deps);
+  return { order: await buildOrderDto(await ownedOrder(db, actor, id)), check };
+}
 
-  const processed = await processImage(file.bytes, { maxWidth: 2000, maxHeight: 2000, quality: 80 });
-  const receiptKey = `payment-receipts/${actor.userId}/${current.id}/receipt.webp`;
-  await storage.put(receiptKey, processed.full, "image/webp");
-
-  const row = await db.$transaction(async (tx) => {
-    await lockCustomer(tx, actor.userId);
-    const fresh = await ownedOrder(tx, actor, orderId);
-    if (fresh.status === "SUBMITTED") return fresh;
-    assertTransition(fresh.status, "SUBMITTED");
-    return tx.subscriptionOrder.update({ where: { id: fresh.id }, data: { status: "SUBMITTED", receiptKey, receiptSize: processed.full.byteLength, submittedAt: now }, include: orderInclude });
-  });
-  return buildOrderDto(row);
+/** submitOrder, then the fresh order DTO. */
+export async function submitOrderForActor(actor: Actor, orderId: string, deps: { db?: Db; now?: Date } = {}): Promise<OrderDto> {
+  const db = deps.db ?? getDb();
+  const { id } = await submitOrder(actor, orderId, { db, now: deps.now });
+  return buildOrderDto(await ownedOrder(db, actor, id));
 }

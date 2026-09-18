@@ -10,6 +10,8 @@ import { setAccountStatus, type AccountAction, type AccountStatus } from "@/serv
 import { decideVerification } from "@/server/admin/verification";
 import { requireActor } from "@/server/auth/current-user";
 import { approveOrder, rejectOrder, type AdminOrderDto } from "@/server/billing/approval";
+import { reprocessReceipt } from "@/server/billing/receipts";
+import type { AdminReceiptVerificationDto } from "@/server/billing/receipt-dto";
 import { createPaymentMethod, updatePaymentMethod, type PaymentMethodAdminDto } from "@/server/billing/payment-methods";
 import { createPlan, updatePlan, type PlanAdminDto } from "@/server/billing/plans";
 import { adjustSubscriptionPeriod, type AdminSubscriptionDto } from "@/server/billing/subscriptions";
@@ -52,10 +54,10 @@ export async function adminChangeRole(userId: string, input: { role: Role; reaso
   }
 }
 
-export async function adminApprovePayment(orderId: string): Promise<AdminResult<{ order: AdminOrderDto; alreadyApproved: boolean }>> {
+export async function adminApprovePayment(orderId: string, input?: { reason?: string }): Promise<AdminResult<{ order: AdminOrderDto; alreadyApproved: boolean }>> {
   try {
     const admin = await requireAdmin("payments.review");
-    const r = await approveOrder(admin, String(orderId));
+    const r = await approveOrder(admin, String(orderId), { reason: typeof input?.reason === "string" ? input.reason : undefined });
     revalidatePath("/admin/payments");
     revalidatePath(`/admin/payments/${r.order.id}`);
     return { ok: true, data: r };
@@ -71,6 +73,17 @@ export async function adminRejectPayment(orderId: string, input: { reason: strin
     revalidatePath("/admin/payments");
     revalidatePath(`/admin/payments/${order.id}`);
     return { ok: true, data: { order } };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+export async function adminReprocessReceipt(orderId: string): Promise<AdminResult<{ verification: AdminReceiptVerificationDto }>> {
+  try {
+    const admin = await requireAdmin("payments.review");
+    const verification = await reprocessReceipt(admin, String(orderId));
+    revalidatePath(`/admin/payments/${String(orderId)}`);
+    return { ok: true, data: { verification } };
   } catch (e) {
     return failure(e);
   }

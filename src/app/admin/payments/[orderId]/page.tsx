@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminPage, KeyValueList, Panel, StatusPill } from "@/components/features/admin/admin-ui";
 import { PaymentReview } from "@/components/features/admin/payment-review";
+import { ReceiptCheckPanel } from "@/components/features/admin/receipt-check";
 import { formatDateTime } from "@/lib/format";
 import { requireAdminPage } from "@/server/admin/authz";
 import { getOrderForAdmin } from "@/server/billing/approval";
@@ -17,7 +18,7 @@ export default async function AdminPaymentDetailPage({ params }: { params: Promi
   return (
     <AdminPage title={o.reference} description={`${o.planName} · ${o.amountLabel}`} backHref={{ href: "/admin/payments", label: "Payments" }} actions={<StatusPill status={o.status} />}>
       <Panel title="Decision">
-        <PaymentReview orderId={o.id} status={o.status} amountLabel={o.amountLabel} planName={o.planName} reference={o.reference} isOwn={o.user.userId === admin.userId} />
+        <PaymentReview orderId={o.id} status={o.status} amountLabel={o.amountLabel} planName={o.planName} reference={o.reference} isOwn={o.user.userId === admin.userId} needsReason={o.approvalNeedsReason} />
       </Panel>
       <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
         <Panel title="Order">
@@ -49,7 +50,8 @@ export default async function AdminPaymentDetailPage({ params }: { params: Promi
           />
         </Panel>
       </div>
-      <Panel title="Receipt" description={o.hasReceipt ? "Uploaded by the customer. The link expires in a few minutes." : undefined}>
+      <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
+        <Panel title="Receipt" description={o.hasReceipt ? "Uploaded by the customer. The link expires in a few minutes. Always compare the image with the check." : undefined}>
         {o.receiptUrl ? (
           <a href={o.receiptUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-border bg-surface-muted">
             {/* Signed, short-lived URL to private storage; a plain img keeps it that way. */}
@@ -59,7 +61,11 @@ export default async function AdminPaymentDetailPage({ params }: { params: Promi
         ) : (
           <p className="text-body-sm text-text-secondary">No receipt has been uploaded for this order.</p>
         )}
-      </Panel>
+        </Panel>
+        <Panel title="Receipt check (OCR)" description="Read automatically from the stored image. Advisory: it approves nothing.">
+          <ReceiptCheckPanel orderId={o.id} verification={o.verification} history={o.verificationHistory} canRerun={o.hasReceipt} />
+        </Panel>
+      </div>
     </AdminPage>
   );
 }

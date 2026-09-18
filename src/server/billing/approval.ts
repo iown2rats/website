@@ -17,6 +17,7 @@ import { AUDIT_ACTIONS, writeAudit } from "@/server/admin/audit";
 import { assertPermission, type AdminActor } from "@/server/admin/authz";
 import { GRANTING_SUBSCRIPTION_STATUSES } from "@/server/entitlements";
 import { buildOrderDto, orderInclude, expireStaleOrders, type OrderDto } from "./orders";
+import { approvalNeedsReason, toAdminVerificationDto, type AdminReceiptVerificationDto } from "./receipt-dto";
 import { assertTransition } from "./state";
 
 export const MANUAL_PROVIDER = "manual_bank_transfer";
@@ -25,10 +26,17 @@ export interface AdminOrderDto extends OrderDto {
   user: { userId: string; handle: string | null; displayName: string | null; status: string };
   decidedBy: { userId: string; displayName: string | null } | null;
   planCode: string | null;
+  /** Latest OCR pass over the attached receipt, in full (§12.14). */
+  verification: AdminReceiptVerificationDto | null;
+  /** Every OCR pass, newest first. */
+  verificationHistory: AdminReceiptVerificationDto[];
+  /** True when the latest reading is a material mismatch or a duplicate: approving then needs a recorded reason. */
+  approvalNeedsReason: boolean;
 }
 
 const adminInclude = {
   ...orderInclude,
+  verifications: { orderBy: { createdAt: "desc" as const } },
   user: { select: { id: true, status: true, profile: { select: { handle: true, displayName: true } } } },
   decidedBy: { select: { id: true, profile: { select: { displayName: true } } } },
   plan: { select: { code: true } },
@@ -42,8 +50,13 @@ async function toAdminDto(row: AdminRow, options: { storage?: StorageProvider; w
     user: { userId: row.user.id, handle: row.user.profile?.handle ?? null, displayName: row.user.profile?.displayName ?? null, status: row.user.status },
     decidedBy: row.decidedBy ? { userId: row.decidedBy.id, displayName: row.decidedBy.profile?.displayName ?? null } : null,
     planCode: row.plan?.code ?? null,
+    verification: row.verifications[0] ? toAdminVerificationDto(row.verifications[0]) : null,
+    verificationHistory: row.verifications.map(toAdminVerificationDto),
+    approvalNeedsReason: approvalNeedsReason(row.verifications[0] ?? null),
   };
 }
+
+export const overrideReasonSchema = noMarkup(300, "Reason").pipe(z.string().min(3, "Explain why you are approving despite the receipt check"));
 
 export type PaymentQueueFilter = "pending" | "approved" | "rejected" | "all";
 
@@ -96,7 +109,12 @@ export interface ApprovalResult {
   alreadyApproved: boolean;
 }
 
-export async function approveOrder(admin: AdminActor, orderId: string, deps: { db?: Db; now?: Date } = {}): Promise<ApprovalResult> {
+/**
+ * `reason` is required only when the latest receipt check is a material mismatch or a duplicate (§12.14): the admin
+ * may still approve a transfer they have seen in the bank statement, but must say why, and the audit row keeps both
+ * the OCR outcome and the explanation.
+ */
+export async function approveOrder(admin: AdminActor, orderId: string, deps: { db?: Db; now?: Date; reason?: string } = {}): Promise<ApprovalResult> {
   assertPermission(admin, "payments.review");
   const db = deps.db ?? getDb();
   const now = deps.now ?? new Date();
@@ -109,6 +127,13 @@ export async function approveOrder(admin: AdminActor, orderId: string, deps: { d
       if (order.userId === admin.userId) throw new InvalidStateError("You can't review your own payment");
       assertTransition(order.status, "APPROVED");
       if (order.user.status === "DELETED") throw new InvalidStateError("This account has been deleted; nothing can be activated");
+      const latest = order.verifications[0] ?? null;
+      let overrideReason: string | null = null;
+      if (approvalNeedsReason(latest)) {
+        const parsed = overrideReasonSchema.safeParse(deps.reason ?? "");
+        if (!parsed.success) throw new ValidationError("The receipt check found a mismatch. Explain why you are approving anyway; this is recorded in the audit log.");
+        overrideReason = parsed.data;
+      }
 
       await lockCustomerSubscriptions(tx, order.userId);
       const period = await computePeriod(tx, order.userId, order.durationDays, now);
@@ -133,7 +158,7 @@ export async function approveOrder(admin: AdminActor, orderId: string, deps: { d
         action: AUDIT_ACTIONS.paymentApproved,
         targetType: "SubscriptionOrder",
         targetId: order.id,
-        data: { reference: order.reference, userId: order.userId, amountMinor: order.amountMinor, currency: order.currency, durationDays: order.durationDays, subscriptionId: subscription.id, periodStart: period.start, periodEnd: period.end, before: { status: order.status }, after: { status: "APPROVED" } },
+        data: { reference: order.reference, userId: order.userId, amountMinor: order.amountMinor, currency: order.currency, durationDays: order.durationDays, subscriptionId: subscription.id, periodStart: period.start, periodEnd: period.end, receiptOutcome: latest?.outcome ?? null, overrideReason, before: { status: order.status }, after: { status: "APPROVED" } },
         now,
       });
       return { order: await toAdminDto(updated), alreadyApproved: false };

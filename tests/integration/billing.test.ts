@@ -3,7 +3,7 @@
  * (docs/ARCHITECTURE.md §12.10–§12.12). Concurrency cases run real parallel transactions against Postgres.
  */
 import sharp from "sharp";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { COMMUNITY } from "@/config/product";
 import { InvalidStateError, NotFoundError, ValidationError } from "@/lib/errors";
 import { hashPhone } from "@/lib/hashing";
@@ -17,6 +17,7 @@ import { createPaymentMethod, getCheckoutPaymentMethod, updatePaymentMethod } fr
 import { createPlan, isPlanForSale, listSellablePlans, updatePlan } from "@/server/billing/plans";
 import { adjustSubscriptionPeriod, listSubscriptionsForAdmin } from "@/server/billing/subscriptions";
 import { getEntitlements } from "@/server/entitlements";
+import { setOcrEngine, textEngine } from "@/server/ocr/engine";
 import { getMembership } from "@/server/entitlements/presentation";
 import { addContactHashes } from "@/server/privacy/contact-hashes";
 import { disconnectDb, resetDb, testDb } from "../helpers/db";
@@ -52,8 +53,13 @@ async function submittedOrder(customer: TestUser, planId: string, now = T0) {
   return submitReceipt(customer, order.id, await receipt(), { db, storage, now });
 }
 
+// These tests are about orders and approval, not reading receipts: a stub engine that returns no text keeps them fast.
+beforeAll(() => setOcrEngine(textEngine("")));
 beforeEach(() => resetDb(db));
-afterAll(() => disconnectDb());
+afterAll(async () => {
+  setOcrEngine(undefined);
+  await disconnectDb();
+});
 
 describe("plans and payment methods (admin)", () => {
   it("only an admin with the permission may manage them; changes are audited with before/after", async () => {
@@ -96,7 +102,7 @@ describe("orders", () => {
     const weekly = await createPlan(admin, { ...PLAN, code: "WEEKLY", name: "1 week", intervalDays: 7, priceMinor: 4_900, sortOrder: 0 }, { db, now: T0 });
     const customer = await createUser(db, { now: T0 });
     const order = await createOrder(customer, { planId: plan.id }, { db, now: T0 });
-    expect(order).toMatchObject({ status: "AWAITING_PAYMENT", planName: "1 month", amountMinor: 14_900, amountLabel: "MVR 149", currency: "MVR", durationDays: 30, method: { bankName: "Test Bank", accountNumber: method.accountNumber, accountHolder: "Thundi Pvt Ltd" }, hasReceipt: false, receiptUrl: null });
+    expect(order).toMatchObject({ status: "AWAITING_PAYMENT", planName: "1 month", amountMinor: 14_900, amountLabel: "MVR 149", currency: "MVR", durationDays: 30, method: { bankName: "Test Bank", accountNumber: method.accountNumber, accountHolder: "Thundi Pvt Ltd" }, hasReceipt: false, receiptUrl: null, check: null, receiptAttachedAt: null });
     expect(order.reference).toMatch(/^THU-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
     expect(new Date(order.expiresAt).getTime()).toBe(T0.getTime() + ORDER_RULES.awaitingPaymentTtlMs);
     const again = await createOrder(customer, { planId: plan.id }, { db, now: at(T0, 1000) });
@@ -169,7 +175,7 @@ describe("receipts", () => {
     expect(submitted.hasReceipt).toBe(true);
     expect(submitted.receiptUrl).toBeNull(); // not requested
     const row = await db.subscriptionOrder.findUniqueOrThrow({ where: { id: order.id } });
-    expect(row.receiptKey).toBe(`payment-receipts/${customer.userId}/${order.id}/receipt.webp`);
+    expect(row.receiptKey).toBe(`payment-receipts/${customer.userId}/${order.id}/receipt-1.webp`);
     const stored = await storage.read(row.receiptKey!);
     expect(stored && (await sharp(stored).metadata()).format).toBe("webp");
     const withUrl = await getOrderForActor(customer, order.id, { db, storage, now: T0, withReceipt: true });

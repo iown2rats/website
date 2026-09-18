@@ -100,8 +100,9 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
 
 export function CurrentOrderCard({ order }: { order: MembershipDto["currentOrder"] & object }) {
   const o = order!;
+  const attached = o.status === "AWAITING_PAYMENT" && o.hasReceipt;
   const tone = o.status === "SUBMITTED" ? "info" : o.status === "APPROVED" ? "success" : o.status === "REJECTED" ? "danger" : "warning";
-  const title = o.status === "SUBMITTED" ? "Payment under review" : o.status === "APPROVED" ? "Payment confirmed" : o.status === "REJECTED" ? "Payment not accepted" : o.status === "AWAITING_PAYMENT" ? "Waiting for your transfer" : `Order ${o.status.toLowerCase()}`;
+  const title = o.status === "SUBMITTED" ? "Payment under review" : o.status === "APPROVED" ? "Payment confirmed" : o.status === "REJECTED" ? "Payment not accepted" : attached ? "Receipt attached, not yet submitted" : o.status === "AWAITING_PAYMENT" ? "Waiting for your transfer" : `Order ${o.status.toLowerCase()}`;
   return (
     <Callout tone={tone} title={title}>
       <div className="flex flex-col gap-1.5">
@@ -111,10 +112,11 @@ export function CurrentOrderCard({ order }: { order: MembershipDto["currentOrder
         {o.status === "SUBMITTED" ? <div>Receipt submitted {formatDateTime(o.submittedAt)}. We check transfers within a day; Plus starts the moment it is confirmed.</div> : null}
         {o.status === "APPROVED" ? <div>Confirmed {formatDateTime(o.decidedAt)}.{o.periodEnd ? ` Plus runs until ${formatDate(o.periodEnd)}.` : ""}</div> : null}
         {o.status === "REJECTED" ? <div>{o.rejectionReason ? `Reason: ${o.rejectionReason}. ` : ""}If you did transfer, check the reference and amount, then start a new order below. Nothing was charged by Thundi.</div> : null}
-        {o.status === "AWAITING_PAYMENT" ? <div>Transfer {o.amountLabel} using the reference above, then upload your receipt.</div> : null}
+        {attached ? <div>Open the order to see what we read from your receipt and submit it for review. Nothing has been sent yet.</div> : null}
+        {o.status === "AWAITING_PAYMENT" && !attached ? <div>Transfer {o.amountLabel} using the reference above, then upload your receipt.</div> : null}
         {o.status === "AWAITING_PAYMENT" || o.status === "SUBMITTED" ? (
           <Link href={`/settings/membership/order/${o.id}`} className="mt-1 inline-flex h-10 items-center justify-center rounded-lg bg-ocean px-4 text-body-sm font-bold text-on-ocean">
-            {o.status === "AWAITING_PAYMENT" ? "Payment instructions" : "View order"}
+            {attached ? "Submit receipt" : o.status === "AWAITING_PAYMENT" ? "Payment instructions" : "View order"}
           </Link>
         ) : null}
       </div>

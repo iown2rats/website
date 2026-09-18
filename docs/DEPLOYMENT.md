@@ -72,6 +72,15 @@ be reachable through the Data API at all.
 3. `/admin/plans`: set the MVR price for each plan, switch on "Price approved" and "Enabled". Only then is anything for sale.
 4. Review transfers at `/admin/payments`; approving activates Plus, rejecting notifies the customer with your reason. Every decision is in `/admin/audit`.
 
+## 3b. Pending migration: receipt OCR
+
+`prisma/migrations/20260918120000_receipt_ocr` (enum `ReceiptOutcome`, table `ReceiptVerification`; additive, touches no
+existing row) is committed but **not applied** to the hosted project. Apply it with the same procedure as §3 (exact
+repo SQL via the Supabase MCP, then the `_prisma_migrations` row with the file's sha256), then enable RLS on the new
+table like the others (`ALTER TABLE "ReceiptVerification" ENABLE ROW LEVEL SECURITY`, no policies). Only owner approval
+starts this. Until it is applied, no production request reaches the table because no order can exist while Plus is
+not for sale.
+
 ## 4. Redeploying
 
 A push to the production branch deploys production. A dashboard "Redeploy" of the latest production
@@ -90,3 +99,22 @@ preview deployment for an existing project, so production redeploys go through o
    `HttpOnly; Secure; SameSite=Lax`.
 5. The first database and storage use happens at the OAuth callback and the photo onboarding step
    respectively; check Vercel runtime logs for errors after the first real sign-in.
+
+## 7. OCR runtime (receipt verification)
+
+Receipts are read **inside the Vercel function**, not by a third party (docs/ARCHITECTURE.md §12.14). tesseract.js 7 runs
+in a Node worker thread with the English `4.0.0_best_int` model; `next.config.ts` keeps `tesseract.js`, `tesseract.js-core`
+and `@tesseract.js-data/eng` as plain Node dependencies (`serverExternalPackages`) and traces the worker script, the three
+LSTM wasm cores and the model (~12 MB) into `/api/payments/*/receipt` (upload) and `/admin/payments/*` ("Re-run OCR")
+through `outputFileTracingIncludes`. Nothing is fetched from a CDN at runtime; the model directory is resolved from
+`process.cwd()/node_modules/...`.
+
+Budget: the upload route declares `maxDuration = 60`; the engine stops itself after 25 s. Locally a phone-sized receipt
+takes ≈ 0.3–0.6 s to start the worker and ≈ 1 s to read; expect a few seconds on a cold function. Memory during a read
+stays in the low hundreds of MB, well inside the plan's default. If a deployment ever shows `[ocr] failed` in the runtime
+logs, the customer path is unaffected (the receipt is attached with outcome `OCR_FAILED` and can be submitted); check the
+function's traced files (`.next/server/app/api/payments/[orderId]/receipt/route.js.nft.json` locally) before anything else.
+
+Post-deployment check for this feature: attach a rendered fixture receipt to a test order in a non-production
+environment, or read the runtime logs for a `[ocr] completed` line after the first real upload. Never upload the owner's
+real bank receipt as a test.

@@ -33,7 +33,7 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
             href={`/admin/payments/${o.id}`}
             primary={<><span className="font-mono">{o.reference}</span> · {o.amountLabel}</>}
             secondary={`${o.planName} · ${o.user.displayName ?? "(no name)"}${o.user.handle ? " @" + o.user.handle : ""}`}
-            badges={<StatusPill status={o.status} />}
+            badges={<><StatusPill status={o.status} />{o.verification ? <StatusPill status={o.verification.outcome} label={`OCR: ${o.verification.outcome.replace(/_/g, " ").toLowerCase()}`} /> : null}</>}
             trailing={o.status === "SUBMITTED" ? `Submitted ${formatDateTime(o.submittedAt)}` : o.decidedAt ? `Decided ${formatDateTime(o.decidedAt)}` : `Created ${formatDateTime(o.createdAt)}`}
           />
         ))}

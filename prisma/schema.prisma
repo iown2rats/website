@@ -166,6 +166,16 @@ enum OrderStatus {
   EXPIRED
 }
 
+/// Structured outcome of the OCR-assisted receipt check (§12.14). Advisory only: never grants Plus, never moves an order.
+enum ReceiptOutcome {
+  MATCH
+  PARTIAL_MATCH
+  REVIEW_REQUIRED
+  MISMATCH
+  OCR_FAILED
+  UNSUPPORTED_RECEIPT
+}
+
 /// Limited actions tracked by the rolling usage-window mechanism (§12.3, §12.8).
 enum UsageKind {
   LIKES
@@ -240,6 +250,7 @@ model User {
   subscriptions        Subscription[]
   orders               SubscriptionOrder[]   @relation("OrderUser")
   decidedOrders        SubscriptionOrder[]   @relation("OrderDecider")
+  receiptReruns        ReceiptVerification[] @relation("ReceiptVerificationActor")
   entitlementOverrides EntitlementOverride[] @relation("OverrideUser")
   grantedOverrides     EntitlementOverride[] @relation("OverrideGrantor")
   likesGiven           Like[]                @relation("LikeFrom")
@@ -732,10 +743,59 @@ model SubscriptionOrder {
   plan          SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
   paymentMethod PaymentMethod?   @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
   subscription  Subscription?
+  verifications ReceiptVerification[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, submittedAt])
   @@index([status, expiresAt])
+}
+
+/// One OCR pass over a receipt (§12.14). Written only by the server from the stored image, never from anything a browser
+/// posted. Rows accumulate (one per attempt: each upload, each admin re-run) so an older reading is never rewritten by a
+/// newer parser. Raw OCR text is deliberately NOT stored; only the normalised fields the check needs.
+model ReceiptVerification {
+  id                 String         @id @default(cuid(2))
+  orderId            String
+  /// 1, 2, 3… per order. Unique together with orderId.
+  attempt            Int
+  /// e.g. bml-v1, mib-v1, generic-v1 — which parser produced these fields.
+  parserVersion      String
+  /// e.g. tesseract.js-7.0.0/eng-4.0.0_best_int
+  engine             String
+  outcome            ReceiptOutcome
+  /// BML, MIB or null when no supported bank was recognised.
+  detectedBank       String?
+  /// COMPLETED, PENDING, FAILED, UNKNOWN
+  transactionStatus  String
+  amountMinor        Int?
+  currency           String?
+  /// Bank transaction/reference id, normalised (upper-case, no spaces).
+  transactionId      String?
+  /// sha256 of the normalised transactionId; what duplicate detection indexes.
+  transactionIdHash  String?
+  transactionAt      DateTime?
+  transactionDateRaw String?
+  /// Destination account digits as read (the merchant's account when the transfer is right).
+  recipientAccount   String?
+  recipientName      String?
+  senderName         String?
+  /// Remark / reference text as read, trimmed.
+  remarks            String?
+  /// Per-check states: { bank, status, amount, currency, recipient, reference, transactionId, duplicate, date }.
+  checks             Json
+  /// Whole-document engine confidence 0–100; kept for diagnostics only, never a threshold.
+  ocrConfidence      Int?
+  durationMs         Int?
+  /// Set when an admin re-ran OCR; null for the automatic pass at upload.
+  triggeredById      String?
+  createdAt          DateTime       @default(now())
+
+  order       SubscriptionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  triggeredBy User?             @relation("ReceiptVerificationActor", fields: [triggeredById], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, attempt])
+  @@index([orderId, createdAt(sort: Desc)])
+  @@index([transactionIdHash])
 }
 
 /// Written only by the admin payment approval (src/server/billing/approval.ts) or a future gateway webhook.

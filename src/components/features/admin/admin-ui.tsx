@@ -151,6 +151,12 @@ const STATUS_TONES: Record<string, TagVariant> = {
   USER: "neutral",
   TRIALING: "success",
   PAST_DUE: "warning",
+  MATCH: "success",
+  PARTIAL_MATCH: "aqua",
+  REVIEW_REQUIRED: "warning",
+  MISMATCH: "danger",
+  OCR_FAILED: "neutral",
+  UNSUPPORTED_RECEIPT: "neutral",
 };
 
 export function StatusPill({ status, label }: { status: string; label?: string }) {

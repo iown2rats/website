@@ -422,6 +422,37 @@ describe("the other providers are unaffected", () => {
   });
 });
 
+describe("deploying before the migration", () => {
+  /**
+   * The hosted database runs the new code before migration 20260918190000_email_auth is applied. Renaming the enum
+   * value away reproduces that database exactly: every per-request path must keep working, because `resolveSession`
+   * runs on every authenticated request. A query that filtered on `provider = 'EMAIL'` would fail here with
+   * "invalid input value for enum", taking down every signed-in page.
+   */
+  it("session resolution survives a database without the EMAIL enum value", async () => {
+    const user = await createUser(db, { now: T0 });
+    await createIdentity(db, user.userId, { email: "before@gmail.com" });
+    await db.user.update({ where: { id: user.userId }, data: { status: "ACTIVE", onboardingCompletedAt: T0 } });
+    const session = await createSession(db, user.userId, {}, at(T0, minutes(1)));
+
+    await db.$executeRawUnsafe(`ALTER TYPE "AuthProvider" RENAME VALUE 'EMAIL' TO 'EMAIL_NOT_YET_MIGRATED'`);
+    try {
+      const resolved = await resolveSession(db, session.token, at(T0, minutes(2)));
+      expect(resolved?.user.id).toBe(user.userId);
+      expect(resolved?.user.emailVerificationPending).toBe(false);
+      expect(authKindForUser(resolved!.user)).toBe("active");
+      // The feature gate reports "not ready", so nothing offers a form that could not complete.
+      resetEmailAvailabilityCache();
+      expect(await databaseSupportsEmailAuth(db)).toBe(false);
+    } finally {
+      await db.$executeRawUnsafe(`ALTER TYPE "AuthProvider" RENAME VALUE 'EMAIL_NOT_YET_MIGRATED' TO 'EMAIL'`);
+      resetEmailAvailabilityCache();
+    }
+    // Back to normal once the migration is in place.
+    expect(await databaseSupportsEmailAuth(db)).toBe(true);
+  });
+});
+
 describe("feature gate", () => {
   it("reports the database ready only when the EMAIL enum value and the AuthToken table both exist", async () => {
     resetEmailAvailabilityCache();

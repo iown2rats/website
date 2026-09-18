@@ -113,9 +113,16 @@ export async function resolveSession(db: DbLike, token: string | null | undefine
           status: true,
           onboardingStage: true,
           onboardingCompletedAt: true,
-          // One EMAIL identity that is still unconfirmed is enough to hold the account back (§4.1b). Selected in the
-          // same query as the session, so this costs no extra round trip.
-          identities: { where: { provider: "EMAIL", emailVerified: false, releasedAt: null }, select: { id: true }, take: 1 },
+          // One EMAIL identity that is still unconfirmed holds the account back (§4.1b). Selected in the same query
+          // as the session, so this costs no extra round trip.
+          //
+          // The provider is READ and compared in JavaScript rather than filtered on in SQL. Filtering would send
+          // `'EMAIL'::"AuthProvider"` to Postgres, and a database that has not yet run migration
+          // 20260918190000_email_auth does not have that enum value — every query here, and therefore every
+          // authenticated request, would fail with "invalid input value for enum". Reading the column is safe on both
+          // schemas, which is what lets the code deploy before the migration. Regression test: "session resolution
+          // survives a database without the EMAIL enum value".
+          identities: { where: { releasedAt: null }, select: { provider: true, emailVerified: true }, take: 4 },
         },
       },
     },
@@ -133,7 +140,8 @@ export async function resolveSession(db: DbLike, token: string | null | undefine
     else await refresh();
   }
   const { identities, ...user } = session.user;
-  return { sessionId: session.id, user: { ...user, emailVerificationPending: identities.length > 0 }, expiresAt };
+  const emailVerificationPending = identities.some((i) => i.provider === "EMAIL" && !i.emailVerified);
+  return { sessionId: session.id, user: { ...user, emailVerificationPending }, expiresAt };
 }
 
 export async function revokeSession(db: DbLike, token: string | null | undefined): Promise<boolean> {

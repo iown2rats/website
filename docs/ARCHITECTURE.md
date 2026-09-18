@@ -192,6 +192,14 @@ onboarding, deletion and re-authentication are the existing ones.
   Tested directly.
 - **Google and Telegram are untouched**: their identities keep `passwordHash` NULL, never enter this flow, and a
   Telegram account with no address at all behaves exactly as before. Tested directly.
+- **Deploying before the migration.** The code must be safe on a database that has not yet run
+  `20260918190000_email_auth`, because the deployment and the migration are approved separately. The rule that makes
+  that true: **no query on a per-request path may send the `EMAIL` enum value to Postgres.** A database without that
+  value rejects the whole statement ("invalid input value for enum"), so a `where: { provider: "EMAIL" }` inside
+  `resolveSession` would fail on every authenticated request and take down every signed-in page. `resolveSession`
+  therefore *reads* the provider column and compares in JavaScript. Every query that does send the value lives behind
+  the feature gate and cannot run until the migration exists. A regression test renames the enum value away and
+  asserts that sessions still resolve.
 - **Feature gate** (`src/server/auth/email-availability.ts`): the method appears only when it is switched on, a mail
   provider that can really deliver is configured, and the database carries both the `EMAIL` enum value and the
   `AuthToken` table. Every page and every server action re-checks it, so an incomplete deployment shows fewer buttons

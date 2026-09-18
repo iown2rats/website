@@ -69,7 +69,18 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
   const specificName = locations.find((l) => l.id === draft.locationId)?.name;
 
   return (
-    <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId} className="desktop:max-w-[560px]">
+    <ResponsiveDialog
+      open={open}
+      onClose={onClose}
+      labelledBy={titleId}
+      className="desktop:max-w-[560px]"
+      footer={
+        <div className="flex flex-col gap-2.5">
+          {error ? <p role="alert" className="text-body-sm font-semibold text-danger">{error}</p> : null}
+          <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={draft.locationScope === "SPECIFIC" && !draft.locationId}>Apply</Button>
+        </div>
+      }
+    >
       <div className="flex items-center justify-between">
         <h2 id={titleId} className="text-[22px] font-extrabold tracking-[-.02em]">Filters</h2>
         <button type="button" onClick={reset} className="h-10 border-0 bg-transparent text-body-sm font-bold text-primary-ink">Reset</button>
@@ -152,8 +163,6 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         )}
       </section>
 
-      {error ? <p role="alert" className="text-body-sm font-semibold text-danger">{error}</p> : null}
-      <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={draft.locationScope === "SPECIFIC" && !draft.locationId}>Apply</Button>
     </ResponsiveDialog>
   );
 }

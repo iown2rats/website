@@ -439,3 +439,30 @@ The card is 573 px tall signing in and 631 px creating an account at 375 px, so 
 Verified with Playwright at 375, 390, 430 and 1280 px: no horizontal or vertical page scroll, every control 48 px tall
 and the same width within a card, the registration flow reaching "Verify your email", and that screen offering only Resend, Change
 email and Sign out. Screenshots in `screenshots/emailauth/` (gitignored).
+
+## 28. Sheets keep their primary action (2026-09-18)
+
+The Filters sheet on an iPhone put "Apply" out of reach: the button sat behind Safari's toolbar and the Advanced
+filters rows were cut off mid-row. Three separate faults, all in `src/components/ui/dialog.tsx`, so the fixes apply to
+every sheet and modal in the app.
+
+- **Height unit.** The sheet was capped at `88dvh`. The *dynamic* viewport unit tracks the browser's collapsing
+  toolbars, so a sheet sized to it can be taller than what is visible while the toolbars are shown, hiding its own
+  bottom. It is now `88svh` (`85svh` for the desktop modal) — the *small* viewport, which is the size that is always
+  visible. A sheet never has to be scrolled to reach its own edge.
+- **Pinned footer.** `DialogBaseProps` gained `footer`. It renders outside the scrolling body, above the safe area,
+  with a hairline and a translucent backdrop. The Filters sheet passes its error line and "Apply" there, so the
+  primary action stays put however long the content is. Content scrolls; the decision does not move.
+- **Why it was not scrolling at all.** The body is a flex column, and flex items shrink by default: the sections were
+  being *compressed* to fit rather than overflowing, and the Advanced filters card — which has its own
+  `overflow-hidden` for its rounded corners — quietly clipped its contents instead. `scrollHeight` therefore never
+  exceeded `clientHeight` and there was nothing to scroll. The body now sets `[&>*]:shrink-0`.
+
+Two related corrections in the same file:
+
+- `showModal()` moves focus to the first focusable descendant, which the global `:focus-visible` rule then outlines.
+  In the Filters sheet that was "Reset", which appeared boxed and pressed before anyone had touched it. The dialog
+  element takes `tabIndex={-1}` and focus itself on open: the accessible name is still announced, focus is still
+  trapped, and no control looks activated.
+- The `display` utility on a `<dialog>` must be `open:flex`, never `flex`. An author `display` declaration beats the
+  user-agent rule that hides a closed dialog, which leaves every sheet in the page laid out and swallowing taps.

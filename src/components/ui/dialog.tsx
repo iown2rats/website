@@ -6,7 +6,8 @@ import { Button, type ButtonVariant } from "./button";
 
 /*
  * One dialog system built on the native <dialog> element (top layer, focus trap, Escape, inert background).
- *  - BottomSheet: prototype sheets — bottom-anchored, max-width 560, max-height 88 %, radius 26 top corners,
+ *  - BottomSheet: prototype sheets — bottom-anchored, max-width 560, max-height 88 % of the SMALL viewport (svh, so
+ *    the sheet fits even while a mobile browser is showing its toolbars), radius 26 top corners,
  *    padding 10px 16px calc(16px + safe-bottom), 40 × 4 drag handle, sheet-in 450 ms, scrim rgba(6,59,76,.4) + blur 4.
  *  - Modal: centred card (radius 26, max-width 420) with fade-in — used on desktop where a sheet would float oddly.
  *  - ResponsiveDialog: sheet below the desktop breakpoint, modal above.
@@ -23,6 +24,11 @@ export interface DialogBaseProps {
   className?: string;
   /** Prevent closing via backdrop / Escape (e.g. blocking actions). */
   dismissible?: boolean;
+  /**
+   * Pinned below the scrolling body: the primary action and anything that must stay reachable however long the
+   * content is. A sheet's footer sits above the safe area, so it is never hidden behind a phone browser's toolbar.
+   */
+  footer?: ReactNode;
 }
 
 function useNativeDialog(open: boolean, onClose: () => void, dismissible: boolean) {
@@ -35,6 +41,10 @@ function useNativeDialog(open: boolean, onClose: () => void, dismissible: boolea
     if (open && !el.open) {
       previouslyFocused.current = document.activeElement;
       el.showModal();
+      // showModal() otherwise focuses the first focusable descendant, which paints the global :focus-visible ring
+      // around whatever happens to come first (the Filters sheet's "Reset"). Focus the dialog instead: the name is
+      // still announced, the modal still traps focus, and no control looks pressed before it has been touched.
+      el.focus();
     } else if (!open && el.open) {
       el.close();
       (previouslyFocused.current as HTMLElement | null)?.focus?.();
@@ -60,41 +70,55 @@ function useNativeDialog(open: boolean, onClose: () => void, dismissible: boolea
   return { ref, onCancel, onBackdropClick };
 }
 
-export function BottomSheet({ open, onClose, label, labelledBy, children, className, dismissible = true }: DialogBaseProps) {
+export function BottomSheet({ open, onClose, label, labelledBy, children, className, dismissible = true, footer }: DialogBaseProps) {
   const { ref, onCancel, onBackdropClick } = useNativeDialog(open, onClose, dismissible);
   return (
     <dialog
       ref={ref}
+      tabIndex={-1}
       aria-label={labelledBy ? undefined : label}
       aria-labelledby={labelledBy}
       onCancel={onCancel}
       onClick={onBackdropClick}
       className={cn(
-        "m-0 mt-auto mx-auto w-full max-w-[var(--sheet-max)] max-h-[88dvh] glass-card text-text border-0 p-0",
-        "rounded-t-card rounded-b-none open:animate-sheet-in overflow-visible",
+        "m-0 mt-auto mx-auto w-full max-w-[var(--sheet-max)] max-h-[88svh] open:flex flex-col glass-card text-text border-0 p-0",
+        "rounded-t-card rounded-b-none open:animate-sheet-in overflow-hidden",
         className,
       )}
     >
-      <div className="flex flex-col gap-4 px-4 pt-2.5 max-h-[88dvh] overflow-auto" style={{ paddingBottom: "calc(16px + var(--safe-bottom))" }}>
+      {/*
+        * min-h-0 lets this column shrink inside the flex parent, so it scrolls rather than pushing the footer away.
+        * [&>*]:shrink-0 is what makes it actually scroll: without it the sections are flex items that compress to
+        * fit, and a section with its own overflow-hidden (the Advanced filters card) silently clips its contents
+        * instead — content disappears and scrollHeight never exceeds clientHeight.
+        */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pt-2.5 pb-4 [&>*]:shrink-0">
         <span aria-hidden="true" className="mx-auto h-1 w-10 rounded-[2px] bg-border shrink-0" />
         {children}
       </div>
+      {footer ? (
+        <div className="shrink-0 border-t border-border bg-surface/80 px-4 pt-3 backdrop-blur-sm" style={{ paddingBottom: "calc(12px + var(--safe-bottom))" }}>
+          {footer}
+        </div>
+      ) : null}
     </dialog>
   );
 }
 
-export function Modal({ open, onClose, label, labelledBy, children, className, dismissible = true }: DialogBaseProps) {
+export function Modal({ open, onClose, label, labelledBy, children, className, dismissible = true, footer }: DialogBaseProps) {
   const { ref, onCancel, onBackdropClick } = useNativeDialog(open, onClose, dismissible);
   return (
     <dialog
       ref={ref}
+      tabIndex={-1}
       aria-label={labelledBy ? undefined : label}
       aria-labelledby={labelledBy}
       onCancel={onCancel}
       onClick={onBackdropClick}
-      className={cn("m-auto w-[calc(100%-32px)] max-w-105 glass-card text-text border-0 p-0 rounded-card open:animate-fade-in", className)}
+      className={cn("m-auto max-h-[85svh] w-[calc(100%-32px)] max-w-105 open:flex flex-col glass-card text-text border-0 p-0 rounded-card overflow-hidden open:animate-fade-in", className)}
     >
-      <div className="flex flex-col gap-4 p-5 max-h-[85dvh] overflow-auto">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-5 [&>*]:shrink-0">{children}</div>
+      {footer ? <div className="shrink-0 border-t border-border bg-surface/80 p-5 backdrop-blur-sm">{footer}</div> : null}
     </dialog>
   );
 }

@@ -39,9 +39,9 @@ Set by the owner in the Vercel dashboard, never through chat, source or commits.
 | `GOOGLE_CLIENT_SECRET` | secret | same |
 | `TELEGRAM_CLIENT_ID` | secret (set 2026-09-18) | BotFather → the bot → Login Widget → Client ID |
 | `TELEGRAM_CLIENT_SECRET` | secret (set 2026-09-18) | same screen → Client Secret (not the bot token). Both or neither: a lone variable fails the boot. |
-| `EMAIL_PROVIDER` | fixed, **not yet set** | `resend` — required before email + password sign-in appears (§10) |
-| `RESEND_API_KEY` | secret, **not yet set** | Resend → API Keys (§10) |
-| `EMAIL_FROM` | fixed, **not yet set** | `Mellocrush <hello@mellocrush.com>` on the verified domain (§10) |
+| `EMAIL_PROVIDER` | fixed (set 2026-09-18) | `resend` |
+| `RESEND_API_KEY` | secret (set 2026-09-18) | Resend → API Keys (§10) |
+| `EMAIL_FROM` | fixed (set 2026-09-18) | `Mellocrush <no-reply@mellocrush.com>` on the verified domain (§10) |
 
 Production-only behaviour that follows from `NODE_ENV=production` (`src/lib/env.ts`, `src/lib/runtime.ts`):
 the development identity provider and local disk storage are refused, `PHOTO_VISIBILITY_POLICY` is
@@ -210,9 +210,17 @@ Sending from a subdomain (`send.mellocrush.com`) is the usual advice: a delivera
 mail then cannot damage the reputation of the apex domain. Verification in the Resend dashboard usually completes
 within an hour of the records propagating.
 
+**Configured 2026-09-18**: the owner verified `mellocrush.com` with Resend and set the three variables in Production
+(`EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM=Mellocrush <no-reply@mellocrush.com>`). With the §3e migration
+already applied, both gates are open and email + password sign-in is offered.
+
 Until `EMAIL_PROVIDER` and its key are set, `emailAuthConfigured()` is false, the welcome screen shows only Google and
 Telegram, and `/auth/register` redirects to it. Development uses `EMAIL_PROVIDER=console`, which prints the link to
 the server log and is refused in production by `src/lib/env.ts`.
+
+**Environment variables reach a deployment only when that deployment is created.** Adding or changing one never
+affects a deployment already running, so a redeploy is always the last step after setting them — the symptom of
+forgetting is a correctly configured project whose live site behaves as though nothing was set.
 
 ## 4. Redeploying
 

@@ -2,7 +2,7 @@ import { SettingsClient } from "@/components/features/settings/settings-client";
 import { getDb } from "@/lib/db";
 import { isAdminRole } from "@/server/admin/authz";
 import { getAuthState, requireActiveUser } from "@/server/auth/current-user";
-import { getSignInIdentity } from "@/server/auth/identity";
+import { describeSignInIdentity, getSignInIdentity } from "@/server/auth/identity";
 import { maskPhone } from "@/server/auth/phone";
 import { getRecentAuthentication } from "@/server/auth/recent-auth";
 import { getNotificationSettings } from "@/server/notifications/settings";
@@ -28,7 +28,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   return (
     <SettingsClient
       maskedPhone={user.phoneE164 ? maskPhone(user.phoneE164) : null}
-      googleEmail={identity?.email ?? null}
+      signIn={identity ? { provider: identity.provider, account: describeSignInIdentity(identity) } : null}
       verificationStatus={user.verification?.status ?? "NONE"}
       notifications={notifications}
       privacy={privacy}

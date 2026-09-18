@@ -316,19 +316,19 @@ describe("account: sessions, deletion", () => {
     const other = await createUser(db, { now: T0 });
     const mine = await createIdentity(db, me.userId);
     const theirs = await createIdentity(db, other.userId);
-    const claims = (i: { subject: string; email: string }) => ({ subject: i.subject, email: i.email, emailVerified: true, name: null, authTime: null, issuedAt: T0 });
+    const claims = (i: { subject: string; email: string }) => ({ subject: i.subject, email: i.email, emailVerified: true, name: null, username: null, authTime: null, issuedAt: T0 });
     const session = await createSession(db, me.userId, {}, T0);
     // An ordinary, even brand-new, session is not enough.
     expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: T0 })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
     // A confirmation by a different Google identity never marks my session.
-    expect(await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: claims(theirs) }, T0)).toBe(false);
+    expect(await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, provider: "google", claims: claims(theirs) }, T0)).toBe(false);
     expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: T0 })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
     // A confirmation older than the window is stale.
-    expect(await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: claims(mine) }, T0)).toBe(true);
+    expect(await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, provider: "google", claims: claims(mine) }, T0)).toBe(true);
     expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: at(T0, minutes(6)) })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
     // Another session of mine does not inherit the mark.
     const second = await createSession(db, me.userId, {}, T0);
-    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: claims(mine) }, at(T0, minutes(7)));
+    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, provider: "google", claims: claims(mine) }, at(T0, minutes(7)));
     expect(await deleteAccount(me, { sessionId: second.sessionId }, { db, storage, now: at(T0, minutes(7)) })).toEqual({ ok: false, code: "REAUTH_REQUIRED" });
     expect((await db.user.findUniqueOrThrow({ where: { id: me.userId } })).status).toBe("ACTIVE");
   });
@@ -346,7 +346,7 @@ describe("account: sessions, deletion", () => {
     const session = await createSession(db, me.userId, {}, T0);
     const phone = me.phoneE164;
 
-    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: { subject: identity.subject, email: identity.email, emailVerified: true, name: null, authTime: null, issuedAt: T0 } }, at(T0, minutes(4)));
+    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, provider: "google", claims: { subject: identity.subject, email: identity.email, emailVerified: true, name: null, username: null, authTime: null, issuedAt: T0 } }, at(T0, minutes(4)));
     expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: at(T0, minutes(5)) })).toEqual({ ok: true });
 
     const user = await db.user.findUniqueOrThrow({ where: { id: me.userId }, include: { profile: { include: { photos: true } }, identities: true } });
@@ -357,7 +357,7 @@ describe("account: sessions, deletion", () => {
     expect(user.profile?.displayName).toBe("Deleted member");
     expect(user.profile?.photos).toHaveLength(0);
     expect(user.identities).toHaveLength(1);
-    expect(user.identities[0]).toMatchObject({ email: "", displayName: null, providerSubject: identity.subject });
+    expect(user.identities[0]).toMatchObject({ email: null, displayName: null, providerSubject: identity.subject });
     expect(user.identities[0]!.releasedAt).not.toBeNull();
     expect(await resolveSession(db, session.token, at(T0, minutes(6)))).toBeNull();
     expect(await canView(db, partner.userId, me.userId, at(T0, minutes(6)))).toBe(false);

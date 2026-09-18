@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation";
-import { ContinueWithGoogle } from "@/components/features/auth/google-button";
+import { ContinueWithGoogle, ContinueWithTelegram } from "@/components/features/auth/google-button";
 import { Wordmark } from "@/components/brand/logo";
+import { getDb } from "@/lib/db";
 import { getAuthState } from "@/server/auth/current-user";
+import { telegramSignInAvailable } from "@/server/auth/telegram-availability";
 import { ROUTES } from "@/server/auth/route-access";
 
 /*
  * Mellocrush welcome screen: one full-screen photograph (a Maldivian beach at night under the Milky Way, a couple on the sand),
- * the wordmark, one headline and Continue with Google. Nothing else — the picture does the storytelling.
+ * the wordmark, one headline and the sign-in buttons (Continue with Google, and Continue with Telegram when the
+ * Telegram client is configured). Nothing else — the picture does the storytelling.
  *
  * The hero is served as pre-rendered static files (public/hero, made by scripts/render-hero.mjs from the master in
  * docs/assets/hero): AVIF with a WebP fallback, four widths chosen by the browser from the viewport width, preloaded
@@ -23,6 +26,7 @@ export default async function WelcomePage() {
   const state = await getAuthState();
   if (state.kind === "active") redirect(ROUTES.home);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
+  const telegram = await telegramSignInAvailable(getDb());
 
   return (
     <main className="relative flex min-h-dvh flex-col overflow-hidden bg-[#050d14] text-white">
@@ -69,7 +73,10 @@ export default async function WelcomePage() {
           <h1 className="text-hero md:text-[44px] md:leading-[1.04]">Meet someone closer to home.</h1>
         </div>
         <div className="mt-auto w-full max-w-[var(--onboarding-max)] self-center md:mt-7 md:self-start">
-          <ContinueWithGoogle className="h-14 rounded-xl shadow-lg" />
+          <div className="flex flex-col gap-3">
+            <ContinueWithGoogle className="h-14 rounded-xl shadow-lg" />
+            {telegram ? <ContinueWithTelegram className="h-14 rounded-xl shadow-lg" /> : null}
+          </div>
         </div>
       </div>
     </main>

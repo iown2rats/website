@@ -19,6 +19,12 @@ const schema = z
     AUTH_PROVIDER: z.enum(["google", "dev"]).optional(),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    /**
+     * Optional second provider: Telegram's OpenID Connect service (BotFather → Login Widget). "Continue with
+     * Telegram" is offered only when both are set; with AUTH_PROVIDER=dev the local stand-in serves it instead.
+     */
+    TELEGRAM_CLIENT_ID: z.string().min(1).optional(),
+    TELEGRAM_CLIENT_SECRET: z.string().min(1).optional(),
     STORAGE_PROVIDER: z.enum(["local", "supabase"]).default("local"),
     LOCAL_STORAGE_DIR: z.string().default(".storage"),
     APP_URL: z.string().url().default("http://localhost:3000"),
@@ -53,6 +59,9 @@ const schema = z
     if (env.AUTH_PROVIDER === "google" && (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET)) {
       ctx.addIssue({ code: "custom", path: ["AUTH_PROVIDER"], message: "AUTH_PROVIDER=google needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" });
     }
+    if (!!env.TELEGRAM_CLIENT_ID !== !!env.TELEGRAM_CLIENT_SECRET) {
+      ctx.addIssue({ code: "custom", path: ["TELEGRAM_CLIENT_ID"], message: "Telegram sign-in needs both TELEGRAM_CLIENT_ID and TELEGRAM_CLIENT_SECRET (or neither)" });
+    }
     if (env.STORAGE_PROVIDER === "supabase" && (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SECRET_KEY)) {
       ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "Supabase storage needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY" });
     }
@@ -71,6 +80,14 @@ export function getEnv(): Env {
   }
   cached = parsed.data;
   return cached;
+}
+
+/**
+ * Whether "Continue with Telegram" is offered. Real Telegram needs the BotFather client; the development identity
+ * provider stands in for it the same way it does for Google.
+ */
+export function telegramLoginEnabled(env: Env = getEnv()): boolean {
+  return env.AUTH_PROVIDER === "dev" || (!!env.TELEGRAM_CLIENT_ID && !!env.TELEGRAM_CLIENT_SECRET);
 }
 
 /** Test hook: clears the cache so a test can change process.env between cases. */

@@ -213,7 +213,7 @@ describe("privacy and boundaries", () => {
     const key = (await db.verification.findUniqueOrThrow({ where: { userId: u.userId } })).selfieStorageKey!;
     expect(await storage.read(key)).not.toBeNull();
     const session = await createSession(db, u.userId);
-    await recordReauthentication(db, { sessionId: session.sessionId, userId: u.userId, claims: { subject: "google-sub-del", email: "del@example.com", emailVerified: true, name: null } as never }, at(T0, 1000));
+    await recordReauthentication(db, { sessionId: session.sessionId, userId: u.userId, provider: "google", claims: { subject: "google-sub-del", email: "del@example.com", emailVerified: true, name: null } as never }, at(T0, 1000));
     const result = await deleteAccount(u, { sessionId: session.sessionId }, { db, storage, now: at(T0, 2000) });
     expect(result).toEqual({ ok: true });
     expect(await storage.read(key)).toBeNull();
@@ -222,7 +222,7 @@ describe("privacy and boundaries", () => {
   });
 
   it("33/34/35 · Google sign-in never grants verification; verification never grants Plus; Plus never grants verification", async () => {
-    const signedIn = await signInWithIdentity(db, { subject: "google-new", email: "new@example.com", emailVerified: true, name: "New" } as never, T0);
+    const signedIn = await signInWithIdentity(db, "google", { subject: "google-new", email: "new@example.com", emailVerified: true, name: "New" } as never, T0);
     if (signedIn.kind !== "signed-in") throw new Error("expected a sign-in");
     expect((await db.verification.findUniqueOrThrow({ where: { userId: signedIn.userId } })).status).toBe("NONE");
     const admin = await makeAdmin();

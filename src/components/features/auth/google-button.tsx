@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import { ROUTES } from "@/server/auth/route-access";
+import { signInRoute } from "@/server/auth/route-access";
 
 /** Google's "G" mark (brand guidelines: four-colour mark on white). */
 export function GoogleMark({ size = 20 }: { size?: number }) {
@@ -14,13 +14,44 @@ export function GoogleMark({ size = 20 }: { size?: number }) {
   );
 }
 
-/** "Continue with Google" — the only way to sign in or sign up. A plain link to the start endpoint (no JS needed). */
-export function ContinueWithGoogle({ className, label = "Continue with Google", purpose = "login", returnTo }: { className?: string; label?: string; purpose?: "login" | "reauth"; returnTo?: string }) {
-  const href = purpose === "reauth" ? `${ROUTES.signIn}?purpose=reauth${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}` : ROUTES.signIn;
+/** Telegram's paper-plane mark on its blue disc (brand colour #2AABEE), same footprint as the Google mark. */
+export function TelegramMark({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#2AABEE" />
+      <path
+        fill="#fff"
+        d="M10.9 23.4c7-3.1 11.7-5.1 14.1-6.1 6.7-2.8 8.1-3.3 9-3.3.2 0 .7 0 1 .3.3.2.3.5.4.8v1c-.4 3.8-1.9 13-2.7 17.3-.3 1.8-1 2.4-1.7 2.5-1.4.1-2.5-.9-3.9-1.8-2.1-1.4-3.4-2.3-5.4-3.6-2.4-1.6-.8-2.4.5-3.8.4-.4 6.4-5.9 6.5-6.4v-.3c-.1-.1-.2-.1-.3-.1-.2 0-2.9 1.8-8.3 5.4-.8.5-1.5.8-2.2.8-.7 0-2.1-.4-3.1-.7-1.3-.4-2.3-.6-2.2-1.3 0-.4.5-.7 1.5-1.1z"
+      />
+    </svg>
+  );
+}
+
+export type SignInButtonProvider = "google" | "telegram";
+
+const MARKS: Record<SignInButtonProvider, () => React.JSX.Element> = { google: () => <GoogleMark />, telegram: () => <TelegramMark /> };
+const LABELS: Record<SignInButtonProvider, string> = { google: "Continue with Google", telegram: "Continue with Telegram" };
+
+/**
+ * "Continue with <provider>": a plain link to that provider's start endpoint (no JS needed). Both providers share
+ * the white sign-in surface with the provider's own mark, so the two buttons read as one choice.
+ */
+export function ContinueWith({ provider, className, label, purpose = "login", returnTo }: { provider: SignInButtonProvider; className?: string; label?: string; purpose?: "login" | "reauth"; returnTo?: string }) {
+  const start = signInRoute(provider);
+  const href = purpose === "reauth" ? `${start}?purpose=reauth${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}` : start;
+  const Mark = MARKS[provider];
   return (
     <Link href={href} prefetch={false} className={cn("flex h-13 items-center justify-center gap-3 rounded-lg bg-white text-cta-lg text-[#1f1f1f] shadow-sm pressable", className)}>
-      <GoogleMark />
-      {label}
+      <Mark />
+      {label ?? LABELS[provider]}
     </Link>
   );
+}
+
+export function ContinueWithGoogle(props: Omit<Parameters<typeof ContinueWith>[0], "provider">) {
+  return <ContinueWith provider="google" {...props} />;
+}
+
+export function ContinueWithTelegram(props: Omit<Parameters<typeof ContinueWith>[0], "provider">) {
+  return <ContinueWith provider="telegram" {...props} />;
 }

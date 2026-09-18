@@ -141,7 +141,7 @@ describe("user directory and detail", () => {
     expect((await searchUsers(admin, { onboarding: "incomplete" }, { db, now: T0 })).items.map((u) => u.userId)).toEqual([b.userId]);
     const detail = await getUserDetail(admin, a.userId, { db, now: T0 });
     expect(detail.account.hasPhone).toBe(true);
-    expect(detail.signIn?.email).toBe("aishath@example.com");
+    expect(detail.signIn).toMatchObject({ provider: "GOOGLE", account: "aishath@example.com" });
     expect(detail.membership.tier).toBe("PLUS");
     const json = JSON.stringify(detail);
     expect(json).not.toMatch(/phoneE164|phoneHash|tokenHash|providerSubject|selfieStorageKey|codeVerifier|secret/i);

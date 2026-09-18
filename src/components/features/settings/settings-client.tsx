@@ -26,13 +26,13 @@ import { DeleteAccountSheet, type RecentAuthDto } from "./delete-account-sheet";
 export interface SettingsClientProps {
   /** Masked (+960 •••• 123) when the user has added a phone; null otherwise — phones are optional profile data. */
   maskedPhone: string | null;
-  /** The Google account the user signs in with (owner-facing only). */
-  googleEmail: string | null;
+  /** How the user signs in (owner-facing only): the provider and the account as they recognise it (email or @username). */
+  signIn: { provider: "google" | "telegram"; account: string | null } | null;
   verificationStatus: keyof typeof VERIFICATION_LABELS;
   notifications: NotificationSettingsDto;
   privacy: PrivacySettingsDto;
   recentAuth: RecentAuthDto;
-  /** Open the deletion sheet immediately (returning from the Google confirmation). */
+  /** Open the deletion sheet immediately (returning from the provider confirmation). */
   openDelete?: boolean;
   /** Shows the Admin dashboard row. Display only: /admin re-checks the role on the server. */
   isAdmin?: boolean;
@@ -49,7 +49,7 @@ const NOTIFICATION_ROWS: { key: keyof NotificationSettingsDto; label: string; de
   { key: "marketing", label: "Marketing", description: "News and offers from Mellocrush" },
 ];
 
-export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy, recentAuth, openDelete = false, isAdmin = false }: SettingsClientProps) {
+export function SettingsClient({ maskedPhone, signIn, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy, recentAuth, openDelete = false, isAdmin = false }: SettingsClientProps) {
   const router = useRouter();
   const toast = useToast();
   const desktop = useIsDesktop();
@@ -99,7 +99,7 @@ export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, n
           <SectionLabel id="settings-account">Account</SectionLabel>
           <ListGroup>
             <LinkRow href="/profile/edit?section=info" height={54} label="Personal information" />
-            <ListRow asDiv height={54} label="Google account" meta={googleEmail ?? "—"} />
+            <ListRow asDiv height={54} label={signIn?.provider === "telegram" ? "Telegram account" : "Google account"} meta={signIn?.account ?? "—"} />
             <ListRow asDiv height={54} label="Phone number" meta={maskedPhone ?? "Not added"} />
             <LinkRow href="/settings/verification" height={54} label="Verification" meta={VERIFICATION_LABELS[verificationStatus]} />
             <LinkRow href="/settings/discovery" height={54} label="Discovery preferences" />
@@ -190,7 +190,7 @@ export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, n
         confirmLabel="Pause dating"
         loading={busy}
       />
-      <DeleteAccountSheet open={deleteOpen} onClose={() => setDeleteOpen(false)} email={googleEmail} recentAuth={recentAuth} />
+      <DeleteAccountSheet open={deleteOpen} onClose={() => setDeleteOpen(false)} signIn={signIn} recentAuth={recentAuth} />
     </PageOverlay>
   );
 }

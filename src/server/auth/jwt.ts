@@ -71,16 +71,23 @@ export interface ClaimExpectations {
   now?: Date;
   /** Tolerance for clock skew between us and the provider. */
   skewMs?: number;
+  /** Google always issues an email; Telegram never does. Default: required. */
+  requireEmail?: boolean;
 }
 
 export interface VerifiedClaims {
   subject: string;
-  email: string;
+  /** Null only for providers that issue no email claim (Telegram). */
+  email: string | null;
   emailVerified: boolean;
   name: string | null;
+  /** `preferred_username` without a leading @ (Telegram); null elsewhere. Display only, never an identifier. */
+  username: string | null;
   authTime: Date | null;
   issuedAt: Date;
 }
+
+const USERNAME = /^[A-Za-z0-9_]{1,64}$/;
 
 /** Validates the standard OIDC claims. Signature verification happens before this. */
 export function assertClaims(payload: Record<string, unknown>, e: ClaimExpectations): VerifiedClaims {
@@ -94,12 +101,18 @@ export function assertClaims(payload: Record<string, unknown>, e: ClaimExpectati
   if (typeof payload.iat !== "number" || payload.iat * 1000 > now.getTime() + skew) throw new TokenError("issued in the future");
   if (typeof payload.nonce !== "string" || payload.nonce !== e.nonce) throw new TokenError("nonce");
   if (typeof payload.sub !== "string" || payload.sub.length === 0 || payload.sub.length > 255) throw new TokenError("subject");
-  if (typeof payload.email !== "string" || !payload.email.includes("@")) throw new TokenError("email");
+  const hasEmail = typeof payload.email === "string" && payload.email.includes("@");
+  if ((e.requireEmail ?? true) && !hasEmail) throw new TokenError("email");
+  const rawUsername = typeof payload.preferred_username === "string" ? payload.preferred_username.trim().replace(/^@/, "") : "";
+  const given = typeof payload.given_name === "string" ? payload.given_name.trim() : "";
+  const family = typeof payload.family_name === "string" ? payload.family_name.trim() : "";
+  const name = typeof payload.name === "string" && payload.name.trim() ? payload.name.trim() : `${given} ${family}`.trim();
   return {
     subject: payload.sub,
-    email: payload.email.trim().toLowerCase(),
-    emailVerified: payload.email_verified === true || payload.email_verified === "true",
-    name: typeof payload.name === "string" && payload.name.trim() ? payload.name.trim().slice(0, 80) : null,
+    email: hasEmail ? (payload.email as string).trim().toLowerCase() : null,
+    emailVerified: hasEmail && (payload.email_verified === true || payload.email_verified === "true"),
+    name: name ? name.slice(0, 80) : null,
+    username: USERNAME.test(rawUsername) ? rawUsername : null,
     authTime: typeof payload.auth_time === "number" ? new Date(payload.auth_time * 1000) : null,
     issuedAt: new Date(payload.iat * 1000),
   };

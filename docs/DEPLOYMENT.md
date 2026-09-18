@@ -12,7 +12,8 @@ names, hosts and procedures. Keep this file current whenever the hosted setup ch
 | Deployment protection | Vercel Authentication on **preview deployments only** | Production is public. Previews stay behind a Vercel login. |
 | Database | Supabase project `Thundi` (`qkubuaicuyoaskzcabcu`, ap-south-1, Postgres 17) | Runtime through the Supavisor transaction pooler (6543, `pgbouncer=true&connection_limit=5`); tooling through the session pooler (5432). Both connect as the `postgres` role. |
 | Storage | Supabase Storage bucket `profile-photos`, private, 10 MB/file, JPEG/PNG/WebP | The app writes WebP after processing and enforces 8 MB itself. Accessed with the server-only secret key. |
-| Sign-in | Google OAuth Web application client | Authorised JavaScript origin `https://thundi.vercel.app`; authorised redirect URI `https://thundi.vercel.app/auth/google/callback`. While the consent screen is in Testing mode only listed test users can sign in. |
+| Sign-in (Google) | Google OAuth Web application client | Authorised JavaScript origin `https://www.mellocrush.com`; authorised redirect URI `https://www.mellocrush.com/auth/google/callback` (§8). While the consent screen is in Testing mode only listed test users can sign in. |
+| Sign-in (Telegram) | Telegram bot "Mellocrush" (BotFather → Login Widget, OpenID Connect) | Redirect URI `https://www.mellocrush.com/auth/telegram/callback`; Trusted Origins `https://www.mellocrush.com` and `https://mellocrush.com`; signing algorithm left at RS256. The Client Secret is separate from the bot token. Live only after §3d is applied. |
 
 This is a staging environment on the Vercel Hobby plan (non-commercial terms). Launch needs a paid plan, a
 custom domain, and the open items in `docs/ARCHITECTURE.md` §20.
@@ -36,6 +37,8 @@ Set by the owner in the Vercel dashboard, never through chat, source or commits.
 | `SUPABASE_SECRET_KEY` | secret | Supabase → Settings → API Keys → `sb_secret_…` |
 | `GOOGLE_CLIENT_ID` | secret | Google Cloud Console → Credentials → OAuth client |
 | `GOOGLE_CLIENT_SECRET` | secret | same |
+| `TELEGRAM_CLIENT_ID` | secret (set 2026-09-18) | BotFather → the bot → Login Widget → Client ID |
+| `TELEGRAM_CLIENT_SECRET` | secret (set 2026-09-18) | same screen → Client Secret (not the bot token). Both or neither: a lone variable fails the boot. |
 
 Production-only behaviour that follows from `NODE_ENV=production` (`src/lib/env.ts`, `src/lib/runtime.ts`):
 the development identity provider and local disk storage are refused, `PHOTO_VISIBILITY_POLICY` is
@@ -91,6 +94,29 @@ new environment variable is needed. Selfies are written to the existing private 
 `verification-selfies/<userId>/` prefix and are only ever read through 5-minute signed URLs by the member (while
 pending) and by admins; deleting an account removes the object. The deployment carrying Phase 10 is an ordinary push
 to the production branch (§4).
+
+## 3d. Telegram sign-in (2026-09-18): migration `20260918160000_telegram_auth` — NOT YET APPLIED to the hosted database
+
+Additive only, no rows changed or removed:
+
+```sql
+ALTER TYPE "AuthProvider" ADD VALUE 'TELEGRAM';
+ALTER TABLE "AuthIdentity" ALTER COLUMN "email" DROP NOT NULL;
+ALTER TABLE "AuthIdentity" ADD COLUMN "providerUsername" TEXT;
+```
+
+Order of operations once the owner approves: apply the migration (`prisma migrate deploy` against `DIRECT_DATABASE_URL`,
+or the same SQL plus the `_prisma_migrations` bookkeeping row as in §3), confirm RLS is still enabled on `AuthIdentity`
+(no new table, so nothing else to enable), then redeploy production. Until the migration is applied the deployed code hides
+the Telegram button and returns 404 from the Telegram routes even with the variables set: `telegram-availability.ts`
+checks for the `TELEGRAM` enum value in the hosted database (cached, re-checked every minute while missing), so the
+order of the migration and the deployment does not matter and there is no window with a broken button. Once the
+migration lands the button appears within a minute without a redeploy.
+
+Post-deployment check: `https://www.mellocrush.com/` shows both buttons; `/auth/telegram/start` redirects to
+`https://oauth.telegram.org/auth` with `client_id`, `redirect_uri=https://www.mellocrush.com/auth/telegram/callback`,
+`scope=openid profile`, `state`, `nonce`, `code_challenge`; a real Telegram sign-in by the owner lands on onboarding
+step 2 as a new account (Telegram and Google accounts are never merged); Settings shows "Telegram account · @username".
 
 ## 4. Redeploying
 

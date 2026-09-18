@@ -219,67 +219,67 @@ enum BlockSource {
 
 /// Account record. Contains the private fields (phone, DOB) that never leave the server.
 model User {
-  id                    String     @id @default(cuid(2))
+  id                    String          @id @default(cuid(2))
   /// Optional. Authentication is Google-only (docs/ARCHITECTURE.md §4.1); the phone, when present, is profile /
   /// contact-blocking data and is NOT verified by sign-in.
-  phoneE164             String?    @unique
+  phoneE164             String?         @unique
   /// HMAC-SHA-256(CONTACT_HASH_SALT, phoneE164). Same keyed function as ContactHash.hash so contact matching is an indexed join.
-  phoneHash             Bytes?     @unique
-  phoneHashVersion      Int        @default(1)
-  dateOfBirth           DateTime?  @db.Date
+  phoneHash             Bytes?          @unique
+  phoneHashVersion      Int             @default(1)
+  dateOfBirth           DateTime?       @db.Date
   gender                Gender?
-  role                  UserRole   @default(USER)
-  status                UserStatus @default(ONBOARDING)
+  role                  UserRole        @default(USER)
+  status                UserStatus      @default(ONBOARDING)
   /// Furthest onboarding stage reached. Lets a user resume exactly where they left off.
   onboardingStage       OnboardingStage @default(NAME)
   onboardingCompletedAt DateTime?
   lastActiveAt          DateTime?
   deletedAt             DateTime?
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
-  profile              Profile?
-  privacy              PrivacySettings?
-  discoveryPreferences DiscoveryPreferences?
-  notificationSettings NotificationSettings?
-  verification         Verification?
-  identities           AuthIdentity[]
-  sessions             Session[]
-  usageCounters        UsageCounter[]
-  boosts               Boost[]
-  subscriptions        Subscription[]
-  orders               SubscriptionOrder[]   @relation("OrderUser")
-  decidedOrders        SubscriptionOrder[]   @relation("OrderDecider")
-  receiptReruns        ReceiptVerification[] @relation("ReceiptVerificationActor")
-  entitlementOverrides EntitlementOverride[] @relation("OverrideUser")
-  grantedOverrides     EntitlementOverride[] @relation("OverrideGrantor")
-  likesGiven           Like[]                @relation("LikeFrom")
-  likesReceived        Like[]                @relation("LikeTo")
-  passesGiven          Pass[]                @relation("PassFrom")
-  passesReceived       Pass[]                @relation("PassTo")
-  matchesAsA           Match[]               @relation("MatchA")
-  matchesAsB           Match[]               @relation("MatchB")
-  unmatchedMatches     Match[]               @relation("MatchUnmatchedBy")
-  conversationsAsA     Conversation[]        @relation("ConvA")
-  conversationsAsB     Conversation[]        @relation("ConvB")
-  participations       ConversationParticipant[]
-  messages             Message[]
-  introsSent           Intro[]               @relation("IntroFrom")
-  introsReceived       Intro[]               @relation("IntroTo")
-  blocksGiven          Block[]               @relation("BlockFrom")
-  blocksReceived       Block[]               @relation("BlockTo")
-  reportsFiled         Report[]              @relation("ReportBy")
-  reportsReceived      Report[]              @relation("ReportTarget")
-  reportsResolved      Report[]              @relation("ReportResolver")
-  verificationsReviewed Verification[]       @relation("VerificationReviewer")
-  posts                CommunityPost[]
-  comments             CommunityComment[]
-  postLikes            CommunityLike[]
-  notifications        Notification[]        @relation("NotificationUser")
-  notificationsActed   Notification[]        @relation("NotificationActor")
-  pushSubscriptions    PushSubscription[]
-  contactHashes        ContactHash[]
-  auditLogs            AuditLog[]
+  profile               Profile?
+  privacy               PrivacySettings?
+  discoveryPreferences  DiscoveryPreferences?
+  notificationSettings  NotificationSettings?
+  verification          Verification?
+  identities            AuthIdentity[]
+  sessions              Session[]
+  usageCounters         UsageCounter[]
+  boosts                Boost[]
+  subscriptions         Subscription[]
+  orders                SubscriptionOrder[]       @relation("OrderUser")
+  decidedOrders         SubscriptionOrder[]       @relation("OrderDecider")
+  receiptReruns         ReceiptVerification[]     @relation("ReceiptVerificationActor")
+  entitlementOverrides  EntitlementOverride[]     @relation("OverrideUser")
+  grantedOverrides      EntitlementOverride[]     @relation("OverrideGrantor")
+  likesGiven            Like[]                    @relation("LikeFrom")
+  likesReceived         Like[]                    @relation("LikeTo")
+  passesGiven           Pass[]                    @relation("PassFrom")
+  passesReceived        Pass[]                    @relation("PassTo")
+  matchesAsA            Match[]                   @relation("MatchA")
+  matchesAsB            Match[]                   @relation("MatchB")
+  unmatchedMatches      Match[]                   @relation("MatchUnmatchedBy")
+  conversationsAsA      Conversation[]            @relation("ConvA")
+  conversationsAsB      Conversation[]            @relation("ConvB")
+  participations        ConversationParticipant[]
+  messages              Message[]
+  introsSent            Intro[]                   @relation("IntroFrom")
+  introsReceived        Intro[]                   @relation("IntroTo")
+  blocksGiven           Block[]                   @relation("BlockFrom")
+  blocksReceived        Block[]                   @relation("BlockTo")
+  reportsFiled          Report[]                  @relation("ReportBy")
+  reportsReceived       Report[]                  @relation("ReportTarget")
+  reportsResolved       Report[]                  @relation("ReportResolver")
+  verificationsReviewed Verification[]            @relation("VerificationReviewer")
+  posts                 CommunityPost[]
+  comments              CommunityComment[]
+  postLikes             CommunityLike[]
+  notifications         Notification[]            @relation("NotificationUser")
+  notificationsActed    Notification[]            @relation("NotificationActor")
+  pushSubscriptions     PushSubscription[]
+  contactHashes         ContactHash[]
+  auditLogs             AuditLog[]
 
   @@index([status, onboardingCompletedAt])
   @@index([lastActiveAt])
@@ -316,18 +316,18 @@ model Profile {
 }
 
 model ProfilePhoto {
-  id          String          @id @default(cuid(2))
-  profileId   String
+  id         String          @id @default(cuid(2))
+  profileId  String
   /// 0 = primary photo. Renumbered in one transaction on reorder.
-  position    Int
-  storageKey  String
-  thumbKey    String
+  position   Int
+  storageKey String
+  thumbKey   String
   /// Precomputed blurhash placeholder; the only photo representation a Free client receives in Likes You.
-  blurhash    String
-  width       Int
-  height      Int
-  moderation  PhotoModeration @default(PENDING)
-  createdAt   DateTime        @default(now())
+  blurhash   String
+  width      Int
+  height     Int
+  moderation PhotoModeration @default(PENDING)
+  createdAt  DateTime        @default(now())
 
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
@@ -448,23 +448,28 @@ model NotificationSettings {
 
 enum AuthProvider {
   GOOGLE
+  TELEGRAM
 }
 
 /// A sign-in identity from an external provider, mapped to our canonical User.id (docs/ARCHITECTURE.md §4.1).
-/// One identity per (provider, subject). After account deletion the row is kept with the email scrubbed and
-/// releasedAt set, so the same Google account is told its previous account was deleted before a new one is made.
+/// One identity per (provider, subject). After account deletion the row is kept with the email and username
+/// scrubbed and releasedAt set, so the same Google or Telegram account is told its previous account was deleted
+/// before a new one is made. Identities are never linked across providers by name, username or email.
 model AuthIdentity {
-  id              String       @id @default(cuid(2))
-  userId          String
-  provider        AuthProvider
-  /// The provider's stable subject identifier (Google `sub`). Never an email: emails can change.
-  providerSubject String
-  email           String
-  emailVerified   Boolean      @default(false)
-  displayName     String?
-  createdAt       DateTime     @default(now())
-  lastLoginAt     DateTime?
-  releasedAt      DateTime?
+  id               String       @id @default(cuid(2))
+  userId           String
+  provider         AuthProvider
+  /// The provider's stable subject identifier (Google `sub`, Telegram user id). Never an email: emails can change.
+  providerSubject  String
+  /// Google always supplies one; Telegram's OpenID Connect issues no email claim, so it is null there.
+  email            String?
+  emailVerified    Boolean      @default(false)
+  displayName      String?
+  /// Telegram `preferred_username` (without @), for display in Settings and admin only. Never used for matching.
+  providerUsername String?
+  createdAt        DateTime     @default(now())
+  lastLoginAt      DateTime?
+  releasedAt       DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -473,11 +478,11 @@ model AuthIdentity {
 }
 
 model Session {
-  id                String   @id @default(cuid(2))
+  id                String    @id @default(cuid(2))
   userId            String
-  tokenHash         Bytes    @unique
-  createdAt         DateTime @default(now())
-  lastSeenAt        DateTime @default(now())
+  tokenHash         Bytes     @unique
+  createdAt         DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
   expiresAt         DateTime
   absoluteExpiresAt DateTime
   userAgent         String?
@@ -567,11 +572,11 @@ model Conversation {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
-  userA        User                      @relation("ConvA", fields: [userAId], references: [id], onDelete: Restrict)
-  userB        User                      @relation("ConvB", fields: [userBId], references: [id], onDelete: Restrict)
-  match        Match?                    @relation(fields: [matchId], references: [id], onDelete: SetNull)
-  participants ConversationParticipant[]
-  messages     Message[]
+  userA         User                      @relation("ConvA", fields: [userAId], references: [id], onDelete: Restrict)
+  userB         User                      @relation("ConvB", fields: [userBId], references: [id], onDelete: Restrict)
+  match         Match?                    @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  participants  ConversationParticipant[]
+  messages      Message[]
   notifications Notification[]
 
   @@unique([userAId, userBId])
@@ -708,40 +713,40 @@ model PaymentMethod {
 /// One purchase attempt. Immutable commercial snapshot + a server-enforced state machine. APPROVED orders own
 /// exactly one Subscription (Subscription.orderId is unique), which is what makes approval idempotent.
 model SubscriptionOrder {
-  id               String      @id @default(cuid(2))
+  id              String      @id @default(cuid(2))
   /// Human-readable payment reference the customer writes on the transfer, e.g. THU-7K4P2M. Random, unique.
-  reference        String      @unique
-  userId           String
-  planId           String
-  paymentMethodId  String?
-  status           OrderStatus @default(AWAITING_PAYMENT)
+  reference       String      @unique
+  userId          String
+  planId          String
+  paymentMethodId String?
+  status          OrderStatus @default(AWAITING_PAYMENT)
   // ── Snapshot at creation (never rewritten) ──
-  planName         String
-  amountMinor      Int
-  currency         String
-  durationDays     Int
-  methodLabel      String
-  bankName         String
-  accountHolder    String
-  accountNumber    String
-  instructions     String?
+  planName        String
+  amountMinor     Int
+  currency        String
+  durationDays    Int
+  methodLabel     String
+  bankName        String
+  accountHolder   String
+  accountNumber   String
+  instructions    String?
   // ── Customer submission ──
-  receiptKey       String?
-  receiptSize      Int?
-  submittedAt      DateTime?
+  receiptKey      String?
+  receiptSize     Int?
+  submittedAt     DateTime?
   // ── Decision ──
-  decidedById      String?
-  decidedAt        DateTime?
-  rejectionReason  String?
+  decidedById     String?
+  decidedAt       DateTime?
+  rejectionReason String?
   /// AWAITING_PAYMENT orders lapse to EXPIRED after this.
-  expiresAt        DateTime
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  expiresAt       DateTime
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  user          User             @relation("OrderUser", fields: [userId], references: [id], onDelete: Restrict)
-  decidedBy     User?            @relation("OrderDecider", fields: [decidedById], references: [id], onDelete: SetNull)
-  plan          SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
-  paymentMethod PaymentMethod?   @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  user          User                  @relation("OrderUser", fields: [userId], references: [id], onDelete: Restrict)
+  decidedBy     User?                 @relation("OrderDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  plan          SubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  paymentMethod PaymentMethod?        @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
   subscription  Subscription?
   verifications ReceiptVerification[]
 
@@ -877,12 +882,12 @@ model Report {
   resolution      String?
   createdAt       DateTime     @default(now())
 
-  reporter      User             @relation("ReportBy", fields: [reporterId], references: [id], onDelete: Restrict)
-  targetUser    User?            @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
-  targetPost    CommunityPost?   @relation(fields: [targetPostId], references: [id], onDelete: Restrict)
+  reporter      User              @relation("ReportBy", fields: [reporterId], references: [id], onDelete: Restrict)
+  targetUser    User?             @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  targetPost    CommunityPost?    @relation(fields: [targetPostId], references: [id], onDelete: Restrict)
   targetComment CommunityComment? @relation(fields: [targetCommentId], references: [id], onDelete: Restrict)
-  targetMessage Message?         @relation(fields: [targetMessageId], references: [id], onDelete: Restrict)
-  resolvedBy    User?            @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  targetMessage Message?          @relation(fields: [targetMessageId], references: [id], onDelete: Restrict)
+  resolvedBy    User?             @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([targetUserId])
@@ -911,23 +916,23 @@ model Verification {
 // ───────────────────────────── Community ─────────────────────────────
 
 model CommunityPost {
-  id           String    @id @default(cuid(2))
-  authorId     String
-  kind         PostKind  @default(TEXT)
-  body         String
-  photoKey     String?
-  photoBlurhash String?
+  id              String          @id @default(cuid(2))
+  authorId        String
+  kind            PostKind        @default(TEXT)
+  body            String
+  photoKey        String?
+  photoBlurhash   String?
   /// Community media has its own moderation state (src/lib/photo-policy.ts decides what other users may see).
   photoModeration PhotoModeration @default(PENDING)
-  likeCount    Int       @default(0)
-  commentCount Int       @default(0)
-  createdAt    DateTime  @default(now())
-  deletedAt    DateTime?
+  likeCount       Int             @default(0)
+  commentCount    Int             @default(0)
+  createdAt       DateTime        @default(now())
+  deletedAt       DateTime?
 
-  author   User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  comments CommunityComment[]
-  likes    CommunityLike[]
-  reports  Report[]
+  author        User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  comments      CommunityComment[]
+  likes         CommunityLike[]
+  reports       Report[]
   notifications Notification[]
 
   @@index([deletedAt, createdAt(sort: Desc)])
@@ -973,9 +978,9 @@ model Notification {
   readAt         DateTime?
   createdAt      DateTime         @default(now())
 
-  user         User          @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
-  actor        User?         @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User           @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor        User?          @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  conversation Conversation?  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   post         CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt(sort: Desc)])

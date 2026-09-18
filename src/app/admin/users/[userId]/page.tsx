@@ -45,8 +45,8 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               { label: "Age", value: a.ageYears !== null ? `${a.ageYears}` : "—" },
               { label: "Phone on file", value: a.hasPhone ? "Yes (never shown here)" : "No" },
               { label: "Open sessions", value: String(a.activeSessions) },
-              { label: "Google sign-in", value: d.signIn?.email ?? "—" },
-              { label: "Last Google login", value: formatDateTime(d.signIn?.lastLoginAt) },
+              { label: "Signs in with", value: d.signIn ? `${d.signIn.provider === "TELEGRAM" ? "Telegram" : "Google"} · ${d.signIn.account ?? "—"}` : "—" },
+              { label: "Last sign-in via provider", value: formatDateTime(d.signIn?.lastLoginAt) },
               ...(a.deletedAt ? [{ label: "Deleted", value: formatDateTime(a.deletedAt) }] : []),
             ]}
           />

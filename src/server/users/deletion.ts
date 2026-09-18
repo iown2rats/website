@@ -1,6 +1,6 @@
 /**
  * Account deletion (Phase 9 §25–§26; Google-auth migration). A destructive action needs recent authentication: the
- * user re-authenticates with Google for the same identity (docs/ARCHITECTURE.md §4.4), which marks their current
+ * user re-authenticates with the same Google or Telegram identity (docs/ARCHITECTURE.md §4.4), which marks their current
  * session; deletion consumes that mark and refuses without it, so an old application session alone can never
  * delete an account. Deletion anonymises the account and removes personal data while keeping safety evidence
  * (reports, blocks, message history, audit log). The sign-in identity row is kept with its email scrubbed and
@@ -67,7 +67,7 @@ export async function deleteAccount(actor: Actor, input: { sessionId: string }, 
     await tx.contactHash.deleteMany({ where: { userId: uid } });
     await tx.pushSubscription.deleteMany({ where: { userId: uid } });
     await tx.session.deleteMany({ where: { userId: uid } });
-    await tx.authIdentity.updateMany({ where: { userId: uid }, data: { email: "", displayName: null, releasedAt: now } });
+    await tx.authIdentity.updateMany({ where: { userId: uid }, data: { email: null, displayName: null, providerUsername: null, releasedAt: now } });
     await tx.verification.updateMany({ where: { userId: uid }, data: { status: "NONE", selfieStorageKey: null, providerRef: null } });
     await tx.privacySettings.updateMany({ where: { userId: uid }, data: { visibility: "HIDDEN", pausedAt: now, invisibleMode: false } });
     // The account itself: no phone, unrecoverable hash, no DOB or gender.

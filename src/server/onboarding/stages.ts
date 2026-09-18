@@ -1,5 +1,5 @@
 /**
- * Onboarding stages, in the prototype's order. Step 1 is authentication ("Continue with Google", replacing the
+ * Onboarding stages, in the prototype's order. Step 1 is authentication ("Continue with Google" or "Continue with Telegram", replacing the
  * prototype's phone + code screens) and shares the same "n / 11" progress treatment; the done screen is 11.
  */
 export const ONBOARDING_STAGES = ["NAME", "DOB", "GENDER", "MEET", "INTENT", "LOCATION", "PHOTOS", "ABOUT", "PRIVACY"] as const;

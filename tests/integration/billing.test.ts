@@ -369,9 +369,9 @@ describe("admin views, expiry and DTO safety", () => {
 });
 
 describe("unchanged foundations", () => {
-  it("Google-only authentication, contact blocking and Invisible Mode + Community semantics are untouched", async () => {
+  it("Provider-keyed authentication (Google and Telegram), contact blocking and Invisible Mode + Community semantics are untouched", async () => {
     const providers = await db.$queryRaw<{ v: string }[]>`SELECT unnest(enum_range(NULL::"AuthProvider"))::text AS v`;
-    expect(providers.map((p) => p.v)).toEqual(["GOOGLE"]);
+    expect(providers.map((p) => p.v)).toEqual(["GOOGLE", "TELEGRAM"]);
     expect(await db.$queryRaw`SELECT to_regclass('"OtpRequest"')::text AS r`).toEqual([{ r: null }]);
     const u = await createUser(db, { now: T0 });
     const digest = Buffer.from(hashPhone("+9607000000")).toString("hex");

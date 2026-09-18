@@ -26,7 +26,7 @@ const T0 = new Date("2026-09-17T20:00:00Z");
 const storage = new LocalDiskStorageProvider("/tmp/thundi-test-storage", "x".repeat(32));
 const CLIENT_ID = "123-test.apps.googleusercontent.com";
 
-const claimsFor = (subject: string, email = `${subject}@example.com`, name: string | null = "Test Person"): VerifiedClaims => ({ subject, email, emailVerified: true, name, authTime: null, issuedAt: T0 });
+const claimsFor = (subject: string, email = `${subject}@example.com`, name: string | null = "Test Person"): VerifiedClaims => ({ subject, email, emailVerified: true, name, username: null, authTime: null, issuedAt: T0 });
 
 /** A fake Google: RSA key pair, JWKS document and an RS256 signer. */
 function fakeGoogle() {
@@ -159,7 +159,7 @@ describe("development identity provider (same contract, local only)", () => {
 
 describe("identity → User mapping", () => {
   it("first sign-in creates one ONBOARDING account (verification NONE, no phone); returning sign-ins map to the same User.id", async () => {
-    const first = await signInWithIdentity(db, claimsFor("sub-1", "a@example.com"), T0);
+    const first = await signInWithIdentity(db, "google", claimsFor("sub-1", "a@example.com"), T0);
     expect(first).toMatchObject({ kind: "signed-in", destination: "onboarding", isNewAccount: true });
     if (first.kind !== "signed-in") throw new Error("expected sign-in");
     const user = await db.user.findUniqueOrThrow({ where: { id: first.userId }, include: { verification: true, privacy: true, discoveryPreferences: true, notificationSettings: true, identities: true } });
@@ -169,17 +169,17 @@ describe("identity → User mapping", () => {
     expect(user.privacy && user.discoveryPreferences && user.notificationSettings).toBeTruthy();
     expect(user.identities[0]).toMatchObject({ provider: "GOOGLE", providerSubject: "sub-1", email: "a@example.com" });
     // Same subject with a changed email/name still lands on the same account; the identity row refreshes.
-    const again = await signInWithIdentity(db, claimsFor("sub-1", "renamed@example.com", "New Name"), at(T0, 1000));
+    const again = await signInWithIdentity(db, "google", claimsFor("sub-1", "renamed@example.com", "New Name"), at(T0, 1000));
     expect(again).toMatchObject({ kind: "signed-in", userId: first.userId, isNewAccount: false });
     expect(await db.user.count()).toBe(1);
-    expect(await getSignInIdentity(db, first.userId)).toEqual({ email: "renamed@example.com", name: "New Name" });
+    expect(await getSignInIdentity(db, first.userId)).toEqual({ provider: "google", email: "renamed@example.com", name: "New Name", username: null });
     // A different subject with the same email is a different person (Google subjects are the key, never emails).
-    const other = await signInWithIdentity(db, claimsFor("sub-2", "renamed@example.com"), at(T0, 2000));
+    const other = await signInWithIdentity(db, "google", claimsFor("sub-2", "renamed@example.com"), at(T0, 2000));
     expect(other.kind === "signed-in" && other.userId !== first.userId).toBe(true);
   });
 
   it("concurrent first sign-ins for one subject converge on a single account", async () => {
-    const results = await Promise.all(Array.from({ length: 5 }, () => signInWithIdentity(db, claimsFor("race"), T0)));
+    const results = await Promise.all(Array.from({ length: 5 }, () => signInWithIdentity(db, "google", claimsFor("race"), T0)));
     const ids = new Set(results.map((r) => (r.kind === "signed-in" ? r.userId : r.kind)));
     expect(ids.size).toBe(1);
     expect(await db.user.count()).toBe(1);
@@ -189,12 +189,12 @@ describe("identity → User mapping", () => {
   it("an existing completed account signs in to the app; suspended and banned accounts get no session", async () => {
     const active = await createUser(db, { now: T0 });
     const identity = await createIdentity(db, active.userId);
-    expect(await signInWithIdentity(db, claimsFor(identity.subject, identity.email), T0)).toMatchObject({ kind: "signed-in", userId: active.userId, destination: "app" });
+    expect(await signInWithIdentity(db, "google", claimsFor(identity.subject, identity.email), T0)).toMatchObject({ kind: "signed-in", userId: active.userId, destination: "app" });
     for (const status of ["SUSPENDED", "BANNED"] as const) {
       const u = await createUser(db, { now: T0 });
       const i = await createIdentity(db, u.userId);
       await db.user.update({ where: { id: u.userId }, data: { status } });
-      expect(await signInWithIdentity(db, claimsFor(i.subject, i.email), T0)).toEqual({ kind: "unavailable" });
+      expect(await signInWithIdentity(db, "google", claimsFor(i.subject, i.email), T0)).toEqual({ kind: "unavailable" });
     }
   });
 });
@@ -204,15 +204,15 @@ describe("deleted accounts and the same Google account", () => {
     const me = await createUser(db, { now: T0, name: "Old" });
     const identity = await createIdentity(db, me.userId, { email: "same@example.com" });
     const session = await createSession(db, me.userId, {}, T0);
-    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, claims: claimsFor(identity.subject, identity.email) }, T0);
+    await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, provider: "google", claims: claimsFor(identity.subject, identity.email) }, T0);
     expect(await deleteAccount(me, { sessionId: session.sessionId }, { db, storage, now: at(T0, minutes(1)) })).toEqual({ ok: true });
 
-    const outcome = await signInWithIdentity(db, claimsFor(identity.subject, identity.email), at(T0, minutes(2)));
+    const outcome = await signInWithIdentity(db, "google", claimsFor(identity.subject, identity.email), at(T0, minutes(2)));
     expect(outcome).toEqual({ kind: "deleted", subject: identity.subject });
     expect((await db.user.findUniqueOrThrow({ where: { id: me.userId } })).status).toBe("DELETED");
     expect(await db.session.count({ where: { userId: me.userId } })).toBe(0);
 
-    const fresh = await createFreshAccountForIdentity(db, claimsFor(identity.subject, identity.email), at(T0, minutes(3)));
+    const fresh = await createFreshAccountForIdentity(db, "google", claimsFor(identity.subject, identity.email), at(T0, minutes(3)));
     expect(fresh.previousUserId).toBe(me.userId);
     expect(fresh.userId).not.toBe(me.userId);
     const newUser = await db.user.findUniqueOrThrow({ where: { id: fresh.userId }, include: { profile: true, verification: true } });
@@ -225,10 +225,10 @@ describe("deleted accounts and the same Google account", () => {
     expect(old.identities).toHaveLength(0); // the identity moved to the new account
     expect(await db.auditLog.count({ where: { action: "account.recreated", targetId: fresh.userId } })).toBe(1);
     // From now on the identity signs into the new account, and "fresh account" is refused while it is live.
-    expect(await signInWithIdentity(db, claimsFor(identity.subject, identity.email), at(T0, minutes(4)))).toMatchObject({ kind: "signed-in", userId: fresh.userId, destination: "onboarding" });
-    await expect(createFreshAccountForIdentity(db, claimsFor(identity.subject, identity.email), at(T0, minutes(5)))).rejects.toBeInstanceOf(InvalidStateError);
+    expect(await signInWithIdentity(db, "google", claimsFor(identity.subject, identity.email), at(T0, minutes(4)))).toMatchObject({ kind: "signed-in", userId: fresh.userId, destination: "onboarding" });
+    await expect(createFreshAccountForIdentity(db, "google", claimsFor(identity.subject, identity.email), at(T0, minutes(5)))).rejects.toBeInstanceOf(InvalidStateError);
     // The choice is only for identities that actually belong to a deleted account.
-    await expect(createFreshAccountForIdentity(db, claimsFor("never-seen"), T0)).rejects.toBeInstanceOf(InvalidStateError);
+    await expect(createFreshAccountForIdentity(db, "google", claimsFor("never-seen"), T0)).rejects.toBeInstanceOf(InvalidStateError);
   });
 });
 
@@ -241,13 +241,13 @@ describe("recent authentication", () => {
     const a = await createSession(db, me.userId, {}, T0);
     const b = await createSession(db, me.userId, {}, T0);
     expect(await getRecentAuthentication(db, a.sessionId, T0)).toEqual({ fresh: false, expiresAt: null });
-    expect(await recordReauthentication(db, { sessionId: a.sessionId, userId: me.userId, claims: claimsFor(strangerIdentity.subject) }, T0)).toBe(false);
-    expect(await recordReauthentication(db, { sessionId: a.sessionId, userId: me.userId, claims: claimsFor(identity.subject) }, T0)).toBe(true);
+    expect(await recordReauthentication(db, { sessionId: a.sessionId, userId: me.userId, provider: "google", claims: claimsFor(strangerIdentity.subject) }, T0)).toBe(false);
+    expect(await recordReauthentication(db, { sessionId: a.sessionId, userId: me.userId, provider: "google", claims: claimsFor(identity.subject) }, T0)).toBe(true);
     expect(await getRecentAuthentication(db, a.sessionId, at(T0, 1000))).toEqual({ fresh: true, expiresAt: at(T0, RECENT_AUTH.windowMs) });
     expect((await getRecentAuthentication(db, b.sessionId, at(T0, 1000))).fresh).toBe(false);
     expect((await getRecentAuthentication(db, a.sessionId, at(T0, RECENT_AUTH.windowMs + 1))).fresh).toBe(false);
     expect(await consumeRecentAuthentication(db, a.sessionId, at(T0, RECENT_AUTH.windowMs + 1))).toBe(false);
-    await recordReauthentication(db, { sessionId: a.sessionId, userId: me.userId, claims: claimsFor(identity.subject) }, at(T0, minutes(10)));
+    await recordReauthentication(db, { sessionId: a.sessionId, userId: me.userId, provider: "google", claims: claimsFor(identity.subject) }, at(T0, minutes(10)));
     expect(await consumeRecentAuthentication(db, a.sessionId, at(T0, minutes(11)))).toBe(true);
     expect(await consumeRecentAuthentication(db, a.sessionId, at(T0, minutes(11)))).toBe(false); // used up
     // The session itself keeps working as a normal session throughout.

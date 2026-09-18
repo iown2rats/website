@@ -11,6 +11,9 @@ export const ROUTES = {
   /** Starts Google sign-in (route handler). `?purpose=reauth` re-authenticates the current session instead. */
   signIn: "/auth/google/start",
   callback: "/auth/google/callback",
+  /** The same two endpoints for Telegram (docs/ARCHITECTURE.md §4.1). */
+  telegramSignIn: "/auth/telegram/start",
+  telegramCallback: "/auth/telegram/callback",
   deleted: "/auth/deleted",
   authError: "/auth/error",
   logout: "/auth/logout",
@@ -28,12 +31,19 @@ export function classifyRoute(pathname: string): RouteGroup {
 
 export type AccessDecision = { allow: true } | { allow: false; redirectTo: string };
 
+/** `/auth/<provider>/start` for whichever provider a button belongs to. */
+export function signInRoute(provider: "google" | "telegram"): string {
+  return provider === "telegram" ? ROUTES.telegramSignIn : ROUTES.signIn;
+}
+
 /**
- * The Google flow endpoints decide for themselves (sign-in for anonymous users, re-authentication for signed-in
+ * The provider flow endpoints decide for themselves (sign-in for anonymous users, re-authentication for signed-in
  * ones), and the error screen must be visible to a signed-in user whose re-authentication failed.
  */
 function isAuthFlowEndpoint(pathname: string): boolean {
-  return pathname === ROUTES.signIn || pathname === ROUTES.callback || pathname === ROUTES.logout || pathname === ROUTES.authError;
+  return (
+    pathname === ROUTES.signIn || pathname === ROUTES.callback || pathname === ROUTES.telegramSignIn || pathname === ROUTES.telegramCallback || pathname === ROUTES.logout || pathname === ROUTES.authError
+  );
 }
 
 /**

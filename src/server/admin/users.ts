@@ -92,7 +92,7 @@ export async function searchUsers(admin: AdminActor, input: UserSearchInput, dep
 
 export interface UserDetailDto {
   account: { userId: string; handle: string | null; displayName: string | null; status: AccountStatus; role: string; onboardingStage: string; onboardingCompletedAt: string | null; createdAt: string; lastActiveAt: string | null; deletedAt: string | null; hasPhone: boolean; ageYears: number | null; activeSessions: number };
-  signIn: { email: string | null; lastLoginAt: string | null } | null;
+  signIn: { provider: "GOOGLE" | "TELEGRAM"; account: string | null; lastLoginAt: string | null } | null;
   profile: { location: string | null; intent: string | null; photos: { approved: number; pending: number; rejected: number }; bioLength: number; interests: number; prompts: number } | null;
   privacy: { paused: boolean; invisibleMode: boolean; visibility: string; blockContacts: boolean } | null;
   verification: { status: string; submittedAt: string | null; decidedAt: string | null; rejectionReason: string | null; hasSelfie: boolean };
@@ -113,7 +113,7 @@ export async function getUserDetail(admin: AdminActor, userId: string, deps: { d
       profile: { select: { handle: true, displayName: true, bio: true, intent: true, location: { select: { name: true } }, photos: { select: { moderation: true } }, _count: { select: { interests: true, prompts: true } } } },
       privacy: { select: { pausedAt: true, invisibleMode: true, visibility: true, blockContacts: true } },
       verification: { select: { status: true, submittedAt: true, decidedAt: true, rejectionReason: true, selfieStorageKey: true } },
-      identities: { where: { releasedAt: null }, select: { email: true, lastLoginAt: true }, take: 1 },
+      identities: { where: { releasedAt: null }, orderBy: { createdAt: "asc" }, select: { provider: true, email: true, providerUsername: true, displayName: true, lastLoginAt: true }, take: 1 },
       subscriptions: { orderBy: { currentPeriodEnd: "desc" }, take: 10, select: { id: true, status: true, provider: true, currentPeriodStart: true, currentPeriodEnd: true, plan: { select: { name: true } }, order: { select: { reference: true } } } },
       orders: { orderBy: { createdAt: "desc" }, take: 10, select: { id: true, reference: true, status: true, planName: true, amountMinor: true, currency: true, createdAt: true, submittedAt: true, decidedAt: true } },
       _count: { select: { sessions: true, reportsFiled: true, reportsReceived: true, blocksGiven: true, blocksReceived: true } },
@@ -135,7 +135,13 @@ export async function getUserDetail(admin: AdminActor, userId: string, deps: { d
   const age = u.dateOfBirth ? Math.floor((now.getTime() - u.dateOfBirth.getTime()) / (365.25 * 86_400_000)) : null;
   return {
     account: { userId: u.id, handle: u.profile?.handle ?? null, displayName: u.profile?.displayName ?? null, status: u.status, role: u.role, onboardingStage: u.onboardingStage, onboardingCompletedAt: u.onboardingCompletedAt?.toISOString() ?? null, createdAt: u.createdAt.toISOString(), lastActiveAt: u.lastActiveAt?.toISOString() ?? null, deletedAt: u.deletedAt?.toISOString() ?? null, hasPhone: Boolean(u.phoneE164), ageYears: age, activeSessions: u._count.sessions },
-    signIn: u.identities[0] ? { email: u.identities[0].email, lastLoginAt: u.identities[0].lastLoginAt?.toISOString() ?? null } : null,
+    signIn: u.identities[0]
+      ? {
+          provider: u.identities[0].provider,
+          account: u.identities[0].provider === "TELEGRAM" ? (u.identities[0].providerUsername ? `@${u.identities[0].providerUsername}` : u.identities[0].displayName) : u.identities[0].email,
+          lastLoginAt: u.identities[0].lastLoginAt?.toISOString() ?? null,
+        }
+      : null,
     profile: u.profile ? { location: u.profile.location?.name ?? null, intent: u.profile.intent, photos, bioLength: u.profile.bio?.length ?? 0, interests: u.profile._count.interests, prompts: u.profile._count.prompts } : null,
     privacy: u.privacy ? { paused: Boolean(u.privacy.pausedAt), invisibleMode: u.privacy.invisibleMode, visibility: u.privacy.visibility, blockContacts: u.privacy.blockContacts } : null,
     verification: { status: u.verification?.status ?? "NONE", submittedAt: u.verification?.submittedAt?.toISOString() ?? null, decidedAt: u.verification?.decidedAt?.toISOString() ?? null, rejectionReason: u.verification?.rejectionReason ?? null, hasSelfie: Boolean(u.verification?.selfieStorageKey) },

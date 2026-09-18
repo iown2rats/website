@@ -29,6 +29,24 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["tesseract.js", "tesseract.js-core", "@tesseract.js-data/eng"],
+  /**
+   * Canonical host. When CANONICAL_HOST is set (Production only, e.g. "mellocrush.com"), every other host that reaches
+   * this deployment — the old *.vercel.app names and www. — redirects permanently to the same path on the canonical
+   * host. Unset (local, preview, or until DNS is verified) nothing redirects. Switch it on only after the domain is
+   * live on Vercel and APP_URL plus the Google redirect URI point at it, otherwise sign-in would land on the old host.
+   */
+  async redirects() {
+    const canonical = process.env.CANONICAL_HOST?.trim();
+    if (!canonical) return [];
+    return [
+      {
+        source: "/:path*",
+        missing: [{ type: "host", value: canonical }],
+        destination: `https://${canonical}/:path*`,
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -1,5 +1,5 @@
+import { MembershipPlans } from "@/components/features/settings/membership-client";
 import { PlusHeroTag } from "@/components/ui/badge";
-import { Callout } from "@/components/ui/alert";
 import { CheckIcon } from "@/components/ui/icons";
 import { ListGroup, OceanCard } from "@/components/ui/surface";
 import { PageOverlay } from "@/components/layout/page-overlay";
@@ -10,10 +10,10 @@ export const metadata = { title: "Membership" };
 export const dynamic = "force-dynamic";
 
 /*
- * Prototype "Membership": ocean hero with the THUNDI PLUS tag, a perks list, three plan cards and a CTA. Perks are
- * the approved entitlements (docs/ARCHITECTURE.md §12.1), not the prototype's older list. Pricing is not approved
- * and no payment provider exists, so plan cards show names only and the CTA states that honestly; nothing here
- * can start or fake a purchase.
+ * Prototype "Membership": ocean hero with the THUNDI PLUS tag, a perks list, plan cards and a CTA. Perks are the
+ * approved entitlements (docs/ARCHITECTURE.md §12.1). Plans, prices and whether anything is for sale come from the
+ * admin-managed rows (§12.10); buying is a bank transfer confirmed by an admin (§12.11), so the CTA creates an order
+ * and nothing on this screen can grant Plus.
  */
 export default async function MembershipPage() {
   const actor = await requireActiveUser();
@@ -54,23 +54,8 @@ export default async function MembershipPage() {
         ))}
       </ListGroup>
 
-      {m.tier === "FREE" ? (
-        <>
-          <div className="grid grid-cols-3 gap-2.5">
-            {m.plans.map((p) => (
-              <div key={p.code} className="flex flex-col items-center gap-1 rounded-2xl border-[1.5px] border-border bg-surface px-3 py-4 text-center">
-                <span className="text-micro font-bold text-text-secondary">{p.name}</span>
-                <span className="text-body font-extrabold tracking-[-.02em] text-text">{p.price ?? "Price TBA"}</span>
-                <span className="text-[11px] text-text-secondary">{p.intervalDays} days</span>
-              </div>
-            ))}
-          </div>
-          <Callout tone="info" title="Plus isn't on sale yet">Pricing in MVR and payments are being finalised. Nothing is charged today, and there are no upgrade prompts elsewhere in the app.</Callout>
-        </>
-      ) : (
-        <Callout tone="info" title="Managing your membership">Billing and cancellation will be handled here once payments launch. Until then nothing changes on your account.</Callout>
-      )}
-      <p className="text-center text-micro leading-relaxed text-text-secondary">Billed in MVR when available. Cancel any time.</p>
+      <MembershipPlans membership={m} />
+      <p className="text-center text-micro leading-relaxed text-text-secondary">Billed in MVR by bank transfer. Plus never renews automatically.</p>
     </PageOverlay>
   );
 }

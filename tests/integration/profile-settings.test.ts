@@ -382,7 +382,8 @@ describe("safe presentation DTOs", () => {
     await db.subscription.create({ data: { userId: me.userId, planId: plan.id, status: "ACTIVE", provider: "stub", providerCustomerRef: "cus_secret", providerSubscriptionRef: "sub_secret", startedAt: T0, currentPeriodStart: T0, currentPeriodEnd: at(T0, hours(24 * 30)) } });
     const m = await getMembership(me, { db, now: T0 });
     expect(m).toMatchObject({ tier: "PLUS", planName: "1 month", cancelAtPeriodEnd: false, paymentsAvailable: false });
-    expect(m.plans[0]).toEqual({ code: "MONTHLY", name: "1 month", intervalDays: 30, price: null });
+    expect(m.plans[0]).toMatchObject({ code: "MONTHLY", name: "1 month", intervalDays: 30, price: null, forSale: false });
+    expect(m.currentOrder).toBeNull();
     const json = JSON.stringify(m);
     expect(json).not.toMatch(/cus_secret|sub_secret|provider|override|reason|priceMinor/);
     const privacy = await getPrivacySettings(me, { db, now: T0 });

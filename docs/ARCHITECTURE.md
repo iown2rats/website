@@ -417,14 +417,35 @@ Plus allowance 2 per rolling 7-day window, using the same `UsageCounter` mechani
 
 Free: age range, show me, location (Anywhere / Greater Malé / My atoll / specific city), intention, as in the prototype. Plus adds: specific island or atoll selection, height range, education, and combined filters. Distance is deliberately absent and no coordinates exist in the model.
 
-### 12.10 Plans, subscriptions and payments
+### 12.10 Plans, subscriptions and payments (as built in the Admin + Plus phase)
 
-- `SubscriptionPlan` rows: `WEEKLY`, `MONTHLY` (badge "Most popular"), `QUARTERLY` (badge "Best value"). Prices are placeholders flagged `isPlaceholderPrice = true`; the UI must render a "development pricing" notice while any displayed plan carries that flag. Final MVR pricing is pending approval.
-- `Subscription` fields as listed in section 5. Status transitions come only from `PaymentProvider.handleWebhook` or an admin action; no user-facing action can create or activate a subscription.
-- `PaymentProvider` interface: `createCheckout(userId, planCode) → { redirectUrl }`, `handleWebhook(rawBody, signature) → SubscriptionEvent[]`, `cancel(subscriptionRef)`. Default `NotConfiguredPaymentProvider` makes the subscribe CTA explain that payments are not yet available. No card data is ever stored.
-- Upsell UX: limits surface as calm in-context prompts ("You've used today's 30 likes. More available in 4h 12m. [Get Thundi Plus] [Maybe later]", "Next free message in 7:24 [Get Thundi Plus] [Wait]"). Reading a conversation is never blocked. The Plus screen and plan selection are built in a later phase using the Thundi visual identity; the supplied Muzz screenshots inform structure only.
+- `SubscriptionPlan` rows are admin-managed (`/admin/plans`, `src/server/billing/plans.ts`): free-form `code`, name, description, `intervalDays`, `priceMinor` (laari), currency (MVR), badge, sort order, `active` (enabled) and `isPlaceholderPrice`. A plan is **for sale** only when `active` and `isPlaceholderPrice = false` with a price above zero. Prices live in the database, never in components; `PLAN_CATALOG` in `src/config/product.ts` is only the development seed (placeholder prices, flagged). Every plan and payment-method change is audited with before/after.
+- `PaymentMethod` rows (`/admin/payments/methods`, `src/server/billing/payment-methods.ts`): type `BANK_TRANSFER`, label, bank, account holder, account number, currency, optional instructions, `enabled`, sort order. Bank details exist only here. The enabled method with the lowest sort order is offered at checkout. The model takes more types (a gateway) without changing orders or subscriptions.
+- `Subscription` rows are created only by the admin approval in §12.12 (`provider = manual_bank_transfer`, `orderId` unique) or, later, by a gateway webhook. No user-facing action creates or activates one. Tier resolution (§12.2) is unchanged and fails closed on `currentPeriodEnd > now`.
+- Upsell UX is unchanged (calm in-context prompts, reading never blocked).
 
-### 12.11 Concurrency guarantees, summarised
+### 12.11 Buying Plus by bank transfer (customer side)
+
+Flow: Membership → choose plan → order created → bank instructions → transfer → "I've made the transfer" → receipt upload → **Payment under review** → approved or rejected.
+
+- `SubscriptionOrder` (`src/server/billing/orders.ts`) snapshots the commercial terms at creation: plan name, `amountMinor`, currency, `durationDays`, plus the payment method's label, bank, account holder, account number and instructions. Editing a plan or method later never changes an existing order (tested).
+- **Reference**: `THU-` + six characters from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (no 0/O/1/I), generated server-side with `crypto.randomInt`, unique by constraint, retried on collision. Random, so sales volume is not revealed. The customer puts it in the transfer remark.
+- **One open order per customer** (advisory lock `order:<userId>`): asking again for the same plan returns the same order; asking for a different plan cancels an unpaid order and creates a new one; a SUBMITTED order is never replaced. Unpaid orders expire after 7 days (`ORDER_RULES.awaitingPaymentTtlMs`), lazily on every read. The customer may cancel only while AWAITING_PAYMENT.
+- Eligibility: ACTIVE account with completed onboarding, a for-sale plan, an enabled payment method. Deleted, suspended and onboarding accounts are refused. The client sends only `planId`.
+- **Receipt** (`/api/payments/<orderId>/receipt`, same-origin, session-owned): JPG/PNG/WebP up to 8 MB, sniffed and re-encoded to WebP with metadata dropped (`processImage`), stored in the private bucket under `payment-receipts/<userId>/<orderId>/receipt.webp`, 10 uploads per hour. The upload **is** the submission: AWAITING_PAYMENT → SUBMITTED in one step; submitting again is idempotent. The browser never sees the storage key, only 5-minute signed URLs, and only the owner and admins can obtain one. Uploading grants nothing.
+- The order screen (`/settings/membership/order/<id>`) shows plan, amount, bank, holder, account number, reference and instructions with copy controls, states that Plus activates after confirmation, and then the review / approved / rejected states. A rejected order is final: the customer starts a new order (new reference). Rejected orders are kept.
+- `getMembership` (§12.6) now carries the for-sale plans with prices, `paymentsAvailable` and the customer's current order; never storage keys, provider references or other people's data.
+
+### 12.12 Admin review, activation, renewal and expiry
+
+- State machine (`src/server/billing/state.ts`): `AWAITING_PAYMENT → SUBMITTED | CANCELLED | EXPIRED`, `SUBMITTED → APPROVED | REJECTED`; every other edge is refused server-side inside the transaction. The client never sends a status.
+- **Approval** (`src/server/billing/approval.ts`, permission `payments.review`): one transaction that locks the order row (`FOR UPDATE`), takes the customer lock `sub:<userId>`, computes the period from the order snapshot, inserts the `Subscription` with `orderId` (unique) and `providerSubscriptionRef = order:<id>`, marks the order APPROVED with the deciding admin and time, writes a `PAYMENT_APPROVED` notification and the audit row. A second approval (double tap, refresh, another admin) waits on the row lock and then sees APPROVED, or hits the unique constraint; both return the same idempotent success and create nothing (tested with parallel transactions). An admin cannot approve their own order; a DELETED customer's order cannot be approved.
+- **Period rule**: first purchase `start = approval time`, `end = start + durationDays`. Renewal while Plus is still active: `start = current paid end`, so early renewal never loses paid days. Two orders for one customer approved simultaneously chain correctly under the customer lock (tested).
+- **Rejection**: reason required (3–300 chars), shown to the customer, `PAYMENT_REJECTED` notification, audit row; Plus is not activated; the record is kept.
+- **Expiry** (`src/server/billing/expiry.ts`): `notifyExpiringSubscriptions` warns once 3 days before a customer's last paid period ends (`SUBSCRIPTION_EXPIRING`); `markExpiredSubscriptions` sets lapsed rows to EXPIRED and notifies once (`SUBSCRIPTION_EXPIRED`). No scheduler is installed yet; entitlement never depends on these because tier resolution compares `currentPeriodEnd` with `now`.
+- Admin subscription adjustments (`/admin/subscriptions`, permission `subscriptions.adjust`) need a reason and write before/after dates to the audit log.
+
+### 12.13 Concurrency guarantees, summarised
 
 | Limit | Serialisation mechanism | Why it holds |
 | --- | --- | --- |
@@ -434,12 +455,14 @@ Free: age range, show me, location (Anywhere / Greater Malé / My atoll / specif
 | Boosts per window | same `UsageCounter` row lock, kind BOOSTS, plus a check for an already-active boost | as likes |
 | Undo | row lock on the latest pass + "is latest action" check | Only one reversal can win; nothing else is mutated. |
 | Mutual match | unique `(userAId, userBId)` with `ON CONFLICT DO NOTHING` | as section 8 |
+| Payment approval | `SELECT … FOR UPDATE` on the order + advisory lock per customer + unique `Subscription.orderId` | Concurrent approvals serialise; the loser sees APPROVED (or the unique violation) and reports idempotent success. |
+| One open order | advisory lock `order:<userId>` inside the create transaction | Two simultaneous "Get Plus" taps yield one order. |
 
 All of these are covered by integration tests that fire parallel transactions against a real Postgres (section 17).
 
 ## 13. Notifications
 
-Types: `NEW_MATCH`, `MESSAGE`, `LIKE_RECEIVED` (Plus users see who; free users get a count-only notification), `INTRO_RECEIVED`, `COMMUNITY_LIKE`, `COMMUNITY_COMMENT`, `VERIFICATION_UPDATE`, `SAFETY_NOTICE`, `ACCOUNT_NOTICE`. Created inside the same transaction as the triggering write. Read model returns unread counts per tab for badges; `markRead(actor, ids | all)`. `NotificationSettings` (matches, likes, messages, community, marketing) gate creation of the non-safety types. A `PushSubscription` table is included in the schema so Web Push can be added without migration; no push is sent in this phase.
+Types: `NEW_MATCH`, `MESSAGE`, `LIKE_RECEIVED` (Plus users see who; free users get a count-only notification), `INTRO_RECEIVED`, `COMMUNITY_LIKE`, `COMMUNITY_COMMENT`, `VERIFICATION_UPDATE`, `SAFETY_NOTICE`, `ACCOUNT_NOTICE`, and the billing types `PAYMENT_APPROVED`, `PAYMENT_REJECTED`, `SUBSCRIPTION_EXPIRING`, `SUBSCRIPTION_EXPIRED` (§12.12; transactional, not gated by preferences). Notifications never control authorization: the entitlement service and the database are canonical. Created inside the same transaction as the triggering write. Read model returns unread counts per tab for badges; `markRead(actor, ids | all)`. `NotificationSettings` (matches, likes, messages, community, marketing) gate creation of the non-safety types. A `PushSubscription` table is included in the schema so Web Push can be added without migration; no push is sent in this phase.
 
 Settings (Phase 9): the five categories are toggles in Settings → Notifications (`src/server/notifications/settings.ts`, partial updates, unknown keys stripped). Each writer already consults the recipient's row when raising a notification, so turning a category off stops future rows of that kind and leaves history intact (tested). Marketing has no sender yet and is stored only; nothing is pushed.
 
@@ -466,6 +489,39 @@ Prototype behaviour reproduced: the Community tab (26/800 title; For You / Follo
 14.9 Notifications. `COMMUNITY_LIKE` and `COMMUNITY_COMMENT` rows are created in the same transaction as the write, only when the recipient has `notificationSettings.community` on, never for one's own actions or across a block, and de-duplicated per (type, post, actor) while unread. No push. No Community badge in the nav (the prototype has none).
 
 14.10 Limits (`COMMUNITY` in `src/config/product.ts`): post 1000 characters, comment 500, feed page 12, comments page 30, New window 24 h, 10 posts/hour, 20 comments/minute, 60 reactions/minute.
+
+## 21. Admin dashboard and roles (as built in the Admin + Plus phase)
+
+### 21.1 Authorization
+
+`User.role` (`USER | MODERATOR | ADMIN`) on the canonical account row is the only source of admin authority. It is read from the database on every request through the session lookup; Google confirms the person and never confers a role. `src/server/admin/authz.ts` exposes `getAdminActor()` (null for anyone who is not an ACTIVE, onboarded admin), `requireAdminPage(permission?)` for pages and layouts (non-admins get the same 404 as a missing page: NotFound, never Forbidden) and `requireAdmin(permission?)` for server actions and route handlers (throws; mapped to a generic failure). Every admin mutation calls `requireAdmin` itself and the domain functions additionally call `assertPermission`, so a client can neither forge a role nor reach a domain function without one. Permissions (`src/server/admin/permissions.ts`, pure): ADMIN has all; MODERATOR has `dashboard.view`, `users.view`, `users.moderate`, `reports.act`, `verification.act` only. Navigation is filtered by role for tidiness; it is not the control.
+
+Routes: `/admin` (dashboard), `/admin/users`, `/admin/users/[userId]`, `/admin/payments`, `/admin/payments/[orderId]`, `/admin/payments/methods`, `/admin/plans`, `/admin/subscriptions`, `/admin/reports`, `/admin/reports/[reportId]`, `/admin/verifications`, `/admin/audit`, all under the guarding layout; `/admin-setup` (bootstrap) is outside it. Admin DTOs never include session tokens, OAuth material, phone numbers, contact hashes, storage keys or provider refs (tested).
+
+### 21.2 First administrator (bootstrap)
+
+No email is hard-coded, nobody becomes admin automatically, and there is no public "become admin" action. Two audited paths:
+
+1. `ADMIN_BOOTSTRAP_TOKEN` (32+ random characters) in the server environment + `/admin-setup`: a signed-in, onboarded user presents the token; the claim succeeds only while **no** admin exists (checked under the `admin:roles` lock), is rate-limited (5/hour/user), compared in constant time, and writes `admin.bootstrapped`. The page is a 404 whenever bootstrap is unavailable. The owner removes the variable afterwards.
+2. `scripts/grant-admin.ts --email <google email> | --user-id <id> [--role …]` for an operator with database access; writes `admin.role.changed` with `via: cli`.
+
+Later role changes happen in the user detail screen (ADMIN only, reason required, never your own role, never the last admin).
+
+### 21.3 Dashboard metrics
+
+`src/server/admin/metrics.ts` computes every figure from canonical rows at request time; nothing is stored. Definitions are shown in the UI (`METRIC_DEFINITIONS`). "Today" is the Maldives calendar day (UTC+5); 7- and 30-day figures are rolling. There is no activity tracking, so the closest figure to "active users" is "Signed in, 7/30 days" (`User.lastActiveAt`, set at Google sign-in) and it is labelled as such.
+
+### 21.4 Users and account actions
+
+Search by public name, handle or internal id with account-state, onboarding, verification, membership and joined-date filters. Detail shows account, sign-in email, profile summary, privacy flags, verification, membership and subscriptions, orders, safety counts and the audit history for that account. Actions: suspend (from ACTIVE/ONBOARDING; sessions deleted), unsuspend (back to ACTIVE or ONBOARDING), ban (sessions deleted), change role (ADMIN only). Each needs a reason and writes before/after to the audit log. Rules: never yourself; moderators act on USER accounts only; admins on USER and MODERATOR accounts (change the role first for an admin); DELETED accounts are untouchable. There is no impersonation or "log in as user".
+
+### 21.5 Moderation and verification queues
+
+Reports reuse the §10 rows and evidence (reason, note, message snapshot). Decisions `OPEN → UNDER_REVIEW | RESOLVED | DISMISSED`, `UNDER_REVIEW → RESOLVED | DISMISSED`; resolving requires a resolution note; every decision is audited; account actions are taken from the target's page. The verification queue lists `SELFIE_SUBMITTED`/`UNDER_REVIEW` rows; a decision requires a submitted selfie (`selfieStorageKey`), so nobody can be marked VERIFIED without evidence; the selfie upload step itself is still pending (§11) and the UI says so. Google sign-in is never evidence.
+
+### 21.6 Audit log
+
+`src/server/admin/audit.ts` is the single writer. Actions: `admin.role.changed`, `admin.bootstrapped`, `user.suspended`, `user.unsuspended`, `user.banned`, `report.decided`, `verification.decided`, `payment.approved`, `payment.rejected`, `subscription.adjusted`, `payment_method.created/updated`, `plan.created/updated` (plus the existing user-initiated `account.deleted` / `account.recreated`). Payloads are sanitised: keys that look like secrets (token, hash, secret, providerSubject, …) are dropped before writing; account numbers are logged as last four digits. `/admin/audit` is read-only and no admin surface can edit or delete rows.
 
 ## 15. Security controls summary
 
@@ -503,6 +559,7 @@ CONTACT_HASH_SALT=       # 32+ bytes, see CONTACT_BLOCKING.md (public salt, deli
 AUTH_PROVIDER=dev        # dev (local stand-in identity provider; refused in production) | google (default and only value in production)
 GOOGLE_CLIENT_ID=        # required with AUTH_PROVIDER=google; redirect URI ${APP_URL}/auth/google/callback
 GOOGLE_CLIENT_SECRET=    # server only
+ADMIN_BOOTSTRAP_TOKEN=   # optional, one-time: first-admin claim at /admin-setup while no admin exists (§21.2); remove after use
 STORAGE_PROVIDER=local   # local (dev/test) | supabase
 LOCAL_STORAGE_DIR=.storage
 PAYMENT_PROVIDER=none
@@ -534,7 +591,7 @@ APP_URL=http://localhost:3000
 | 10 Likes You + intros | Likes You grids (Free anonymised / Plus full), intros, Matches tab. |
 | 9a Google-only authentication (done) | Migration `20260917230000_google_auth` (AuthIdentity, Session.reauthenticatedAt, optional phone, OtpRequest dropped, PHONE_VERIFIED → NONE), `src/server/auth/{jwt,oidc,identity,recent-auth}.ts`, `src/lib/oauth-cookie.ts`, `/auth/google/{start,callback}`, `/auth/deleted`, `/auth/error`, dev identity provider under `/dev/google`, deletion via Google re-authentication, seeded dev identities, 11 new tests. SMS OTP code, routes, actions and env removed; phone normalisation and hashing kept for contact blocking. |
 | 9 Profile, settings, privacy & safety (done) | `src/server/profiles/edit.ts`, photo minimum rule, `src/server/privacy/{settings,contact-hashes}.ts`, `src/server/safety/blocked.ts`, `src/server/notifications/settings.ts`, `src/server/entitlements/presentation.ts`, `src/server/users/deletion.ts`, `verifyOtpCode`, actions `profile/settings/account`, routes `/profile/edit`, `/profile/preview`, `/settings`, `/settings/{privacy,blocked,membership,safety,verification,discovery}`, shared `PhotoManager`, Pause Dating enforcement in likes and deck, 20 new tests (177 total). No migration needed. |
-| 11 Plus + verification | Entitlements, plan UI, provider stubs, verification state machine. |
+| 11 Admin dashboard + Plus subscriptions (done) | Migration `20260918030000_admin_billing` (plans as admin-managed rows, `PaymentMethod`, `SubscriptionOrder`, `Subscription.orderId`, billing notification types), `src/server/admin/*`, `src/server/billing/*`, actions `admin`/`billing`, `/api/payments/[orderId]/receipt`, `/admin/**` (dashboard, users, payments, methods, plans, subscriptions, reports, verifications, audit), `/admin-setup`, Membership purchase flow and order screen, `scripts/grant-admin.ts`, 38 new tests (209 total). Selfie verification workflow still pending (§11). |
 | 12 Hardening | Tests, CSP, rate limits review, build, security review. |
 
 ## 19. Decisions taken without asking (reversible)
@@ -562,5 +619,8 @@ APP_URL=http://localhost:3000
 - Verified phone (optional): sign-in no longer verifies a phone. If the product wants "phone verified" as an independent signal (or wants people to hide from contacts through their own number), an explicit phone step with its own SMS provider decision is needed; nothing is assumed meanwhile.
 - Photo moderation before launch: production shows APPROVED photos only (§7.1). Either the moderation/approval workflow (Phase 12) must exist so uploads become APPROVED, or the owner must approve an alternative photo policy. Without one of these, new users will not be discoverable in production.
 - Account deletion retention (Phase 9, Google-auth migration): deletion anonymises immediately but keeps the anonymised User row, message history, reports, blocks, subscription records and the scrubbed identity row (Google subject only, so a returning Google account is told its account was deleted) indefinitely because no legal retention period has been decided. The owner (with legal advice) must set how long those records are kept before a purge job is written; no duration was invented.
-- Payment provider for MVR (BML payment gateway or equivalent). The interface is provider-agnostic.
-- Subscription pricing (weekly / monthly / 3-month). Seeded plans carry placeholder prices flagged `isPlaceholderPrice`.
+- **Hosted migration `20260918030000_admin_billing`** must be applied to the Supabase project (approved process: owner approval, then `docs/DEPLOYMENT.md` §3) before the admin and Membership purchase screens work on staging. Until then those routes fail on the hosted database; sign-in, Discover, chats and Community are unaffected.
+- **First administrator**: set `ADMIN_BOOTSTRAP_TOKEN` (32+ random characters) in the Vercel Production environment, redeploy, open `/admin-setup` signed in as the owner, enter the token, then remove the variable (§21.2). Alternative: `npx tsx scripts/grant-admin.ts --email <google email>` with database access.
+- **Plus prices and bank account**: no prices or bank details exist in code. In `/admin/plans` set the MVR price, switch on "Price approved" and enable each plan to sell; in `/admin/payments/methods` add the bank account and enable it. Nothing is for sale until both are done.
+- Automated payment gateway for MVR (BML or equivalent) later: implement a provider that creates a `Subscription` the way `approveOrder` does; orders, plans and entitlements stay as they are.
+- Admin-side expiry job: `notifyExpiringSubscriptions` / `markExpiredSubscriptions` exist but nothing schedules them yet (a Vercel cron or similar needs owner approval).

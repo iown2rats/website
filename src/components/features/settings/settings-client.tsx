@@ -34,6 +34,8 @@ export interface SettingsClientProps {
   recentAuth: RecentAuthDto;
   /** Open the deletion sheet immediately (returning from the Google confirmation). */
   openDelete?: boolean;
+  /** Shows the Admin dashboard row. Display only: /admin re-checks the role on the server. */
+  isAdmin?: boolean;
 }
 
 const GROUPS = ["Account", "Notifications", "Privacy", "App", "Support", "Account management"] as const;
@@ -47,7 +49,7 @@ const NOTIFICATION_ROWS: { key: keyof NotificationSettingsDto; label: string; de
   { key: "marketing", label: "Marketing", description: "News and offers from Thundi" },
 ];
 
-export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy, recentAuth, openDelete = false }: SettingsClientProps) {
+export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, notifications: initialNotifications, privacy: initialPrivacy, recentAuth, openDelete = false, isAdmin = false }: SettingsClientProps) {
   const router = useRouter();
   const toast = useToast();
   const desktop = useIsDesktop();
@@ -102,6 +104,7 @@ export function SettingsClient({ maskedPhone, googleEmail, verificationStatus, n
             <LinkRow href="/settings/verification" height={54} label="Verification" meta={VERIFICATION_LABELS[verificationStatus]} />
             <LinkRow href="/settings/discovery" height={54} label="Discovery preferences" />
             <LinkRow href="/settings/membership" height={54} label="Membership" />
+            {isAdmin ? <LinkRow href="/admin" height={54} label="Admin dashboard" meta="Staff" /> : null}
           </ListGroup>
         </section>
       ) : null}

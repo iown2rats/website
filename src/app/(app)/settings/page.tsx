@@ -1,5 +1,6 @@
 import { SettingsClient } from "@/components/features/settings/settings-client";
 import { getDb } from "@/lib/db";
+import { isAdminRole } from "@/server/admin/authz";
 import { getAuthState, requireActiveUser } from "@/server/auth/current-user";
 import { getSignInIdentity } from "@/server/auth/identity";
 import { maskPhone } from "@/server/auth/phone";
@@ -33,6 +34,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       privacy={privacy}
       recentAuth={{ fresh: recent.fresh, expiresAt: recent.expiresAt?.getTime() ?? null }}
       openDelete={confirmDelete === "1"}
+      isAdmin={state.kind !== "anonymous" && isAdminRole(state.user.role)}
     />
   );
 }

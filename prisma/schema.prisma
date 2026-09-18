@@ -136,12 +136,6 @@ enum VerificationStatus {
   REJECTED
 }
 
-enum PlanCode {
-  WEEKLY
-  MONTHLY
-  QUARTERLY
-}
-
 enum SubscriptionStatus {
   ACTIVE
   TRIALING
@@ -153,6 +147,23 @@ enum SubscriptionStatus {
 enum EntitlementTier {
   FREE
   PLUS
+}
+
+/// How a customer can pay for Plus. Manual bank transfer first; an automated gateway is a new value plus a
+/// provider implementation, not a rewrite (docs/ARCHITECTURE.md §12.10).
+enum PaymentMethodType {
+  BANK_TRANSFER
+}
+
+/// Subscription order lifecycle (docs/ARCHITECTURE.md §12.12). Transitions are enforced in
+/// src/server/billing/orders.ts; the client never sets a status.
+enum OrderStatus {
+  AWAITING_PAYMENT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
 }
 
 /// Limited actions tracked by the rolling usage-window mechanism (§12.3, §12.8).
@@ -171,6 +182,10 @@ enum NotificationType {
   VERIFICATION_UPDATE
   SAFETY_NOTICE
   ACCOUNT_NOTICE
+  PAYMENT_APPROVED
+  PAYMENT_REJECTED
+  SUBSCRIPTION_EXPIRING
+  SUBSCRIPTION_EXPIRED
 }
 
 enum PostKind {
@@ -223,6 +238,8 @@ model User {
   usageCounters        UsageCounter[]
   boosts               Boost[]
   subscriptions        Subscription[]
+  orders               SubscriptionOrder[]   @relation("OrderUser")
+  decidedOrders        SubscriptionOrder[]   @relation("OrderDecider")
   entitlementOverrides EntitlementOverride[] @relation("OverrideUser")
   grantedOverrides     EntitlementOverride[] @relation("OverrideGrantor")
   likesGiven           Like[]                @relation("LikeFrom")
@@ -632,10 +649,15 @@ model Boost {
   @@index([endsAt])
 }
 
+/// A Plus plan as sold. `active` = enabled/visible; a plan is FOR SALE only when `active` and `isPlaceholderPrice`
+/// is false (an admin has set a real price). Orders snapshot the commercial terms, so editing a plan never changes
+/// what an existing customer bought.
 model SubscriptionPlan {
   id                 String   @id @default(cuid(2))
-  code               PlanCode @unique
+  /// Stable admin-chosen identifier (e.g. MONTHLY). Free-form so plans can be added without a migration.
+  code               String   @unique
   name               String
+  description        String?
   intervalDays       Int
   /// Minor units (laari for MVR). Placeholder until pricing is approved.
   priceMinor         Int
@@ -645,11 +667,79 @@ model SubscriptionPlan {
   isPlaceholderPrice Boolean  @default(true)
   active             Boolean  @default(true)
   sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   subscriptions Subscription[]
+  orders        SubscriptionOrder[]
 }
 
-/// Written only by PaymentProvider webhooks or admin actions. Never by a user-facing action.
+/// Where customers send money. Configured by an admin, never in source. Shown to signed-in customers at checkout;
+/// snapshotted onto the order so the instructions a customer saw never change under them.
+model PaymentMethod {
+  id            String            @id @default(cuid(2))
+  type          PaymentMethodType @default(BANK_TRANSFER)
+  /// Admin label, e.g. "BML MVR account".
+  label         String
+  bankName      String
+  accountHolder String
+  accountNumber String
+  currency      String            @default("MVR")
+  instructions  String?
+  enabled       Boolean           @default(false)
+  sortOrder     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  orders SubscriptionOrder[]
+}
+
+/// One purchase attempt. Immutable commercial snapshot + a server-enforced state machine. APPROVED orders own
+/// exactly one Subscription (Subscription.orderId is unique), which is what makes approval idempotent.
+model SubscriptionOrder {
+  id               String      @id @default(cuid(2))
+  /// Human-readable payment reference the customer writes on the transfer, e.g. THU-7K4P2M. Random, unique.
+  reference        String      @unique
+  userId           String
+  planId           String
+  paymentMethodId  String?
+  status           OrderStatus @default(AWAITING_PAYMENT)
+  // ── Snapshot at creation (never rewritten) ──
+  planName         String
+  amountMinor      Int
+  currency         String
+  durationDays     Int
+  methodLabel      String
+  bankName         String
+  accountHolder    String
+  accountNumber    String
+  instructions     String?
+  // ── Customer submission ──
+  receiptKey       String?
+  receiptSize      Int?
+  submittedAt      DateTime?
+  // ── Decision ──
+  decidedById      String?
+  decidedAt        DateTime?
+  rejectionReason  String?
+  /// AWAITING_PAYMENT orders lapse to EXPIRED after this.
+  expiresAt        DateTime
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  user          User             @relation("OrderUser", fields: [userId], references: [id], onDelete: Restrict)
+  decidedBy     User?            @relation("OrderDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  plan          SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  paymentMethod PaymentMethod?   @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  subscription  Subscription?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, submittedAt])
+  @@index([status, expiresAt])
+}
+
+/// Written only by the admin payment approval (src/server/billing/approval.ts) or a future gateway webhook.
+/// Never by a user-facing action.
 model Subscription {
   id                      String             @id @default(cuid(2))
   userId                  String
@@ -663,11 +753,14 @@ model Subscription {
   currentPeriodEnd        DateTime
   cancelAtPeriodEnd       Boolean            @default(false)
   cancelledAt             DateTime?
+  /// The approved manual order that created this subscription (unique: one order activates at most one period).
+  orderId                 String?            @unique
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
 
-  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan  SubscriptionPlan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+  order SubscriptionOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([userId, currentPeriodEnd(sort: Desc)])
   @@index([status, currentPeriodEnd])
@@ -733,6 +826,7 @@ model Report {
 
   @@index([status, createdAt])
   @@index([targetUserId])
+  @@index([targetCommentId])
 }
 
 model Verification {
@@ -871,4 +965,5 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([targetType, targetId])
+  @@index([createdAt])
 }

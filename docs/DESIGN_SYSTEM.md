@@ -285,3 +285,19 @@ Results:
 - Deleted account (430 dark): after Google confirmation the account is DELETED with no phone, sessions gone, the identity kept with its email scrubbed and `releasedAt` set. The same Google account signing in again is told "Your previous Thundi account was deleted" (no session, nothing revived); "Create a new account" creates a new `User.id` in onboarding while the old row stays DELETED and anonymised, with an `account.recreated` audit entry.
 - Desktop 1280: welcome, the dev account chooser, Settings with the Google row, and the deletion sheet as a centred modal with the Google step.
 
+
+## 18. Admin dashboard + Plus purchase verification (2026-09-18)
+
+Method: Playwright against the dev server (`AUTH_PROVIDER=dev`) with three sessions: an admin at 1280×900, the same admin on a 375×812 phone, and a Free customer on a 375×812 phone; then every admin screen at 375, 390 and 430 px. 63 scripted checks passed, each state confirmed in the database. Screenshots in `screenshots/admin/` (gitignored).
+
+Admin visual language (operational, not a dating screen): same tokens and type scale, surfaces with 1 px borders and 16–20 px radii, uppercase 12 px labels, tabular numbers, aqua for the active navigation item, ocean for primary actions, danger outline for suspend/ban/reject. Desktop: 232 px grouped sidebar (Overview, People, Revenue, System) with waiting-count badges, content to 1100 px. Phone: 56 px top bar with section name and a Menu button opening the same navigation as a bottom sheet; lists stack (primary, secondary, badges, timestamp); detail screens use two-column key/value grids that collapse to one column.
+
+Results:
+
+- Non-admin: `/admin` and `/admin/users` return 404 with no admin content for a signed-in Free user.
+- Admin: dashboard renders every metric with its definition; plan edit (price 149, "Price approved") makes the plan "for sale"; a bank account added in Payment methods becomes the checkout method; both actions appear in the audit log.
+- Customer (375): Membership shows "MVR 149" and "Get Thundi Plus"; the order screen shows amount, reference (THU-XXXXXX), account number, holder, bank and instructions, each with a Copy control; "I've made the transfer" opens the receipt sheet; uploading a JPG moves the order to SUBMITTED, stores `payment-receipts/<userId>/<orderId>/receipt.webp` and grants nothing; Membership then shows "Payment under review" and no Plus badge.
+- Admin on the phone: the pending queue lists the order; the detail shows the receipt image; Reject opens a reason sheet; Approve opens a confirmation; confirming creates exactly one subscription, one `payment.approved` audit row and one `PAYMENT_APPROVED` notification; the customer's Membership then reads "You're on Thundi Plus." with the period end.
+- Users: search by id finds the account; detail exposes no phone number or token material; Suspend with a reason sets SUSPENDED, deletes the sessions and audits; Unsuspend restores ACTIVE.
+- Subscriptions, Reports, Verifications (empty, with the honest "selfie upload not built yet" note), Audit log and the payment detail all render on desktop.
+- 375/390/430: dashboard, users, user detail, payments, payment detail, plans, payment methods, subscriptions, reports, verifications and audit have no horizontal overflow (33 checks); the menu sheet lists every section.

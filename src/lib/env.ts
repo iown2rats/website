@@ -25,6 +25,11 @@ const schema = z
     NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
     SUPABASE_SECRET_KEY: z.string().optional(),
     SUPABASE_STORAGE_BUCKET_PHOTOS: z.string().default("profile-photos"),
+    /**
+     * One-time first-admin bootstrap (src/server/admin/bootstrap.ts): a signed-in user who presents this token
+     * becomes ADMIN, only while no admin exists. Remove the variable after use.
+     */
+    ADMIN_BOOTSTRAP_TOKEN: z.string().min(32, "ADMIN_BOOTSTRAP_TOKEN must be at least 32 characters").optional(),
     /** Which photo moderation states other users may see (src/lib/photo-policy.ts). Defaults per NODE_ENV. */
     PHOTO_VISIBILITY_POLICY: z.enum(["approved-only", "approved-and-pending"]).optional(),
   })

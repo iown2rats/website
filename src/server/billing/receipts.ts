@@ -21,7 +21,7 @@ import { AUDIT_ACTIONS, writeAudit } from "@/server/admin/audit";
 import { assertPermission, type AdminActor } from "@/server/admin/authz";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { processImage } from "@/server/media/process-image";
-import { sniffUnsupported, UNSUPPORTED_MESSAGES } from "@/server/media/sniff";
+import { sniffUnsupported, unsupportedMessage } from "@/server/media/sniff";
 import type { OcrEngine } from "@/server/ocr/engine";
 import { readReceipt } from "@/server/ocr/read";
 import type { DuplicateSignal, NormalizedTransaction, OrderExpectation } from "@/server/ocr/types";
@@ -145,7 +145,7 @@ export async function attachReceipt(actor: Actor, orderId: string, file: Receipt
   if (file.size > RECEIPT_RULES.maxBytes || file.bytes.byteLength > RECEIPT_RULES.maxBytes) throw new ValidationError("That receipt is too large. Choose an image under 8 MB.");
   if (file.bytes.byteLength === 0) throw new ValidationError("That file is empty.");
   const unsupported = sniffUnsupported(file.bytes);
-  if (unsupported) throw new ValidationError(UNSUPPORTED_MESSAGES[unsupported]);
+  if (unsupported) throw new ValidationError(unsupportedMessage(unsupported, "receipt"));
 
   const current = await ownedOrder(db, actor, orderId);
   if (current.status === "SUBMITTED") throw new InvalidStateError("This receipt has already been submitted for review.");

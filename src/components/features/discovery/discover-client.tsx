@@ -8,10 +8,12 @@ import { formatDuration } from "@/lib/time";
 import type { PhotoRef } from "@/lib/photos";
 import { IconButton } from "@/components/ui/button";
 import { FilterIcon, HeartIcon } from "@/components/ui/icons";
+import { PlusLockSheet } from "@/components/ui/plus-lock";
 import { useToast } from "@/components/ui/toast";
 import { AppScreen, DiscoveryFrame } from "@/components/layout/page";
 import { TabHeader } from "@/components/layout/screen-header";
-import type { AllowanceDto, DeckCapabilities, DeckPage, EmptyReason } from "@/server/discovery/deck";
+import type { AllowanceDto, BoostDto, DeckCapabilities, DeckPage, EmptyReason } from "@/server/discovery/deck";
+import { BoostControl } from "./boost-control";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
 import { DeckError, DeckExhausted, DeckFiltered, DeckLoading, LikesExhaustedNote, DeckPaused } from "./deck-states";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "./filters-sheet";
@@ -61,6 +63,8 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
   const [openProfile, setOpenProfile] = useState<DeckCard | null>(null);
   const [match, setMatch] = useState<{ name: string; photo: PhotoRef | null; conversationId: string | null } | null>(null);
   const [undoBusy, setUndoBusy] = useState(false);
+  const [boost, setBoost] = useState<BoostDto>(initial.boost);
+  const [lock, setLock] = useState<{ feature: string; description: string } | null>(null);
   const loadingMore = useRef(false);
   const cardsRef = useRef<DeckCard[]>(cards);
   useEffect(() => {
@@ -177,7 +181,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     setUndoBusy(false);
     if (!result.ok) {
       applyFailure(result);
-      if (result.code === "ENTITLEMENT") toast.show("Undo is part of Thundi Plus.");
+      if (result.code === "ENTITLEMENT") setLock({ feature: "Undo your last pass", description: "Thundi Plus lets you bring back the person you just passed on, once, straight away." });
       else if (result.code === "UNDO_UNAVAILABLE") toast.show(result.message);
       else toast.show("Couldn't reach Thundi. Try again.");
       return;
@@ -232,10 +236,12 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     <AppScreen aria-label="Discover">
       <TabHeader
         logo
+        compactLogo={boost.activeEndsAt != null && Date.parse(boost.activeEndsAt) > serverTime()}
         title="Discover"
         actions={
           <>
             <AllowancePill allowance={allowance} msUntilReset={msUntilReset} onClick={() => likesExhausted && setLimitOpen(true)} />
+            <BoostControl boost={boost} tier={capabilities.tier} serverTime={serverTime} onSync={sync} onBoosted={setBoost} onLocked={() => setLock({ feature: "Boost your profile", description: "A Boost puts your profile first in Discover for 30 minutes so more people see you sooner. Thundi Plus includes 2 Boosts a week." })} />
             <IconButton aria-label="Filters" onClick={() => setFiltersOpen(true)}>
               <FilterIcon size={20} />
             </IconButton>
@@ -286,7 +292,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         resetsAt={allowance.resetsAt}
         serverTime={serverTime}
         onCountdownDone={onCountdownDone}
-        onGetPlus={() => { setLimitOpen(false); toast.show("Thundi Plus plans open soon."); }}
+        onGetPlus={() => { setLimitOpen(false); router.push("/settings/membership"); }}
       />
 
       <FiltersSheet
@@ -297,8 +303,9 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         saving={filtersSaving}
         error={filtersError}
         onApply={onApplyFilters}
-        onLockedAdvanced={() => toast.show("Advanced filters are part of Thundi Plus.")}
+        onLockedAdvanced={() => setLock({ feature: "Advanced filters", description: "Filter by height and education, on top of the basic filters everyone has. Part of Thundi Plus." })}
       />
+      <PlusLockSheet open={lock != null} onClose={() => setLock(null)} feature={lock?.feature ?? ""} description={lock?.description ?? ""} />
     </AppScreen>
   );
 }
@@ -313,7 +320,7 @@ function AllowancePill({ allowance, msUntilReset, onClick }: { allowance: Allowa
       onClick={onClick}
       aria-label={exhausted ? `You've used today's ${allowance.limit} likes. ${label}.` : `${allowance.remaining} of ${allowance.limit} likes left today`}
       data-testid="allowance-pill"
-      className="inline-flex h-11 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-caption font-bold text-text tabular-nums"
+      className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-surface px-3 text-caption font-bold text-text tabular-nums"
     >
       <HeartIcon size={14} filled strokeWidth={0} className={exhausted ? "text-text-muted" : "text-primary-pressed"} />
       {label}

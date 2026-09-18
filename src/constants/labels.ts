@@ -24,7 +24,7 @@ export const VERIFICATION_LABELS = {
   PHONE_VERIFIED: "Unverified",
   SELFIE_SUBMITTED: "Pending",
   UNDER_REVIEW: "Pending",
-  VERIFIED: "Verified",
+  VERIFIED: "Photo verified",
   REJECTED: "Try again",
 } as const;
 

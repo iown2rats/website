@@ -12,6 +12,7 @@ import { getDb, type Db, type DbLike } from "@/lib/db";
 import { InvalidStateError, NotFoundError, ValidationError } from "@/lib/errors";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
+import { sniffUnsupported, unsupportedMessage } from "@/server/media/sniff";
 
 export const PHOTO_RULES = {
   max: PHOTO_LIMITS.max,
@@ -56,6 +57,9 @@ export async function processAndStorePhoto(actor: Actor, input: UploadInput, dep
   const now = deps.now ?? new Date();
   if (input.size > PHOTO_RULES.maxBytes || input.bytes.byteLength > PHOTO_RULES.maxBytes) throw new ValidationError("That photo is too large. Choose one under 8 MB.");
   if (input.bytes.byteLength === 0) throw new ValidationError("That file is empty.");
+  // Formats we recognise but do not accept get an accurate message (iPhone HEIC, PDF) instead of the generic one.
+  const unsupported = sniffUnsupported(input.bytes);
+  if (unsupported) throw new ValidationError(unsupportedMessage(unsupported, "photo"));
 
   const profileId = await profileIdFor(db, actor);
   const count = await db.profilePhoto.count({ where: { profileId } });

@@ -189,7 +189,7 @@ export const WifiOffIcon = (p: IconProps) => (
 );
 
 /** Verified seal: 12-point teal badge with an ocean check. Filled, not stroked. */
-export function VerifiedBadge({ size = 20, className, title = "Verified" }: { size?: number; className?: string; title?: string }) {
+export function VerifiedBadge({ size = 20, className, title = "Photo verified" }: { size?: number; className?: string; title?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className} role="img" aria-label={title}>
       <path

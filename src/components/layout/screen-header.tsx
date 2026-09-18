@@ -10,19 +10,23 @@ import { ChevronLeftIcon, ThundiLogo } from "@/components/ui/icons";
  *  - GlassHeader: conversation header — glass + blur 16, bottom border.
  */
 
-export function TabHeader({ title, logo = false, actions, className }: { title?: string; logo?: boolean; actions?: ReactNode; className?: string }) {
+/**
+ * Tab-level header. `compactLogo` keeps only the logo mark on the narrowest phones (< 390 px) when the actions
+ * area is temporarily wider than usual (e.g. Discover while a Boost countdown is showing), so nothing wraps or clips.
+ */
+export function TabHeader({ title, logo = false, compactLogo = false, actions, className }: { title?: string; logo?: boolean; compactLogo?: boolean; actions?: ReactNode; className?: string }) {
   return (
-    <header className={cn("flex h-12 shrink-0 items-center justify-between", className)}>
+    <header className={cn("flex h-12 shrink-0 items-center justify-between gap-2", className)}>
       {logo ? (
-        <div className="flex items-center gap-2 text-h3 text-text">
-          <ThundiLogo size={24} />
-          <span>thundi</span>
+        <div className="flex min-w-0 items-center gap-2 text-h3 text-text">
+          <ThundiLogo size={24} className="shrink-0" />
+          <span className={cn("truncate", compactLogo && "max-[389px]:sr-only")}>thundi</span>
           {title ? <span className="sr-only">{title}</span> : null}
         </div>
       ) : (
         <h1 className="text-h1 text-text">{title}</h1>
       )}
-      {actions ? <div className="flex gap-2">{actions}</div> : null}
+      {actions ? <div className="flex shrink-0 gap-2">{actions}</div> : null}
     </header>
   );
 }

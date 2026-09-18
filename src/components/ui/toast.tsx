@@ -62,7 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={toast.id}
             role="status"
             className={cn(
-              "pointer-events-auto h-11 px-5 rounded-full text-body-sm font-semibold flex items-center shadow-lg animate-pop-in max-w-full truncate",
+              "pointer-events-auto min-h-11 max-w-full rounded-[22px] px-5 py-2.5 text-center text-body-sm font-semibold flex items-center shadow-lg animate-pop-in",
               toast.tone === "ocean" && "bg-ocean text-on-ocean",
               toast.tone === "success" && "bg-primary text-on-primary",
               toast.tone === "danger" && "bg-danger text-white",

@@ -83,6 +83,15 @@ RLS and zero policies; the `postgres` role (BYPASSRLS) reads and writes the tabl
 rows; existing data fingerprints unchanged; production healthy. No redeploy was needed: the deployed code already
 carried the schema.
 
+## 3c. Phase 10 (2026-09-18): no migration
+
+Photo verification, the Likes tab, the Boost control and the Membership comparison reuse the existing schema
+(`Verification`, `Boost`, `UsageCounter`, `AuditLog`, `Notification`); nothing was applied to the hosted database and no
+new environment variable is needed. Selfies are written to the existing private `profile-photos` bucket under the
+`verification-selfies/<userId>/` prefix and are only ever read through 5-minute signed URLs by the member (while
+pending) and by admins; deleting an account removes the object. The deployment carrying Phase 10 is an ordinary push
+to the production branch (§4).
+
 ## 4. Redeploying
 
 A push to the production branch deploys production. A dashboard "Redeploy" of the latest production

@@ -6,7 +6,7 @@ Meet someone closer to home. Dating for the Maldives. 18+.
 - Architecture and approved product rules: `docs/ARCHITECTURE.md` (monetization in §12)
 - Contact blocking design: `docs/CONTACT_BLOCKING.md`
 - Design system and per-phase visual verification: `docs/DESIGN_SYSTEM.md`
-- Admin dashboard, roles and the Plus bank-transfer flow: `docs/ARCHITECTURE.md` §12.10–§12.12 and §21; OCR-assisted receipt verification (server-side tesseract.js, BML/MIB parsers): §12.14 and `docs/DEPLOYMENT.md` §7; staging procedures in `docs/DEPLOYMENT.md`
+- Admin dashboard, roles and the Plus bank-transfer flow: `docs/ARCHITECTURE.md` §12.10–§12.12 and §21; OCR-assisted receipt verification (server-side tesseract.js, BML/MIB parsers): §12.14 and `docs/DEPLOYMENT.md` §7; Photo verification (human review, private selfies): §11; staging procedures in `docs/DEPLOYMENT.md`
 
 ## Stack
 

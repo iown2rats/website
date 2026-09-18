@@ -291,7 +291,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
               <span>
                 Next free message in <b className="tabular-nums text-text">{mmss(waitingMs)}</b>. Chat anytime with Thundi Plus.
               </span>
-              <button type="button" onClick={() => toast.show("Thundi Plus plans open soon.")} className="shrink-0 border-0 bg-transparent text-[13px] font-bold text-primary-pressed">Get Thundi Plus</button>
+              <Link href="/settings/membership" className="shrink-0 text-[13px] font-bold text-primary-pressed">Get Thundi Plus</Link>
             </div>
           ) : null}
           <form

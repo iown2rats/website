@@ -16,7 +16,26 @@ export function sniffUnsupported(bytes: Uint8Array): UnsupportedKind {
   return null;
 }
 
-export const UNSUPPORTED_MESSAGES: Record<Exclude<UnsupportedKind, null>, string> = {
-  pdf: "PDF receipts aren't supported. Take a screenshot of the receipt in your bank app and upload that instead.",
-  heic: "HEIC photos aren't supported yet. Take a screenshot of the receipt, or share the photo as a JPEG, then try again.",
+/** What the bytes were meant to be; the message tells the person what to do instead in that context. */
+export type UploadContext = "receipt" | "photo" | "selfie";
+
+const HEIC_FIX = "In Photos, share the picture as a JPEG (or set Camera → Formats → Most Compatible), then try again.";
+
+export const UNSUPPORTED_MESSAGES: Record<UploadContext, Record<Exclude<UnsupportedKind, null>, string>> = {
+  receipt: {
+    pdf: "PDF receipts aren't supported. Take a screenshot of the receipt in your bank app and upload that instead.",
+    heic: `HEIC photos aren't supported yet. ${HEIC_FIX}`,
+  },
+  photo: {
+    pdf: "That file is a PDF, not a photo. Choose a JPEG, PNG or WebP picture instead.",
+    heic: `HEIC photos aren't supported yet. ${HEIC_FIX}`,
+  },
+  selfie: {
+    pdf: "That file is a PDF, not a photo. Choose a JPEG, PNG or WebP selfie instead.",
+    heic: "HEIC photos aren't supported yet. Take the selfie with the camera button here, or share it as a JPEG, then try again.",
+  },
 };
+
+export function unsupportedMessage(kind: Exclude<UnsupportedKind, null>, context: UploadContext): string {
+  return UNSUPPORTED_MESSAGES[context][kind];
+}

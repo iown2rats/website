@@ -9,7 +9,7 @@ import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
-import { getEntitlements, getLikeAllowance, type LikeAllowance } from "@/server/entitlements";
+import { getBoostAllowance, getEntitlements, getLikeAllowance, type LikeAllowance } from "@/server/entitlements";
 import { likeUser, passUser, undoLastPass, type LikeResult } from "@/server/likes/like";
 import { buildDiscoveryCards, isDemoKey, type DiscoveryCardDto } from "./dto";
 import { countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate } from "./query";
@@ -35,12 +35,23 @@ export interface DeckCapabilities {
   tier: "FREE" | "PLUS";
 }
 
+/** Boost state for the Discover header (docs/ARCHITECTURE.md §12.8). Free: limit 0. */
+export interface BoostDto {
+  limit: number;
+  remaining: number;
+  /** ISO end of the active boost, or null. */
+  activeEndsAt: string | null;
+  /** ISO end of the rolling 7-day window, or null when none is open. */
+  resetsAt: string | null;
+}
+
 export type EmptyReason = "NONE" | "FILTERS" | "EXHAUSTED" | "PAUSED";
 
 export interface DeckPage {
   cards: DiscoveryCardDto[];
   allowance: AllowanceDto;
   capabilities: DeckCapabilities;
+  boost: BoostDto;
   /** Authoritative server time; the client renders countdowns relative to this, never to its own clock alone. */
   serverNow: string;
   /** Only meaningful when `cards` is empty: FILTERS = relaxing your filters would show people, EXHAUSTED = nobody new, PAUSED = the viewer paused dating. */
@@ -85,11 +96,12 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
   const excludeIds = await resolveHandles(db, input.excludeHandles ?? []);
   const privacy = await db.privacySettings.findUnique({ where: { userId: actor.userId }, select: { visibility: true, pausedAt: true } });
   const paused = privacy?.visibility === "HIDDEN" || Boolean(privacy?.pausedAt);
-  const [ids, allowance, entitlements, me] = await Promise.all([
+  const [ids, allowance, entitlements, me, boost] = await Promise.all([
     paused ? Promise.resolve([] as string[]) : getDeckCandidateIds(db, actor, { now, limit: input.limit, excludeIds }),
     getLikeAllowance(db, actor.userId, now),
     getEntitlements(db, actor.userId, now),
     loadMe(db, actor, storage),
+    getBoostAllowance(db, actor.userId, now),
   ]);
   const cards = await buildDiscoveryCards(db, actor.userId, ids, now, storage);
   let emptyReason: EmptyReason = "NONE";
@@ -101,6 +113,7 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
     cards,
     allowance: toAllowanceDto(allowance),
     capabilities: { canUndo: entitlements.rules.canUndoPass, canUseAdvancedFilters: entitlements.rules.canUseAdvancedFilters, tier: entitlements.tier },
+    boost: { limit: boost.limit, remaining: boost.remaining, activeEndsAt: boost.activeBoostEndsAt?.toISOString() ?? null, resetsAt: boost.resetsAt?.toISOString() ?? null },
     serverNow: now.toISOString(),
     emptyReason,
     me,

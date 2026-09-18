@@ -9,6 +9,7 @@ import type { Actor } from "@/server/actor";
 import { getCurrentOrderForActor, type OrderDto } from "@/server/billing/orders";
 import { getCheckoutPaymentMethod } from "@/server/billing/payment-methods";
 import { isPlanForSale } from "@/server/billing/plans";
+import { PRODUCT_RULES } from "@/config/product";
 import { getEntitlements } from ".";
 
 export interface MembershipPlanDto {
@@ -42,6 +43,26 @@ export interface MembershipDto {
   /** True when at least one plan is for sale and a payment method is enabled. */
   paymentsAvailable: boolean;
   currentOrder: OrderDto | null;
+  /** Free vs Plus, row by row, from the approved product rules (§12.1). Display only. */
+  comparison: { capability: string; free: string; plus: string }[];
+}
+
+function describeRules(): MembershipDto["comparison"] {
+  const f = PRODUCT_RULES.FREE;
+  const p = PRODUCT_RULES.PLUS;
+  const yesNo = (v: boolean) => (v ? "Included" : "—");
+  return [
+    { capability: "Profile, photos, Discover, matching and chat", free: "Included", plus: "Included" },
+    { capability: "Likes per day", free: String(f.dailyLikeLimit), plus: String(p.dailyLikeLimit) },
+    { capability: "Sending messages", free: f.messageCooldownMs ? `One every ${Math.round(f.messageCooldownMs / 60_000)} minutes` : "No wait", plus: p.messageCooldownMs ? `One every ${Math.round(p.messageCooldownMs / 60_000)} minutes` : "No wait" },
+    { capability: "See who likes you", free: f.canSeeIncomingLikes ? "Included" : "Count only", plus: yesNo(p.canSeeIncomingLikes) },
+    { capability: "Invisible Mode", free: yesNo(f.canUseInvisibleMode), plus: yesNo(p.canUseInvisibleMode) },
+    { capability: "Profile Boosts", free: f.boostsPerWindow ? `${f.boostsPerWindow} a week` : "—", plus: p.boostsPerWindow ? `${p.boostsPerWindow} a week` : "—" },
+    { capability: "Advanced filters", free: yesNo(f.canUseAdvancedFilters), plus: yesNo(p.canUseAdvancedFilters) },
+    { capability: "Undo your last pass", free: yesNo(f.canUndoPass), plus: yesNo(p.canUndoPass) },
+    { capability: "Intro with a like", free: f.introsPerWeek === null ? "Unlimited" : `${f.introsPerWeek} a week`, plus: p.introsPerWeek === null ? "Unlimited" : `${p.introsPerWeek} a week` },
+    { capability: "Block, report and safety tools", free: "Always", plus: "Always" },
+  ];
 }
 
 export async function getMembership(actor: Actor, deps: { db?: Db; now?: Date } = {}): Promise<MembershipDto> {
@@ -73,5 +94,6 @@ export async function getMembership(actor: Actor, deps: { db?: Db; now?: Date } 
     plans: planDtos,
     paymentsAvailable: Boolean(method) && planDtos.some((p) => p.forSale),
     currentOrder,
+    comparison: describeRules(),
   };
 }

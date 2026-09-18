@@ -7,26 +7,21 @@ import { MoonIcon, SunIcon } from "@/components/ui/icons";
 
 /*
  * Appearance is a per-viewer convenience stored in localStorage and applied as data-theme on <html>
- * (see the inline script in app/layout.tsx). Without a stored value the system preference applies.
+ * (see the inline script in app/layout.tsx). Light is the default; dark applies only when chosen here, never from
+ * the system setting, so the rose palette is what every new visitor sees.
  */
 type Theme = "light" | "dark";
 const KEY = "thundi.theme";
 
 function readTheme(): Theme {
   const attr = document.documentElement.getAttribute("data-theme");
-  if (attr === "dark" || attr === "light") return attr;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return attr === "dark" ? "dark" : "light";
 }
 
 function subscribe(cb: () => void) {
   const observer = new MutationObserver(cb);
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  mq.addEventListener("change", cb);
-  return () => {
-    observer.disconnect();
-    mq.removeEventListener("change", cb);
-  };
+  return () => observer.disconnect();
 }
 
 export function useTheme(): [Theme, () => void] {
@@ -34,6 +29,7 @@ export function useTheme(): [Theme, () => void] {
   const toggle = useCallback(() => {
     const next: Theme = readTheme() === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", next === "dark" ? "#32232A" : "#FCEDEA");
     try {
       localStorage.setItem(KEY, next);
     } catch {

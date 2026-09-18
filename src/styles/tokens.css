@@ -94,6 +94,7 @@
   --duration-sheet: 450ms;
 }
 
+/* Dark mode is opt-in (Profile → appearance). Light is the Thundi experience and never follows the system setting. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --background: #32232a;
@@ -127,40 +128,6 @@
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --background: #32232a;
-    --surface: #49323a;
-    --surface-muted: #3d2a32;
-    --text: #fff8f6;
-    --text-secondary: #d0bbc0;
-    --text-muted: color-mix(in srgb, #d0bbc0 70%, transparent);
-    --border: #5b4149;
-    --primary: #e99a9c;
-    --primary-hover: #e3898b;
-    --primary-pressed: #e3898b;
-    --on-primary: #32232a;
-    --primary-ink: #f2b3b4;
-    --ocean: #5c4149;
-    --on-ocean: #fff8f6;
-    --on-ocean-muted: rgba(255, 248, 246, 0.75);
-    --accent: #7ad7ce;
-    --on-accent: #32232a;
-    --aqua: #7ad7ce;
-    --aqua-soft: #2f4a48;
-    --on-aqua-soft: #fff8f6;
-    --success: #7ad7ce;
-    --warning: #e6b85c;
-    --danger: #e88a8e;
-    --sand: #f0c978;
-    --on-sand: #32232a;
-    --glass: rgba(73, 50, 58, 0.85);
-    --scrim: rgba(20, 10, 14, 0.5);
-    --shadow-sm: 0 8px 30px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   :root {

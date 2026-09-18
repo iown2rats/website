@@ -40,7 +40,7 @@ Long copy uses line-height 1.5 (24×) or 1.55 (5×); headings use `text-wrap: pr
 
 ## 2. Colour tokens
 
-Pastel Rose / Teal identity (2026-09-18). Values live in `src/styles/tokens.css` and are exposed as Tailwind colours in `src/app/globals.css`; components never use raw hex. Light mode is the primary experience; dark mode is a warm "berry night", not the old teal-black.
+Pastel Rose / Teal identity (2026-09-18). Values live in `src/styles/tokens.css` and are exposed as Tailwind colours in `src/app/globals.css`; components never use raw hex. Light mode is the Thundi experience and is what every visitor sees regardless of the phone's system setting; dark mode is a warm "berry night" that applies only when chosen from the appearance toggle (stored per viewer).
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ Pastel Rose / Teal identity (2026-09-18). Values live in `src/styles/tokens.css`
 | `--color-scrim` | `rgba(71,43,48,.4)` | `rgba(20,10,14,.5)` | dialog backdrop |
 | `--color-on-photo*` | white / 85 % / 16 % | same | text and chips over photographs |
 
-Shadows are warm (`rgba(71,43,48,.08)` / `.16`), the Like shadow is rose (`rgba(232,139,134,.4)`). The `like-gradient` utility keeps its name but is the solid rose; the only remaining gradients are the photo scrim and the demo photo placeholders. Component mapping: high-emphasis `Button` variants (`primary`, the historic `ocean`, `plus`) are all rose with plum text; `PillTabs` active is rose; `OceanCard` is the teal-tint trust card (`premium` = warm surface with a gold edge for the Plus hero); the match overlay is rose with white ripple rings; `Switch`, `Progress` and the profile completion ring are teal; `PlusTag`, `PlusHeroTag` and plan badges are gold with plum text; `VerifiedBadge` and `ThundiLogo` read `var(--accent)`.
+Shadows are warm (`rgba(71,43,48,.08)` / `.16`), the Like shadow is rose (`rgba(232,139,134,.4)`). The `like-gradient` utility keeps its name but is the solid rose; the only remaining gradients are the photo scrim and the demo photo placeholders. Component mapping: high-emphasis `Button` variants (`primary`, the historic `ocean`, `plus`) are all rose with plum text; `PillTabs` active is rose; `OceanCard` is the teal-tint trust card (`premium` = warm surface with a gold edge for the Plus hero); the match overlay is rose with white ripple rings; `Switch` is teal with a white knob when on and border-coloured with a plum knob when off, `Progress` and the profile completion ring are teal; `PlusTag`, `PlusHeroTag` and plan badges are gold with plum text; `VerifiedBadge` and `ThundiLogo` read `var(--accent)`.
 
 ## 3. Radius
 

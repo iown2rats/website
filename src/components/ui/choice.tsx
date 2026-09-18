@@ -86,7 +86,7 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch
     >
       <span
         aria-hidden="true"
-        className="absolute top-[3px] rounded-full bg-white shadow-knob transition-[left] duration-200"
+        className={cn("absolute top-[3px] rounded-full shadow-knob transition-[left,background-color] duration-200", checked ? "bg-white" : "bg-text")}
         style={{ width: knob, height: knob, left: checked ? w - knob - 3 : 3 }}
       />
     </button>

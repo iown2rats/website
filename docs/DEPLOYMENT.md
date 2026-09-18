@@ -59,7 +59,7 @@ prices) come from `prisma/seed-data/reference.ts` and were loaded with idempoten
 users, profiles, matches, chats and Community fixtures are development-only and must never be loaded
 here; the seed refuses them when `NODE_ENV=production`.
 
-**Row Level Security.** RLS is enabled on all 37 public tables with no policies. The application reaches
+**Row Level Security.** RLS is enabled on all 39 public tables with no policies. The application reaches
 Postgres only server-side through Prisma as the `postgres` role, which has `BYPASSRLS`, so it is unaffected;
 the anon and authenticated roles used by Supabase's Data API see no rows (verified with `SET ROLE`). Do not
 add permissive anon policies to silence the "RLS enabled, no policy" advisory: the tables are not meant to
@@ -67,7 +67,7 @@ be reachable through the Data API at all.
 
 ## 3a. First administrator and selling Plus
 
-1. Add `ADMIN_BOOTSTRAP_TOKEN` (Production, Sensitive), redeploy, sign in as the owner, open `https://thundi.vercel.app/admin-setup`, paste the token. Your account becomes ADMIN (audited). Delete the variable and redeploy.
+1. Add `ADMIN_BOOTSTRAP_TOKEN` (Production, Sensitive), redeploy, sign in as the owner, open `https://thundi.vercel.app/admin-setup`, paste the token. Your account becomes ADMIN (audited). Delete the variable and redeploy. **Done on 2026-09-18**: the owner's account is the single ADMIN and the variable has been removed; `/admin-setup` is a 404 from now on. Further admins are granted from `/admin/users/<id>` or with `scripts/grant-admin.ts`.
 2. `/admin/payments/methods`: add the bank account customers transfer to and switch it on. Bank details live only in this table.
 3. `/admin/plans`: set the MVR price for each plan, switch on "Price approved" and "Enabled". Only then is anything for sale.
 4. Review transfers at `/admin/payments`; approving activates Plus, rejecting notifies the customer with your reason. Every decision is in `/admin/audit`.

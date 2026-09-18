@@ -212,7 +212,10 @@ within an hour of the records propagating.
 
 **Configured 2026-09-18**: the owner verified `mellocrush.com` with Resend and set the three variables in Production
 (`EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM=Mellocrush <no-reply@mellocrush.com>`). With the §3e migration
-already applied, both gates are open and email + password sign-in is offered.
+already applied, both gates are open and email + password sign-in is offered. Verified live at 21:21 UTC on build
+`dmFGn109jUCvXdyXCrwtX`: the welcome card renders the `or` divider, the email and password fields, the Continue pill,
+"Forgot password?" and "New to Mellocrush? Create account" under the two provider buttons. It only became visible once
+the newer deployment was promoted (see "A dashboard Redeploy does not always move the production domains" below).
 
 Until `EMAIL_PROVIDER` and its key are set, `emailAuthConfigured()` is false, the welcome screen shows only Google and
 Telegram, and `/auth/register` redirects to it. Development uses `EMAIL_PROVIDER=console`, which prints the link to
@@ -227,9 +230,18 @@ production commit finished `READY` with target `production`, but its alias list 
 `thundi-kingdom-trips.vercel.app` and the branch alias: `www.mellocrush.com`, `mellocrush.com` and `thundi.vercel.app`
 stayed on the earlier deployment, which had been built before the Resend variables existed. The live site therefore
 kept serving the old build (same Next.js `buildId`) and kept hiding email + password, with nothing wrong in the code,
-the database or the variables. Check the alias list of the deployment you expect to be live — `thundi.vercel.app` and
-both `mellocrush.com` hosts must appear on it — and if they do not, push a commit so a `source: git` deployment is
-created, or use Promote in the dashboard. A push to the production branch is the reliable path.
+the database or the variables. At the same time Vercel stopped reacting to pushes for about twenty minutes — two
+commits reached GitHub with no deployment created, then both appeared at once when the backlog flushed.
+
+How to tell the two apart, and what to do:
+
+- Read the alias list of the deployment you expect to be live (`get_deployment`). `thundi.vercel.app` and both
+  `mellocrush.com` hosts must appear on it. If they sit on an older deployment, the fix is **Promote to Production**
+  on the newer one in the Deployments tab — instant, no rebuild, and it moves the domains straight away.
+- Confirm what is actually being served by comparing the Next.js `buildId` in the page source before and after. An
+  unchanged `buildId` means the domains never moved, whatever the deployment list says.
+- A push is the normal way to deploy, but it is not a diagnostic: webhook delivery can lag by many minutes, so a
+  missing deployment is not proof that the Git integration is broken. Check the alias list first.
 
 ## 4. Redeploying
 

@@ -29,6 +29,17 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["tesseract.js", "tesseract.js-core", "@tesseract.js-data/eng"],
+  async headers() {
+    return [
+      {
+        // Welcome-screen hero (public/hero, rendered by scripts/render-hero.mjs). Vercel's default for public files is
+        // max-age=0 + revalidation on every visit; the hero is the largest-contentful-paint image, so let browsers keep
+        // it for a week. Rename the files (scripts/render-hero.mjs) when the photograph changes.
+        source: "/hero/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+      },
+    ];
+  },
   outputFileTracingIncludes: {
     // Customer upload (OCR at attach) and the admin payment detail (server action "Re-run OCR"). Keys are picomatch
     // route globs, so the dynamic segment is written as `*` rather than `[orderId]` (which would be a character class).

@@ -318,3 +318,48 @@ sequential database round trips of roughly 200 ms each plus one Supabase Storage
 
 No environment variable or database change. Verification list after deploy: `x-vercel-id: bom1::…` on
 `https://www.mellocrush.com/`; Discover, Likes, Chats, Community, Profile and Settings render; sign-in unchanged.
+
+## 11. QA cohort (2026-09-19)
+
+Twenty marked test accounts in production for pre-launch testing of discovery, likes, matching, messaging, filters
+and empty states. Created and removed by `scripts/qa-cohort.ts`, which prints SQL rather than executing it, so the
+statements can be read before they run. No schema change, no application change, no relaxed authorization: these are
+ordinary EMAIL accounts with real scrypt password hashes going through the same rules as anybody else.
+
+**Three markers, all required.** `destroy` resolves the cohort only where all three match at once, so a real member
+cannot be caught by it:
+
+| Marker | Value |
+| --- | --- |
+| identity email | `qa01@qa.mellocrush.invalid` … `qa20@…` |
+| `Profile.handle` | `qa-01` … `qa-20` |
+| `Profile.displayName` | ends in `(TEST)` |
+
+`.invalid` is reserved by RFC 2606 and cannot resolve, so a stray password reset can never reach a person and can
+never bounce against the Resend sending domain. **Never send mail to these addresses**; the identities are seeded
+with `emailVerified = true` and no verification message is sent.
+
+**Photos** are `demo/<handle>/<n>.hue-<h>` placeholder keys, which the app renders as gradients (`src/lib/photos.ts`).
+Nothing is written to storage, so nothing needs cleaning up there, and no photograph of any real person is involved.
+Nineteen profiles carry 2–4 APPROVED photos; `qa-19` keeps two PENDING as a permanent subject for the moderation
+queue. `qa-17` holds Invisible Mode, which is a Plus feature, through an `EntitlementOverride` — the legitimate
+mechanism, never a fabricated payment — and the override cascades away with the user.
+
+**Commands**
+
+    MELLOCRUSH_QA_COHORT=i-understand npx tsx scripts/qa-cohort.ts create        > create.sql
+    MELLOCRUSH_QA_COHORT=i-understand npx tsx scripts/qa-cohort.ts verify        > verify.sql
+    MELLOCRUSH_QA_COHORT=i-understand npx tsx scripts/qa-cohort.ts destroy-check > check.sql
+    MELLOCRUSH_QA_COHORT=i-understand npx tsx scripts/qa-cohort.ts destroy       > destroy.sql
+
+**Cleanup, and the hazard to read first.** `Like`, `Pass`, `Match`, `Conversation`, `Message`, `Intro`,
+`CommunityPost`, `CommunityComment`, `Report` and `SubscriptionOrder` all declare `onDelete: Restrict` on their user
+columns, so `DELETE FROM "User"` fails once the cohort has swiped anything; `destroy` deletes in foreign-key order and
+lets the rest cascade. More important: an interaction row belongs to *both* people in it. If a real member likes a
+test profile, purging the cohort deletes that member's like, match and conversation too. **Always run `destroy-check`
+first** — it is read-only and lists, separately and by name, every non-cohort account whose rows would go with the
+purge. `destroy` then re-resolves the cohort inside one transaction and aborts unless exactly twenty accounts match
+all three markers (verified by breaking a marker deliberately: it refused and deleted nothing).
+
+The whole create → verify → destroy lifecycle was rehearsed against the local database before production, and the
+production matrix came back byte-identical to the rehearsal.

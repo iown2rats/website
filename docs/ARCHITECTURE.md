@@ -566,6 +566,51 @@ Types: `NEW_MATCH`, `MESSAGE`, `LIKE_RECEIVED` (Plus users see who; free users g
 
 Settings (Phase 9): the five categories are toggles in Settings → Notifications (`src/server/notifications/settings.ts`, partial updates, unknown keys stripped). Each writer already consults the recipient's row when raising a notification, so turning a category off stops future rows of that kind and leaves history intact (tested). Marketing has no sender yet and is stored only; nothing is pushed.
 
+### 13.1 The member's feed, the bell and the dropdown (2026-09-19)
+
+Until now the rows existed but nothing showed them: there was no bell, no list and no way to mark one read. The
+reader is `src/server/notifications/feed.ts` — `countUnreadNotifications`, `getNotificationFeed`,
+`markNotificationRead`, `markAllNotificationsRead` — wrapped by `src/actions/notifications.ts` behind
+`requireActor()`. It adds no notification type and no producer; `NOTIFICATION_FEED` in `src/config/product.ts`
+holds the sizes (5 in the dropdown, 20 a page, 50 ceiling, 70-character previews) so the client can read them
+without pulling the database layer into its bundle. **No migration:** the `Notification` model and its
+`[userId, readAt, createdAt desc]` index already carried everything.
+
+**Ownership is a WHERE clause, not a check.** Every query and every update matches the id *and* `userId` together,
+so another member's notification id marks nothing and returns exactly what a nonexistent id returns
+(`{ changed: false }`). Nothing distinguishes the two, so nothing leaks whether that id exists. `markAll` updates
+`{ userId, readAt: null }`. Reading never deletes: the row stays, it just stops counting.
+
+**What a row may name is an authorization question, so the server composes the text.** The client receives a
+finished `title`, never an identity to hide:
+
+| Row | Named | Anonymous |
+| --- | --- | --- |
+| `LIKE_RECEIVED`, `INTRO_RECEIVED` | viewer holds `seeIncomingLikes` and the actor is ACTIVE | otherwise — "Someone liked you", no photo |
+| `NEW_MATCH`, `MESSAGE`, `COMMUNITY_*` | normally | blocked either way — no name, no photo |
+| system rows | never carry an actor | — |
+
+A like is the Plus paywall (§12.5). Sending the liker's name to a Free member's browser and hiding it in CSS would
+hand away what Likes You charges for, so a Free member's row is anonymised in the query result itself. The same fix
+was applied to the desktop Discover activity panel (`src/server/matching/aside.ts`), which had been naming likers
+to Free members since it was built.
+
+A message row previews the latest line of the conversation. That is safe because the viewer is a participant — and
+the preview query re-asserts that participation rather than trusting the notification. Soft-deleted and non-text
+messages are skipped; the preview is whitespace-collapsed and truncated.
+
+**Destinations degrade rather than 404.** `href` is null when the target is gone (a deleted Community post); the
+row still renders and can still be marked read, it just is not a link. A `NEW_MATCH` with no conversation falls
+back to `/likes`.
+
+**Paging** uses an opaque `"<createdAt ISO>|<id>"` cursor matching the `[createdAt desc, id desc]` order, so a page
+boundary between two rows created in the same millisecond cannot drop one. A malformed cursor is ignored, not
+trusted.
+
+**No polling and no socket.** The authenticated layout already runs per request, so it counts unread rows there and
+seeds `NotificationsProvider`; the bell costs nothing until it is opened, and the rows are fetched only on open.
+After a read the client updates the count locally and calls `router.refresh()` so the next server render agrees.
+
 ## 14. Community (as built in Phase 8)
 
 Prototype behaviour reproduced: the Community tab (26/800 title; For You / Following / New pills; radius-24 post cards with 44 px avatar, 15/700 name + 14 px seal, "island · time" meta, 36 px ··· options, QUESTION tag, 16 px body, 240 px radius-18 photo, heart + count and comment bubble + count), the 54 px ocean FAB, and the "New post" sheet (Text / Photo / Question pills, 4-row textarea whose placeholder follows the kind, "Posting as {island} · Community posts don't create matches", 52 px ocean Post). Tapping the author avatar opens the full profile. The prototype has no thread screen, no Community nav badge, no follow feature, no image comments and no nested replies; its Share button has no behaviour and is not rendered.

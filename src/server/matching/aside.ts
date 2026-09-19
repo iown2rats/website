@@ -1,6 +1,10 @@
 /**
  * Desktop Discover side panel: the viewer's newest matches and recent activity, from real rows.
  * Photos are the other person's primary thumb through the storage provider; nothing private leaves.
+ *
+ * "Liked you" is the Plus paywall (§12.5), so an activity row for a like is anonymised — "Someone liked you",
+ * no photo — unless the viewer holds `seeIncomingLikes`. Matches and messages already have an established
+ * connection, so those rows name the other person as Chats does.
  */
 import { getDb, type Db } from "@/lib/db";
 import { displayablePhotoWhere } from "@/lib/photo-policy";
@@ -8,6 +12,7 @@ import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
 import { isDemoKey } from "@/server/discovery/dto";
+import { getEntitlements } from "@/server/entitlements";
 
 export interface AsidePhoto {
   url: string | null;
@@ -47,9 +52,10 @@ async function primaryPhotos(db: Db, userIds: string[], storage: StorageProvider
   return out;
 }
 
-export async function getDiscoverAside(actor: Actor, deps: { db?: Db; storage?: StorageProvider } = {}): Promise<{ matches: AsideMatchDto[]; activity: AsideActivityDto[] }> {
+export async function getDiscoverAside(actor: Actor, deps: { db?: Db; storage?: StorageProvider; now?: Date } = {}): Promise<{ matches: AsideMatchDto[]; activity: AsideActivityDto[] }> {
   const db = deps.db ?? getDb();
   const storage = deps.storage ?? getStorageProvider();
+  const now = deps.now ?? new Date();
   const [matches, notifications] = await Promise.all([
     db.match.findMany({
       where: { status: "ACTIVE", OR: [{ userAId: actor.userId }, { userBId: actor.userId }] },
@@ -71,11 +77,17 @@ export async function getDiscoverAside(actor: Actor, deps: { db?: Db; storage?: 
     return { name: other.profile?.displayName ?? "Match", conversationId: m.conversation?.id ?? null, photo: photos.get(otherIds[i]!) ?? null };
   });
   const text = { LIKE_RECEIVED: "liked you", NEW_MATCH: "matched with you", MESSAGE: "sent a message" } as const;
-  const activity = notifications.map((n) => ({
-    name: n.actor?.profile?.displayName ?? "Someone",
-    text: text[n.type as keyof typeof text] ?? "",
-    at: n.createdAt.toISOString(),
-    photo: n.actorId ? photos.get(n.actorId) ?? null : null,
-  }));
+  const canSeeLikers = notifications.some((n) => n.type === "LIKE_RECEIVED")
+    ? (await getEntitlements(db, actor.userId, now)).rules.canSeeIncomingLikes
+    : false;
+  const activity = notifications.map((n) => {
+    const named = n.type !== "LIKE_RECEIVED" || canSeeLikers;
+    return {
+      name: (named ? n.actor?.profile?.displayName : null) ?? "Someone",
+      text: text[n.type as keyof typeof text] ?? "",
+      at: n.createdAt.toISOString(),
+      photo: named && n.actorId ? photos.get(n.actorId) ?? null : null,
+    };
+  });
   return { matches: matchDtos, activity };
 }

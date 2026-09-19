@@ -151,3 +151,16 @@ export const PLAN_CATALOG = [
 ] as const;
 
 export const PLACEHOLDER_PRICING = true;
+
+/**
+ * Notification feed sizes (docs/ARCHITECTURE.md §13). The bell's dropdown asks for exactly what it shows; the
+ * dedicated page pages through the rest. Lives here rather than in the server module so the client can read it
+ * without pulling the database layer into its bundle.
+ */
+export const NOTIFICATION_FEED = {
+  dropdownSize: 5,
+  pageSize: 20,
+  maxPageSize: 50,
+  /** Longest message preview shown in a row. */
+  previewChars: 70,
+} as const;

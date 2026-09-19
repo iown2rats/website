@@ -3,6 +3,7 @@ import { cn } from "@/lib/cn";
 import { IconButton } from "@/components/ui/button";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { BrandMark, Wordmark } from "@/components/brand/logo";
+import { NotificationBell } from "@/components/features/notifications/notification-bell";
 
 /*
  * Header patterns from the prototype:
@@ -14,8 +15,14 @@ import { BrandMark, Wordmark } from "@/components/brand/logo";
 /**
  * Tab-level header. `compactLogo` keeps only the linked "oo" mark on the narrowest phones (< 390 px) when the actions
  * area is temporarily wider than usual (e.g. Discover while a Boost countdown is showing), so nothing wraps or clips.
+ *
+ * Every tab carries the notification bell as its LAST trailing control, so it is the rightmost thing in the row on
+ * every screen. That ordering is structural, not cosmetic: the dropdown is anchored to the bell's right edge, so a
+ * screen control rendered after it would push the bell inwards and hang the panel off the left of a phone screen.
+ * Callers pass screen controls through `actions`; they cannot place anything to the right of the bell.
+ * `bell={false}` is for skeletons rendered before the count exists.
  */
-export function TabHeader({ title, logo = false, compactLogo = false, actions, className }: { title?: string; logo?: boolean; compactLogo?: boolean; actions?: ReactNode; className?: string }) {
+export function TabHeader({ title, logo = false, compactLogo = false, actions, bell = true, className }: { title?: string; logo?: boolean; compactLogo?: boolean; actions?: ReactNode; bell?: boolean; className?: string }) {
   return (
     <header className={cn("flex h-12 shrink-0 items-center justify-between gap-2", className)}>
       {logo ? (
@@ -27,7 +34,12 @@ export function TabHeader({ title, logo = false, compactLogo = false, actions, c
       ) : (
         <h1 className="text-h1 text-text">{title}</h1>
       )}
-      {actions ? <div className="flex shrink-0 gap-2">{actions}</div> : null}
+      {bell || actions ? (
+        <div className="flex shrink-0 items-center gap-2">
+          {actions}
+          {bell ? <NotificationBell /> : null}
+        </div>
+      ) : null}
     </header>
   );
 }

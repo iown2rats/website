@@ -187,6 +187,18 @@ export const BoltIcon = (p: IconProps) => (
     <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
   </Base>
 );
+export const BellIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M18 9a6 6 0 10-12 0c0 4.2-1.2 5.6-1.8 6.3a.8.8 0 00.6 1.3h14.4a.8.8 0 00.6-1.3C19.2 14.6 18 13.2 18 9z" />
+    <path d="M10 20a2.4 2.4 0 004 0" />
+  </Base>
+);
+export const CardIcon = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="2.5" y="5" width="19" height="14" rx="3" />
+    <path d="M2.5 10h19" />
+  </Base>
+);
 export const WifiOffIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M2 2l20 20" />

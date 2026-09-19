@@ -517,3 +517,33 @@ to the wrapper with it. Everything §28 added is unaffected: the pinned footer, 
 One incidental trap worth knowing: **Tailwind scans prose for class names**, including code comments and these docs.
 The first version of this section made Tailwind emit the very rule it was warning about, from the sentence describing
 it. Where a utility has to be named in prose, describe it rather than spelling it.
+
+## 31. The notification bell and its dropdown (2026-09-19)
+
+The reference is a dropdown, not a screen: a floating card under the bell, aligned to its right edge, over a page
+that stays visible and undimmed. It is deliberately not a bottom sheet on phones — the same card is sized to the
+viewport instead (78vw, so 292 px at 375 and 304 at 390; a fixed 400 px from the desktop tier), capped at
+`calc(100vw - 1.25rem)` so it can never reach an edge.
+
+Composition: a header row ("Notifications", plus "Mark all as read" in `primary-ink` only while something is
+unread), a scrolling list capped at `min(60svh, 420px)`, and a centred accent footer linking to `/notifications`.
+Rows are the shared list component, so the dropdown and the page cannot drift: 40 px avatar or a muted circular
+line icon, an extra-bold title, an optional secondary line, and the time on the right. Unread is marked twice and
+quietly — a 6 px rose dot beside the time and a `primary-soft/35` row wash — with a screen-reader-only "Unread".
+Separators are `divide-border`; the card has no outline, as everywhere else in the system.
+
+**The bell is the last trailing control in `TabHeader`, and that ordering is structural.** The card extends
+leftwards from the bell, so a screen control rendered after it pushes the bell inwards and hangs the panel off the
+left of a phone. That is not hypothetical: with the bell placed first, the Discover header's Boost and Filters
+buttons put the panel at x = −166 on a 390 px screen. `TabHeader` now renders `actions` and then the bell, so a
+caller cannot place anything to its right. Measured after: fully inside the viewport at 375, 390, 430 and 1440.
+
+Behaviour: the bell toggles; a pointerdown anywhere outside closes it; Escape closes it and returns focus to the
+bell. The button carries `aria-haspopup="dialog"`, `aria-expanded` and a label that includes the count
+("Notifications, 5 unread"); the card is a `dialog` labelled "Notifications", so Tab moves into it in DOM order
+rather than trapping focus in a non-modal popover. The badge is exact to 9 and then "9+", and there is no badge at
+zero. Empty is one line — "You're all caught up." — not an illustration.
+
+The page at `/notifications` is the same rows in a `ListGroup` under the standard page overlay, with "Show older"
+paging and its own mark-all. Its bottom clearance is a spacer rather than padding, because the page-overlay body
+sets `padding-bottom` inline and an inline style beats a class.

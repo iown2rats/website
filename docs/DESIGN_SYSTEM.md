@@ -695,3 +695,30 @@ is recorded so a WebKit run checks it, and so clause 3 — which is a real measu
 
 Clause 3 is the proxy: it verifies the documented precondition for the zoom, not the zoom. Final confirmation is a
 real iPhone.
+
+
+### Postscript: the same bug wearing a different hat
+
+Safari came back clean and Chrome on iPhone did not — on a few screens, not all. Chrome on iOS is WebKit, the same
+engine, so the engine was not the difference.
+
+What was ruled out, in order:
+
+- **Production content.** The longest unbroken run in the whole production database is 17 characters, a bank
+  account number. Nothing a member has written is wide enough to overflow a 320px column.
+- **Text scaling.** Every route holds at 200% text with no overflow. The px-based scale is robust to it.
+- **Desktop-mode layout.** The audit had been running phone widths *without* `isMobile`, so Chromium ignored the
+  meta viewport entirely and laid pages out as narrow desktop windows — a rendering mode no user has. Fixed; the
+  results are the same either way, but the earlier runs were measuring the wrong thing.
+
+What reproduces it exactly: **page zoom at 110%.** The visual viewport drops to 355px while the layout viewport
+stays 390px, giving 35px of sideways pan — with `scrollWidth === clientWidth` throughout.
+
+So it is the same shape of bug as the focus-zoom: a zoom state, not a layout. Chrome on iOS keeps page zoom
+**per site** and syncs it; Safari does not. A zoom recorded while the focus-zoom bug was live survives the fix,
+because nothing in the page controls it. It shows only on dense screens, because on a sparse one the extra 35px
+is empty margin.
+
+There is no code fix, and there should not be one: overriding a zoom the user or their browser chose is the same
+mistake as `user-scalable=no`, just later in the stack. The check is per-device — a private tab carries no saved
+zoom, so if the app is clean there and not in a normal tab, the saved zoom is the cause.

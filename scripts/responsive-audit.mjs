@@ -25,6 +25,7 @@
  *   node scripts/responsive-audit.mjs --routes=/chats      # subset (substring match)
  *   node scripts/responsive-audit.mjs --keyboard           # also probe with a simulated on-screen keyboard
  *   node scripts/responsive-audit.mjs --focus              # also probe with each field focused and filled
+ *   node scripts/responsive-audit.mjs --no-mobile          # lay phone widths out as a desktop window instead
  *   node scripts/responsive-audit.mjs --json=out.json      # machine-readable report
  *
  * Exit code is 1 when the contract is violated, so it works as a CI gate.
@@ -309,6 +310,28 @@ async function resolveDynamicRoutes(page) {
   return out;
 }
 
+/*
+ * Context options.
+ *
+ * Without `isMobile`, Chromium lays a page out as a narrow desktop window: it ignores the meta viewport tag
+ * entirely and there is no layout-viewport/visual-viewport split. That is not the mode any phone browser uses, so
+ * every run before this measured a rendering mode no user has. `--mobile` turns on the emulation phone Chrome
+ * actually does — meta viewport honoured, touch, a real device pixel ratio — and is the default at phone widths.
+ */
+function contextOpts(width, height) {
+  const phone = width <= 430 && !flag("no-mobile");
+  return phone
+    ? {
+        viewport: { width, height },
+        deviceScaleFactor: 3,
+        isMobile: true,
+        hasTouch: true,
+        userAgent:
+          "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+      }
+    : { viewport: { width, height }, deviceScaleFactor: 1 };
+}
+
 /** The contract, in one place: the document must not scroll sideways, nothing may escape it, no field may sit below the iOS floor. */
 function violates(r) {
   return r.overflows || r.culprits.length > 0 || r.smallFields.length > 0 || (r.vv && (r.vv.scale !== 1 || r.vv.offsetLeft !== 0));
@@ -323,7 +346,7 @@ async function main() {
 
   for (const width of WIDTHS) {
     const height = HEIGHT_FOR(width);
-    const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+    const ctx = await browser.newContext(contextOpts(width, height));
     const page = await ctx.newPage();
     await signIn(page);
     const dynamic = await resolveDynamicRoutes(page);
@@ -335,7 +358,7 @@ async function main() {
      * legal routes without ever rendering one of them, and it is why every navigation below is verified to have
      * landed where it was sent.
      */
-    const anon = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+    const anon = await browser.newContext(contextOpts(width, height));
     const anonPage = await anon.newPage();
 
     const routeFilter = arg("routes", "");
@@ -384,7 +407,7 @@ async function main() {
 
     // Keyboard: a focused composer on a short viewport is where sticky bars and safe areas usually break.
     if (flag("keyboard") && width <= 430 && dynamic.__FIRST_CHAT__) {
-      const short = await browser.newContext({ viewport: { width, height: Math.round(height * 0.55) }, deviceScaleFactor: 1 });
+      const short = await browser.newContext(contextOpts(width, Math.round(height * 0.55)));
       const kp = await short.newPage();
       await signIn(kp);
       await kp.goto(`${BASE}/chats/${dynamic.__FIRST_CHAT__}`, { waitUntil: "domcontentloaded" });
@@ -418,7 +441,7 @@ async function main() {
         redirected.push({ width: 0, route: flow.name, wanted: flow.path, landed: "(skipped: flows only run against localhost)", auth: true });
         continue;
       }
-      const fctx = await browser.newContext({ viewport: { width: WIDTHS[0], height: HEIGHT_FOR(WIDTHS[0]) }, deviceScaleFactor: 1 });
+      const fctx = await browser.newContext(contextOpts(WIDTHS[0], HEIGHT_FOR(WIDTHS[0])));
       const fp = await fctx.newPage();
       const reached = await flow.reach(fp).then(() => true).catch(() => false);
       if (!reached) {

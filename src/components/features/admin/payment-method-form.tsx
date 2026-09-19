@@ -44,12 +44,12 @@ export function PaymentMethodForm({ method, onDone }: { method?: PaymentMethodAd
       <Field label="Sort order" hint="Lower shows first. The lowest enabled method is used at checkout.">{(p) => <Input {...p} type="number" min={0} max={1000} value={d.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value))} className="h-11 text-body-sm" />}</Field>
       <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>
-          <div className="text-body-sm font-semibold text-text" id={`enabled-${method?.id ?? "new"}`}>Enabled</div>
+          <div className="text-body-sm font-medium text-text" id={`enabled-${method?.id ?? "new"}`}>Enabled</div>
           <div className="text-caption text-text-secondary">Customers can pay to this account.</div>
         </div>
         <Switch compact checked={d.enabled} onCheckedChange={(v) => set("enabled", v)} aria-labelledby={`enabled-${method?.id ?? "new"}`} />
       </div>
-      {error ? <p role="alert" className="text-caption font-semibold text-danger desktop:col-span-2">{error}</p> : null}
+      {error ? <p role="alert" className="text-caption font-medium text-danger desktop:col-span-2">{error}</p> : null}
       <div className="flex gap-2 desktop:col-span-2">
         <Button type="submit" variant="ocean" size="sm" loading={busy}>{method ? "Save changes" : "Add payment method"}</Button>
         {onDone ? <Button type="button" variant="ghost" size="sm" onClick={onDone} disabled={busy}>Cancel</Button> : null}

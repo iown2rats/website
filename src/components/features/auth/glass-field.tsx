@@ -15,7 +15,7 @@ export interface GlassFieldProps extends Omit<InputHTMLAttributes<HTMLInputEleme
 }
 
 const base =
-  "h-12 w-full rounded-full border border-white/25 bg-white/10 px-4.5 text-[14px] text-white placeholder:text-white/55 " +
+  "h-11 w-full rounded-full border border-white/25 bg-white/10 px-3.5 text-body text-white placeholder:text-white/55 " +
   "outline-none focus-visible:border-white/60 focus-visible:outline-2 focus-visible:outline-white/80 " +
   "aria-[invalid=true]:border-[#ffb3b3] disabled:opacity-60";
 
@@ -30,7 +30,7 @@ export function GlassField({ label, error, id: providedId, ...rest }: GlassField
       </label>
       <input id={id} aria-describedby={errorId} aria-invalid={error ? true : undefined} className={base} {...rest} />
       {error ? (
-        <p id={errorId} role="alert" className="px-4 text-[12px] font-semibold text-[#ffc9c9]">
+        <p id={errorId} role="alert" className="px-4 text-caption-sm font-medium text-[#ffc9c9]">
           {error}
         </p>
       ) : null}
@@ -61,7 +61,7 @@ export function GlassPasswordField({ label, error, id: providedId, ...rest }: Gl
         </button>
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="px-4 text-[12px] font-semibold text-[#ffc9c9]">
+        <p id={errorId} role="alert" className="px-4 text-caption-sm font-medium text-[#ffc9c9]">
           {error}
         </p>
       ) : null}
@@ -76,7 +76,7 @@ export function GlassSubmit({ children, loading = false, ...rest }: { children: 
       type="submit"
       disabled={loading || rest.disabled}
       aria-busy={loading || undefined}
-      className="pressable flex h-12 w-full items-center justify-center rounded-full bg-primary text-[15px] font-bold text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.25)] disabled:opacity-60"
+      className="pressable flex h-11 w-full items-center justify-center rounded-full bg-primary text-cta-lg font-medium text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.25)] disabled:opacity-60"
       {...rest}
     >
       {children}

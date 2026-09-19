@@ -76,7 +76,7 @@ export function DeleteAccountSheet({ open, onClose, signIn, recentAuth }: { open
     <ResponsiveDialog open={open} onClose={busy ? () => undefined : onClose} labelledBy={titleId} dismissible={!busy}>
       {!fresh ? (
         <>
-          <DialogTitle id={titleId} className="text-[22px]">Delete your account?</DialogTitle>
+          <DialogTitle id={titleId}>Delete your account?</DialogTitle>
           <DialogDescription>This can&apos;t be undone.</DialogDescription>
           <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-body-sm leading-relaxed text-text-secondary">
             <li>Your profile, photos, likes and Community posts are removed.</li>
@@ -86,12 +86,12 @@ export function DeleteAccountSheet({ open, onClose, signIn, recentAuth }: { open
           </ul>
           <p className="text-body-sm text-text-secondary">
             {provider === "email" ? (
-              <>Confirm your password to continue{account ? <> as <span className="font-semibold text-text">{account}</span></> : null}.</>
+              <>Confirm your password to continue{account ? <> as <span className="font-medium text-text">{account}</span></> : null}.</>
             ) : (
-              <>To confirm, sign in with {P} again{account ? <> as <span className="font-semibold text-text">{account}</span></> : null}.</>
+              <>To confirm, sign in with {P} again{account ? <> as <span className="font-medium text-text">{account}</span></> : null}.</>
             )}
           </p>
-          {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-caption font-medium text-danger">{error}</p> : null}
           <div className="flex flex-col gap-2.5 pt-1">
             {provider === "email" ? (
               <>
@@ -119,9 +119,9 @@ export function DeleteAccountSheet({ open, onClose, signIn, recentAuth }: { open
         </>
       ) : (
         <>
-          <DialogTitle id={titleId} className="text-[22px]">Confirm deletion</DialogTitle>
+          <DialogTitle id={titleId}>Confirm deletion</DialogTitle>
           <DialogDescription>{provider === "email" ? "You just confirmed your password" : `You just confirmed with ${P}`}{account ? ` as ${account}` : ""}. This is the last step and can&apos;t be undone.</DialogDescription>
-          {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-caption font-medium text-danger">{error}</p> : null}
           <div className="flex flex-col gap-2.5 pt-1">
             <Button variant="destructive" onClick={() => void confirm()} loading={busy} fullWidth>Delete my account</Button>
             <Button variant="ghost" size="md" onClick={onClose} disabled={busy} fullWidth>Keep my account</Button>

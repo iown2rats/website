@@ -47,7 +47,7 @@ export default async function ProfilePage() {
     <AppScreen aria-label="Profile">
       <TabHeader title="Profile" actions={<ThemeToggleIcon />} />
       <ScrollArea>
-        <div className="flex flex-col gap-5 pt-2 wide:flex-row wide:items-start wide:gap-10">
+        <div className="flex flex-col gap-3.5 pt-2 wide:flex-row wide:items-start wide:gap-10">
         <Stack className="wide:w-[var(--profile-side-wide)] wide:shrink-0">
           <div className="flex flex-col items-center gap-2.5 text-center wide:rounded-card wide:glass-card wide:px-6 wide:py-7">
             <ProfileAvatar name={me.name} photo={me.primaryPhoto ? { url: me.primaryPhoto.url, key: me.primaryPhoto.key, blurhash: me.primaryPhoto.blurhash } : null} completion={me.completion.percent} verified={me.verified} />
@@ -57,10 +57,10 @@ export default async function ProfilePage() {
             </div>
             {meta ? <div className="-mt-2 text-body-sm text-text-secondary">{meta}</div> : null}
             <div className="mt-1 flex w-full max-w-95 gap-2.5">
-              <Link href="/profile/edit" className="flex h-12.5 flex-1 items-center justify-center rounded-lg bg-primary text-body font-bold text-on-primary pressable">
+              <Link href="/profile/edit" className="flex h-11.5 flex-1 items-center justify-center rounded-lg bg-primary text-body font-medium text-on-primary pressable">
                 Edit profile
               </Link>
-              <Link href="/profile/preview" className="flex h-12.5 flex-1 items-center justify-center rounded-lg bg-surface-muted text-body font-bold text-text pressable">
+              <Link href="/profile/preview" className="flex h-11.5 flex-1 items-center justify-center rounded-lg bg-surface-muted text-body font-medium text-text pressable">
                 Preview
               </Link>
             </div>
@@ -74,9 +74,9 @@ export default async function ProfilePage() {
                   <LinkRow
                     key={s.key}
                     href={SUGGESTION_HREF[s.key] ?? "/profile/edit"}
-                    height={56}
+                    height={50}
                     label={s.label}
-                    leading={<span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-aqua-soft text-micro font-extrabold text-primary-ink">+{s.points}</span>}
+                    leading={<span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-aqua-soft text-micro font-medium text-primary-ink">+{s.points}</span>}
                     className="pl-3 pr-3.5"
                   />
                 ))}
@@ -89,7 +89,7 @@ export default async function ProfilePage() {
           <SectionLabel className="hidden wide:block">Account</SectionLabel>
           <ListGroup>
             {rows.map((r) => (
-              <LinkRow key={r.label} href={r.href} height={60} label={r.label} meta={r.meta || undefined} />
+              <LinkRow key={r.label} href={r.href} height={54} label={r.label} meta={r.meta || undefined} />
             ))}
           </ListGroup>
         </Stack>

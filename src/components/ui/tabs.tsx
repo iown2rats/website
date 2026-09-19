@@ -5,9 +5,10 @@ import { cn } from "@/lib/cn";
 
 /*
  * Two tab patterns from the prototype:
- *  - SegmentedControl (Likes You / Matches): surface-muted track radius 18 padding 4, segments 42 px radius 14,
- *    active = surface background + shadow-sm + text colour; inactive = secondary text.
- *  - PillTabs (Community, Edit profile): 38 px pills, 1.5 px border; active = rose background, plum text.
+ *  - SegmentedControl (Likes You / Matches): surface-muted track, segments 36 px radius 14, active = surface
+ *    background + shadow-sm + text colour; inactive = secondary text.
+ *  - PillTabs (Community, Edit profile): 34 px pills; active = rose background, plum text.
+ * Compact pass (§32): 42 → 36 and 38 → 34, and the labels dropped from 700 to 500 — a tab row is navigation.
  */
 
 export interface TabItem<T extends string> {
@@ -26,7 +27,7 @@ interface TabsProps<T extends string> {
 export function SegmentedControl<T extends string>({ items, value, onChange, label, className }: TabsProps<T>) {
   const id = useId();
   return (
-    <div role="tablist" aria-label={label} className={cn("flex gap-1.5 p-1 rounded-xl bg-surface-muted", className)}>
+    <div role="tablist" aria-label={label} className={cn("flex gap-1 p-0.75 rounded-lg bg-surface-muted", className)}>
       {items.map((item) => {
         const active = item.value === value;
         return (
@@ -40,7 +41,7 @@ export function SegmentedControl<T extends string>({ items, value, onChange, lab
             onClick={() => onChange(item.value)}
             onKeyDown={(e) => handleArrowKeys(e, items, value, onChange)}
             className={cn(
-              "flex-1 h-10.5 rounded-md text-body-sm font-bold transition-colors duration-200 border-0",
+              "flex-1 h-9 rounded-md text-body font-medium transition-colors duration-200 border-0",
               active ? "bg-surface text-text shadow-sm" : "bg-transparent text-text-secondary",
             )}
           >
@@ -71,7 +72,7 @@ export function PillTabs<T extends string>({ items, value, onChange, label, clas
             onClick={() => onChange(item.value)}
             onKeyDown={(e) => handleArrowKeys(e, items, value, onChange)}
             className={cn(
-              "shrink-0 h-9.5 px-4 rounded-full text-body-sm font-bold whitespace-nowrap",
+              "shrink-0 h-8.5 px-3.5 rounded-full text-body-sm font-medium whitespace-nowrap",
               active ? "bg-primary text-on-primary" : "bg-surface-muted text-text",
             )}
           >

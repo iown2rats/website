@@ -22,7 +22,7 @@ export function AppScreen({ className, children, ...rest }: HTMLAttributes<HTMLE
 
 export function ScrollArea({ className, children, navSafe = true, ...rest }: HTMLAttributes<HTMLDivElement> & { navSafe?: boolean }) {
   return (
-    <div className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden", navSafe && "pb-nav desktop:pb-6", className)} {...rest}>
+    <div className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden", navSafe && "pb-nav desktop:pb-4", className)} {...rest}>
       {children}
     </div>
   );
@@ -31,7 +31,7 @@ export function ScrollArea({ className, children, navSafe = true, ...rest }: HTM
 export function DiscoveryFrame({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={cn("relative mx-auto mt-1.5 min-h-0 w-full max-w-[var(--deck-max)] flex-1 mb-[calc(74px+var(--safe-bottom))] desktop:mb-0 wide:max-w-[var(--deck-wide)]", className)}
+      className={cn("relative mx-auto mt-1 min-h-0 w-full max-w-[var(--deck-max)] flex-1 mb-[calc(64px+var(--safe-bottom))] desktop:mb-0 wide:max-w-[var(--deck-wide)]", className)}
     >
       {children}
     </div>
@@ -48,7 +48,7 @@ export function PageFrame({ children, wide = false, className }: { children: Rea
 
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overflow-x-hidden px-4 pt-1", className)} style={{ paddingBottom: "calc(32px + var(--safe-bottom))" }}>
+    <div className={cn("flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overflow-x-hidden px-4 pt-1", className)} style={{ paddingBottom: "calc(20px + var(--safe-bottom))" }}>
       {children}
     </div>
   );
@@ -57,17 +57,17 @@ export function PageBody({ children, className }: { children: ReactNode; classNa
 export function SettingsFrame({ sideNav, children }: { sideNav?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1">
-      {sideNav ? <nav aria-label="Sections" className="hidden desktop:flex w-55 shrink-0 flex-col gap-1 border-r border-border px-3 py-2">{sideNav}</nav> : null}
+      {sideNav ? <nav aria-label="Sections" className="hidden desktop:flex w-52 shrink-0 flex-col gap-0.5 border-r border-border px-2.5 py-2">{sideNav}</nav> : null}
       <PageBody>{children}</PageBody>
     </div>
   );
 }
 
-/** Content column inside tab screens (Profile, Community) with the prototype's 20 px section gap. */
+/** Content column inside tab screens (Profile, Community). Section gap 14 after the compact pass (§32). */
 export function Stack({ className, gap = "lg", ...rest }: HTMLAttributes<HTMLDivElement> & { gap?: "sm" | "md" | "lg" }) {
-  return <div className={cn("flex flex-col", gap === "sm" && "gap-2.5", gap === "md" && "gap-3.5", gap === "lg" && "gap-5", className)} {...rest} />;
+  return <div className={cn("flex flex-col", gap === "sm" && "gap-2", gap === "md" && "gap-3", gap === "lg" && "gap-3.5", className)} {...rest} />;
 }
 
 export function ModalBody({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-4", className)} {...rest} />;
+  return <div className={cn("flex flex-col gap-3", className)} {...rest} />;
 }

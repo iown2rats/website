@@ -88,12 +88,12 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
 
   return (
     <PageOverlay title="Privacy & Safety" backHref="/profile">
-      <OceanCard className="flex-row items-start gap-3.5 p-5">
-        <ShieldIcon size={26} className="shrink-0 text-accent" />
+      <OceanCard className="flex-row items-start gap-3 p-4">
+        <ShieldIcon size={20} className="shrink-0 text-accent" />
         <p className="text-body-sm leading-relaxed text-text">You control exactly who sees you. Your phone number and exact location are never shown to anyone.</p>
       </OceanCard>
 
-      <section className="flex flex-col gap-2.5" aria-labelledby="privacy-visibility">
+      <section className="flex flex-col gap-1.5" aria-labelledby="privacy-visibility">
         <SectionLabel id="privacy-visibility">Profile visibility</SectionLabel>
         <div role="radiogroup" aria-labelledby="privacy-visibility" className="flex flex-col gap-2">
           {options.map((o) => {
@@ -106,10 +106,10 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
                 aria-checked={on}
                 disabled={busy === "visibility"}
                 onClick={() => void chooseVisibility(o.value)}
-                className={cn("flex min-h-14.5 items-center justify-between gap-3 rounded-lg px-4.5 py-2.5 text-left text-text", on ? "bg-primary-soft" : "bg-surface-muted")}
+                className={cn("flex min-h-11.5 items-center justify-between gap-3 rounded-lg px-3.5 py-2 text-left text-text", on ? "bg-primary-soft" : "bg-surface-muted")}
               >
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-body font-semibold">{o.label}{o.plus ? <PlusTag size="xs" /> : null}</span>
+                  <span className="flex items-center gap-2 text-body font-medium">{o.label}{o.plus ? <PlusTag size="xs" /> : null}</span>
                   <span className="block text-caption-sm text-text-secondary">{o.sub}</span>
                 </span>
                 <span aria-hidden="true" className={cn("size-5 shrink-0 rounded-full border-2", on ? "border-primary bg-primary" : "border-text-secondary/40")} />
@@ -124,9 +124,9 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
               : "Only people you like can find you in Discover. It doesn't affect your existing matches or chats."}{" "}
             {INVISIBLE_MODE_DISCLOSURE}
             {privacy.invisibleMode.suspended ? (
-              <span className="mt-2.5 flex gap-2">
-                <Link href="/settings/membership" className="inline-flex h-9 items-center rounded-md bg-primary px-3.5 text-caption font-bold text-on-primary">Renew Mellocrush Plus</Link>
-                <Button size="sm" variant="secondary" className="h-9 rounded-md px-3.5 text-caption" onClick={() => void chooseVisibility("everyone")} loading={busy === "visibility"}>Turn Invisible Mode off</Button>
+              <span className="mt-2 flex gap-2">
+                <Link href="/settings/membership" className="inline-flex h-8.5 items-center rounded-md bg-primary px-3 text-caption font-medium text-on-primary">Renew Mellocrush Plus</Link>
+                <Button size="sm" variant="secondary" className="h-8.5 rounded-md px-3 text-caption" onClick={() => void chooseVisibility("everyone")} loading={busy === "visibility"}>Turn Invisible Mode off</Button>
               </span>
             ) : null}
           </Callout>
@@ -135,9 +135,9 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
 
       <ListGroup>
         {toggles.map((t) => (
-          <div key={t.key} className="flex items-center justify-between gap-3.5 px-4.5 py-3.5">
+          <div key={t.key} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
             <div className="min-w-0">
-              <div id={`priv-${t.key}`} className="text-body font-semibold text-text">{t.label}</div>
+              <div id={`priv-${t.key}`} className="text-body font-medium text-text">{t.label}</div>
               <div id={`priv-${t.key}-d`} className="mt-0.5 text-caption-sm text-text-secondary">{t.sub}</div>
             </div>
             <Switch checked={privacy[t.key]} onCheckedChange={(v) => toggle(t.key, v)} disabled={busy === t.key} aria-labelledby={`priv-${t.key}`} aria-describedby={`priv-${t.key}-d`} />
@@ -145,20 +145,20 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
         ))}
       </ListGroup>
 
-      <div className="flex flex-col gap-3 rounded-card glass-card p-5">
+      <div className="flex flex-col gap-2.5 rounded-card glass-card p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-extrabold tracking-[-.01em] text-text">Block my contacts</h2>
-          <span className={cn("inline-flex h-6 items-center rounded-xs px-2.5 text-[11px] font-extrabold", privacy.blockContacts ? "bg-aqua-soft text-accent" : "bg-surface-muted text-text-secondary")} role="status">{privacy.blockContacts ? "ON" : "OFF"}</span>
+          <h2 className="text-h4 text-text">Block my contacts</h2>
+          <span className={cn("inline-flex h-5.5 items-center rounded-xs px-2 text-tag font-medium", privacy.blockContacts ? "bg-aqua-soft text-accent" : "bg-surface-muted text-text-secondary")} role="status">{privacy.blockContacts ? "ON" : "OFF"}</span>
         </div>
         <p className="m-0 text-body-sm leading-relaxed text-text-secondary">People you block from your contacts won&apos;t be shown your dating profile, and you won&apos;t see theirs. Numbers are hashed on your device — we never store your contacts.</p>
         {privacy.blockContacts ? (
           <>
             <p className="text-caption text-text-secondary">{privacy.contactHashCount} number{privacy.contactHashCount === 1 ? "" : "s"} on your list.</p>
-            <Button variant="muted" onClick={() => setContactsOpen(true)} className="h-12.5">Manage blocked contacts</Button>
+            <Button variant="muted" onClick={() => setContactsOpen(true)} className="h-11.5">Manage blocked contacts</Button>
             <Button variant="ghost" size="md" onClick={() => toggle("blockContacts", false)} disabled={busy === "blockContacts"}>Turn off (keeps your list)</Button>
           </>
         ) : (
-          <Button variant="ocean" onClick={() => toggle("blockContacts", true)} loading={busy === "blockContacts"} className="h-12.5">Block my contacts</Button>
+          <Button variant="ocean" onClick={() => toggle("blockContacts", true)} loading={busy === "blockContacts"} className="h-11.5">Block my contacts</Button>
         )}
       </div>
 
@@ -172,10 +172,10 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
 
       <ResponsiveDialog open={plusOpen} onClose={() => setPlusOpen(false)} labelledBy={plusTitleId}>
         <div className="flex items-center gap-2"><PlusTag size="md" /></div>
-        <DialogTitle id={plusTitleId} className="text-[22px]">Invisible Mode is part of Mellocrush Plus</DialogTitle>
+        <DialogTitle id={plusTitleId}>Invisible Mode is part of Mellocrush Plus</DialogTitle>
         <DialogDescription>With Plus, only people you like can find you in Discover. {INVISIBLE_MODE_DISCLOSURE}</DialogDescription>
         <div className="flex flex-col gap-2.5 pt-1">
-          <Link href="/settings/membership" className="flex h-13 items-center justify-center rounded-lg bg-primary text-body font-bold text-on-primary">See Mellocrush Plus</Link>
+          <Link href="/settings/membership" className="flex h-11.5 items-center justify-center rounded-lg bg-primary text-body font-medium text-on-primary">See Mellocrush Plus</Link>
           <Button variant="muted" size="md" onClick={() => setPlusOpen(false)} fullWidth>Not now</Button>
         </div>
       </ResponsiveDialog>

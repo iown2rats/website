@@ -118,7 +118,7 @@ export function VerificationClient({ initial }: { initial: VerificationStateDto 
     <>
       <div className="flex flex-col items-center gap-3 py-2.5 text-center" aria-live="polite">
         <Seal verified={phase === "VERIFIED"} />
-        <h2 className="text-[22px] font-extrabold tracking-[-.02em] text-text">{title}</h2>
+        <h2 className="text-h3 text-text">{title}</h2>
         <p className="max-w-80 text-body-sm leading-normal text-text-secondary">{subtitle}</p>
       </div>
 
@@ -145,7 +145,7 @@ export function VerificationClient({ initial }: { initial: VerificationStateDto 
       {phase === "REJECTED" ? (
         <Callout tone="warning" title="Why it wasn't approved">
           {state.rejectionReason ?? "The selfie couldn't be matched to your profile photos."}
-          {retryPending ? <div className="mt-1 font-semibold">You can try again after {formatDateTime(state.retryAvailableAt)}.</div> : null}
+          {retryPending ? <div className="mt-1 font-medium">You can try again after {formatDateTime(state.retryAvailableAt)}.</div> : null}
         </Callout>
       ) : null}
 
@@ -153,10 +153,10 @@ export function VerificationClient({ initial }: { initial: VerificationStateDto 
         <>
           <ListGroup>
             {INSTRUCTIONS.map(([label, sub]) => (
-              <div key={label} className="flex items-center gap-3.5 px-4.5 py-3.5">
+              <div key={label} className="flex items-center gap-3.5 px-3.5 py-3.5">
                 <span className="grid size-8.5 shrink-0 place-items-center rounded-full bg-aqua-soft text-accent"><CheckIcon size={16} strokeWidth={2.4} /></span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-body font-bold text-text">{label}</div>
+                  <div className="text-body font-medium text-text">{label}</div>
                   <div className="text-caption-sm text-text-secondary">{sub}</div>
                 </div>
               </div>
@@ -175,9 +175,9 @@ export function VerificationClient({ initial }: { initial: VerificationStateDto 
             </figure>
           ) : null}
 
-          {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-caption font-medium text-danger">{error}</p> : null}
           {uploading ? (
-            <div className="flex items-center gap-2.5 rounded-xl bg-aqua-soft px-4 py-3 text-caption font-semibold text-on-aqua-soft" role="status" aria-live="polite">
+            <div className="flex items-center gap-2.5 rounded-xl bg-aqua-soft px-4 py-3 text-caption font-medium text-on-aqua-soft" role="status" aria-live="polite">
               <Spinner size={16} /> {progress && progress < 100 ? `Uploading ${progress}%` : "Saving your selfie…"}
             </div>
           ) : null}

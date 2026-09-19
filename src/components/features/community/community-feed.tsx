@@ -158,7 +158,7 @@ export function CommunityFeed({ initial, serverNow, island, canPost }: Community
       <TabHeader title="Community" />
       <PillTabs
         label="Community feeds"
-        className="mb-3.5 mt-2"
+        className="mb-2.5 mt-1.5"
         value={tab}
         onChange={onTab}
         items={[
@@ -167,14 +167,14 @@ export function CommunityFeed({ initial, serverNow, island, canPost }: Community
           { value: "new", label: "New" },
         ]}
       />
-      <ScrollArea className="flex flex-col gap-3.5" aria-live="polite">
+      <ScrollArea className="flex flex-col gap-2.5" aria-live="polite">
         {tab === "following" || !feedTab || !state ? (
           <EmptyState icon={<PeopleIcon />} title="Nothing to follow yet." description="Following isn't part of Community yet. Posts from everyone appear in For You." />
         ) : state.status === "error" && state.posts.length === 0 ? (
           <ErrorState title="Community couldn't load" description="Check your connection and try again." onRetry={() => void load(feedTab, "first")} />
         ) : state.status === "loading" && state.posts.length === 0 ? (
-          <div className="flex justify-center py-12" role="status" aria-label="Loading posts">
-            <Spinner size={24} className="text-primary" />
+          <div className="flex justify-center py-8" role="status" aria-label="Loading posts">
+            <Spinner size={22} className="text-primary" />
           </div>
         ) : state.loaded && state.posts.length === 0 ? (
           emptyFor(feedTab)
@@ -186,16 +186,16 @@ export function CommunityFeed({ initial, serverNow, island, canPost }: Community
             <div ref={sentinel} aria-hidden="true" className="h-px shrink-0" />
             {state.status === "loading" ? (
               <div className="flex justify-center py-3" role="status" aria-label="Loading more posts">
-                <Spinner size={22} className="text-primary" />
+                <Spinner size={20} className="text-primary" />
               </div>
             ) : state.status === "error" ? (
               <div className="flex flex-col items-center gap-2 py-3 text-center" role="alert">
                 <p className="text-body-sm text-text-secondary">Couldn&apos;t load more posts.</p>
-                <Button variant="secondary" size="md" onClick={() => void load(feedTab, "more")}>Try again</Button>
+                <Button variant="secondary" size="sm" onClick={() => void load(feedTab, "more")}>Try again</Button>
               </div>
             ) : state.nextCursor ? (
               <div className="flex justify-center py-1">
-                <Button variant="secondary" size="md" onClick={() => void load(feedTab, "more")}>Load more</Button>
+                <Button variant="secondary" size="sm" onClick={() => void load(feedTab, "more")}>Load more</Button>
               </div>
             ) : (
               <p className="py-3 text-center text-caption text-text-muted">You&apos;re all caught up.</p>

@@ -1,7 +1,9 @@
 import type { SVGProps } from "react";
 
 /**
- * Mellocrush icon set — line icons on a 24 grid with round caps, stroke 2–2.4, from the prototype.
+ * Mellocrush icon set — line icons on a 24 grid with round caps. The compact pass (docs/DESIGN_SYSTEM.md §32)
+ * takes the default from 20 to 18 and the default stroke from 2 to 1.9, which is what makes the chrome read thin
+ * rather than merely smaller. Callers that need a heavier or larger glyph still pass their own.
  * Every icon is decorative by default (aria-hidden); pass `title` for a labelled standalone icon.
  */
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "strokeWidth"> {
@@ -10,7 +12,7 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "strokeWidth"> 
   title?: string;
 }
 
-function Base({ size = 20, strokeWidth = 2, title, children, ...rest }: IconProps & { children: React.ReactNode }) {
+function Base({ size = 18, strokeWidth = 1.9, title, children, ...rest }: IconProps & { children: React.ReactNode }) {
   return (
     <svg
       width={size}

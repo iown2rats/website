@@ -16,7 +16,7 @@ export function FreshAccountForm() {
       >
         Create a new account
       </Button>
-      {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="text-caption font-medium text-danger">{error}</p> : null}
     </div>
   );
 }

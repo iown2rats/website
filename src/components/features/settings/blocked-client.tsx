@@ -46,10 +46,10 @@ export function BlockedClient({ initial }: { initial: BlockedUserDto[] }) {
           <p className="text-body-sm text-text-secondary">Blocked people can&apos;t see your profile, posts or messages, and you can&apos;t see theirs. Unblocking doesn&apos;t restore old likes, matches or chats.</p>
           <ListGroup>
             {blocked.map((b) => (
-              <div key={b.handle} className="flex items-center gap-3 px-4.5 py-3">
+              <div key={b.handle} className="flex items-center gap-3 px-3.5 py-3">
                 <Avatar name="" aria-hidden="true" size={44} photo={b.photo ? { url: b.photo.url, key: b.photo.demoKey, blurhash: b.photo.blurhash } : null} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.25 text-body font-bold text-text"><span className="truncate">{b.name}</span>{b.verified ? <VerifiedBadge size={14} /> : null}</div>
+                  <div className="flex items-center gap-1.25 text-body font-medium text-text"><span className="truncate">{b.name}</span>{b.verified ? <VerifiedBadge size={14} /> : null}</div>
                   <div className="text-caption text-text-secondary">Blocked {new Date(b.blockedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setTarget(b)} className="h-9 rounded-md px-3.5 text-caption" aria-label={`Unblock ${b.name}`}>Unblock</Button>

@@ -26,11 +26,11 @@ export default async function DeletedAccountPage() {
         <div className="flex items-center"><Wordmark height={24} /></div>
         <h1 className="text-h2">Your previous Mellocrush account was deleted</h1>
         <p className="text-body text-text-secondary">
-          {who ? <><span className="font-semibold text-text">{who}</span> ({label})</> : <>This {label} account</>} was used for a Mellocrush account that has since been deleted. Its profile, photos, matches, chats and posts are gone and can&apos;t be restored.
+          {who ? <><span className="font-medium text-text">{who}</span> ({label})</> : <>This {label} account</>} was used for a Mellocrush account that has since been deleted. Its profile, photos, matches, chats and posts are gone and can&apos;t be restored.
         </p>
         <p className="text-body text-text-secondary">You can start again with a brand-new account. Nothing from before comes back, and you&apos;ll set up your profile from the beginning.</p>
         <FreshAccountForm />
-        <Link href={ROUTES.welcome} className="flex h-11 items-center justify-center text-body-sm font-semibold text-text-secondary">Not now</Link>
+        <Link href={ROUTES.welcome} className="flex h-11 items-center justify-center text-body-sm font-medium text-text-secondary">Not now</Link>
       </div>
     </main>
   );

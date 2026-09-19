@@ -32,7 +32,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: { searchP
         {result.items.map((s) => (
           <div key={s.id} className="flex flex-col gap-2 border-b border-border px-4 py-3 last:border-0 desktop:flex-row desktop:items-center desktop:gap-4">
             <div className="min-w-0 flex-1">
-              <Link href={`/admin/users/${s.user.userId}`} className="truncate text-body-sm font-bold text-text hover:underline">{s.user.displayName ?? "(no name)"}{s.user.handle ? ` @${s.user.handle}` : ""}</Link>
+              <Link href={`/admin/users/${s.user.userId}`} className="truncate text-body-sm font-medium text-text hover:underline">{s.user.displayName ?? "(no name)"}{s.user.handle ? ` @${s.user.handle}` : ""}</Link>
               <div className="text-caption text-text-secondary">
                 {s.planName} ({s.planCode}) · {s.provider.replace(/_/g, " ")}{s.orderReference ? ` · ${s.orderReference}` : ""}
               </div>

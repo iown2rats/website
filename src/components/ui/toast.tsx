@@ -55,14 +55,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         aria-live="polite"
         aria-atomic="true"
         className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4"
-        style={{ bottom: "calc(90px + var(--safe-bottom))" }}
+        style={{ bottom: "calc(var(--nav-clearance) - 4px + var(--safe-bottom))" }}
       >
         {toast ? (
           <div
             key={toast.id}
             role="status"
             className={cn(
-              "pointer-events-auto min-h-11 max-w-full rounded-[22px] px-5 py-2.5 text-center text-body-sm font-semibold flex items-center shadow-lg animate-pop-in",
+              "pointer-events-auto min-h-10 max-w-full rounded-[20px] px-4 py-2 text-center text-body-sm font-medium flex items-center shadow-lg animate-pop-in",
               toast.tone === "ocean" && "bg-ocean text-on-ocean",
               toast.tone === "success" && "bg-primary text-on-primary",
               toast.tone === "danger" && "bg-danger text-white",

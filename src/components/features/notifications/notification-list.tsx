@@ -33,15 +33,15 @@ function RowBody({ item }: { item: NotificationDto }) {
   return (
     <>
       {item.photo && item.actorName ? (
-        <Avatar name={item.actorName} photo={{ url: item.photo.url, key: item.photo.demoKey, blurhash: item.photo.blurhash }} size={40} />
+        <Avatar name={item.actorName} photo={{ url: item.photo.url, key: item.photo.demoKey, blurhash: item.photo.blurhash }} size={36} />
       ) : (
-        <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-muted text-text-secondary">
-          <Icon size={19} />
+        <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-muted text-text-secondary">
+          <Icon size={17} />
         </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="flex items-start gap-2">
-          <span className={cn("min-w-0 flex-1 text-body-sm leading-snug text-text", item.read ? "font-semibold" : "font-extrabold")}>{item.title}</span>
+          <span className={cn("min-w-0 flex-1 text-body-sm leading-snug text-text", item.read ? "font-normal" : "font-medium")}>{item.title}</span>
           <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
             {item.read ? null : <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />}
             <time dateTime={item.createdAt} suppressHydrationWarning className="text-micro text-text-secondary">
@@ -56,7 +56,7 @@ function RowBody({ item }: { item: NotificationDto }) {
   );
 }
 
-const ROW = "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted/70";
+const ROW = "flex w-full items-start gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-surface-muted/70";
 
 export function NotificationList({
   items,
@@ -88,5 +88,5 @@ export function NotificationList({
 }
 
 export function NotificationsEmpty({ className }: { className?: string }) {
-  return <p className={cn("px-4 py-8 text-center text-body-sm text-text-secondary", className)}>You&rsquo;re all caught up.</p>;
+  return <p className={cn("px-4 py-6 text-center text-body-sm text-text-secondary", className)}>You&rsquo;re all caught up.</p>;
 }

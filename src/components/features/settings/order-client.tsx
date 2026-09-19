@@ -30,10 +30,10 @@ function CopyRow({ label, value, mono = true }: { label: string; value: string; 
     }
   };
   return (
-    <div className="flex items-center gap-3 px-4.5 py-3.5">
+    <div className="flex items-center gap-3 px-3.5 py-3.5">
       <div className="min-w-0 flex-1">
         <div className="text-caption-sm text-text-secondary">{label}</div>
-        <div className={mono ? "select-all break-all font-mono text-body font-bold tracking-[.02em] text-text" : "select-all text-body font-bold text-text"}>{value}</div>
+        <div className={mono ? "select-all break-all font-mono text-body font-medium tracking-[.02em] text-text" : "select-all text-body font-medium text-text"}>{value}</div>
       </div>
       <Button variant="secondary" size="sm" onClick={copy} aria-label={`Copy ${label}`}>
         Copy
@@ -177,7 +177,7 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
 
       {order.status === "SUBMITTED" ? (
         <Callout tone="info" title="Payment under review">
-          Receipt submitted {formatDateTime(order.submittedAt)} for <span className="font-mono font-bold">{order.reference}</span> ({order.amountLabel}, {order.planName}). We check transfers within a day. Plus starts the moment it is confirmed, and you will see it here and in Settings.
+          Receipt submitted {formatDateTime(order.submittedAt)} for <span className="font-mono font-medium">{order.reference}</span> ({order.amountLabel}, {order.planName}). We check transfers within a day. Plus starts the moment it is confirmed, and you will see it here and in Settings.
         </Callout>
       ) : null}
 
@@ -189,14 +189,14 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
 
       {order.status === "REJECTED" ? (
         <Callout tone="danger" title="Payment not accepted">
-          {order.rejectionReason ? `Reason: ${order.rejectionReason}. ` : ""}Plus was not activated. If you did transfer the money, check that the reference <span className="font-mono font-bold">{order.reference}</span> and amount {order.amountLabel} match, then start a new order from Membership; a new reference will be issued.
+          {order.rejectionReason ? `Reason: ${order.rejectionReason}. ` : ""}Plus was not activated. If you did transfer the money, check that the reference <span className="font-mono font-medium">{order.reference}</span> and amount {order.amountLabel} match, then start a new order from Membership; a new reference will be issued.
         </Callout>
       ) : null}
 
       {order.status === "CANCELLED" || expired ? <Callout tone="warning" title={expired ? "This order expired" : "This order was cancelled"}>Nothing was charged. Start a new order from Membership when you are ready.</Callout> : null}
 
       <dl className="grid grid-cols-2 gap-3 px-1 text-caption text-text-secondary">
-        <div><dt>Reference</dt><dd className="font-mono font-bold text-text">{order.reference}</dd></div>
+        <div><dt>Reference</dt><dd className="font-mono font-medium text-text">{order.reference}</dd></div>
         <div><dt>Created</dt><dd className="text-text">{formatDateTime(order.createdAt)}</dd></div>
         <div><dt>Plan</dt><dd className="text-text">{order.planName} · {order.durationDays} days</dd></div>
         <div><dt>Amount</dt><dd className="text-text">{order.amountLabel}</dd></div>
@@ -206,9 +206,9 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
         <DialogTitle>{attached ? "Replace your receipt" : "Upload your receipt"}</DialogTitle>
         <DialogDescription>A screenshot or photo of the transfer confirmation from your bank app, showing the amount and the reference. JPG, PNG or WebP, up to 8 MB. We read it automatically and show you what we found before you submit.</DialogDescription>
         <input ref={inputRef} type="file" accept={ACCEPT} className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
-        {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="text-caption font-medium text-danger">{error}</p> : null}
         {phase.kind === "checking" ? (
-          <div className="flex items-center gap-2.5 rounded-xl bg-aqua-soft px-4 py-3 text-caption font-semibold text-on-aqua-soft" role="status" aria-live="polite">
+          <div className="flex items-center gap-2.5 rounded-xl bg-aqua-soft px-4 py-3 text-caption font-medium text-on-aqua-soft" role="status" aria-live="polite">
             <Spinner size={16} /> Checking transfer details…
           </div>
         ) : null}

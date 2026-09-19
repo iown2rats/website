@@ -32,7 +32,7 @@ export function LocationForm({ locations, initialId }: { locations: LocationOpti
   return (
     <form action={action} className="flex flex-1 flex-col gap-3.5" noValidate>
       <input type="hidden" name="locationId" value={selected ?? ""} />
-      <div className="flex h-14 items-center gap-2.5 rounded-xl bg-surface-muted px-4 focus-within:outline-2 focus-within:outline-primary">
+      <div className="flex h-12 items-center gap-2.5 rounded-xl bg-surface-muted px-4 focus-within:outline-2 focus-within:outline-primary">
         <SearchIcon size={20} className="shrink-0 text-text-secondary" />
         <label htmlFor="location-search" className="sr-only">Search island or atoll</label>
         <input
@@ -54,17 +54,17 @@ export function LocationForm({ locations, initialId }: { locations: LocationOpti
               role="option"
               aria-selected={isSelected}
               onClick={() => setSelected(l.id)}
-              className="flex h-13.5 items-center justify-between border-0 bg-transparent px-4.5 text-left text-body font-semibold text-text hover:bg-surface-muted"
+              className="flex h-12 items-center justify-between border-0 bg-transparent px-3.5 text-left text-body font-medium text-text hover:bg-surface-muted"
             >
               <span>
                 {l.name}
                 {l.kind !== "ATOLL" ? <span className="ml-2 text-caption font-medium text-text-secondary">{l.atollName}</span> : null}
               </span>
-              {isSelected ? <span className="text-caption font-semibold text-primary-ink">Selected</span> : null}
+              {isSelected ? <span className="text-caption font-medium text-primary-ink">Selected</span> : null}
             </button>
           );
         })}
-        {results.length === 0 ? <div className="px-4.5 py-4 text-body-sm text-text-secondary">No islands or atolls match that.</div> : null}
+        {results.length === 0 ? <div className="px-3.5 py-3 text-body-sm text-text-secondary">No islands or atolls match that.</div> : null}
       </div>
       <p className="text-caption text-text-secondary">Only your island or atoll is ever shown — never a distance. You can hide it entirely later.</p>
       <FormError message={state.error} />

@@ -120,7 +120,7 @@ export function NotificationBell({ className }: { className?: string }) {
         {badge ? (
           <span
             aria-hidden="true"
-            className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-extrabold leading-none text-on-primary"
+            className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-tag font-medium leading-none text-on-primary"
           >
             {badge}
           </span>
@@ -138,13 +138,13 @@ export function NotificationBell({ className }: { className?: string }) {
           )}
         >
           <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-3">
-            <h2 className="text-body-sm font-extrabold text-text">Notifications</h2>
+            <h2 className="text-body-sm font-medium text-text">Notifications</h2>
             {unread > 0 ? (
               <button
                 type="button"
                 onClick={() => void markAll()}
                 disabled={marking}
-                className="shrink-0 text-caption font-bold text-primary-ink disabled:opacity-50 hover:underline"
+                className="shrink-0 text-caption font-medium text-primary-ink disabled:opacity-50 hover:underline"
               >
                 Mark all as read
               </button>
@@ -158,7 +158,7 @@ export function NotificationBell({ className }: { className?: string }) {
             {failed ? (
               <p role="alert" className="px-4 py-6 text-center text-caption text-text-secondary">
                 Couldn&rsquo;t load your notifications.{" "}
-                <button type="button" onClick={() => void fetchFeed()} className="font-bold text-primary-ink hover:underline">
+                <button type="button" onClick={() => void fetchFeed()} className="font-medium text-primary-ink hover:underline">
                   Try again
                 </button>
               </p>
@@ -168,7 +168,7 @@ export function NotificationBell({ className }: { className?: string }) {
           <Link
             href="/notifications"
             onClick={() => setOpen(false)}
-            className="border-t border-border px-4 py-3 text-center text-caption font-bold text-primary-ink hover:bg-surface-muted/70"
+            className="border-t border-border px-4 py-3 text-center text-caption font-medium text-primary-ink hover:bg-surface-muted/70"
           >
             See all notifications
           </Link>

@@ -29,7 +29,7 @@ export default async function AuthErrorPage({ searchParams }: { searchParams: Pr
         <h1 className="text-h2">{r.title}</h1>
         <p className="text-body text-text-secondary">{r.body}</p>
         {reason !== "unavailable" ? <ContinueWith provider={provider} className="mt-2 shadow-sm" /> : null}
-        <Link href={ROUTES.welcome} className="flex h-11 items-center justify-center text-body-sm font-semibold text-text-secondary">Back to start</Link>
+        <Link href={ROUTES.welcome} className="flex h-11 items-center justify-center text-body-sm font-medium text-text-secondary">Back to start</Link>
       </div>
     </main>
   );

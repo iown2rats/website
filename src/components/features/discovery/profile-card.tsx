@@ -53,7 +53,7 @@ export function ProfileCard({
         <Image src={photo.url} alt={photo.alt ?? ""} fill unoptimized sizes="(min-width: 900px) 500px, 100vw" className="object-cover" draggable={false} />
       ) : null}
       {showPlaceholderLabel && isDemoPhoto(photo) ? (
-        <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] font-semibold uppercase tracking-[.14em] text-white/45">
+        <span className="pointer-events-none absolute inset-0 grid place-items-center text-tiny font-medium uppercase tracking-[.12em] text-white/45">
           Photo {photoIndex + 1}
         </span>
       ) : null}
@@ -87,28 +87,28 @@ export function ProfileCard({
         </>
       ) : null}
 
-      <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 flex flex-col text-on-photo", variant === "deck" ? "gap-1.75 px-4.5 pb-5 pt-4.5" : "gap-0.5 p-3.5")}>
+      <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 flex flex-col text-on-photo", variant === "deck" ? "gap-1.25 px-4 pb-4 pt-3.5" : "gap-0.5 p-3")}>
         <div className="flex items-baseline gap-2">
-          <span className={variant === "deck" ? "text-name" : "text-[17px] font-extrabold leading-tight"}>{title}</span>
+          <span className={variant === "deck" ? "text-name" : "text-h4 leading-tight"}>{title}</span>
           {profile.verified ? <VerifiedBadge size={variant === "deck" ? 20 : 15} className="shrink-0 self-center" /> : null}
         </div>
         {variant === "deck" ? (
           <>
             {meta.length > 0 ? (
-              <div className="flex items-center gap-1.5 text-body text-on-photo-muted">
+              <div className="flex items-center gap-1.5 text-body-sm text-on-photo-muted">
                 <PinIcon size={14} strokeWidth={2.2} className="shrink-0" />
                 <span className="truncate">{meta.join(" · ")}</span>
               </div>
             ) : null}
             {intent ? (
-              <span className="inline-flex h-7.5 items-center self-start gap-1.5 rounded-full bg-on-photo-glass px-3 text-caption font-semibold backdrop-blur-[8px]">
+              <span className="inline-flex h-6.5 items-center self-start gap-1.5 rounded-full bg-on-photo-glass px-2.5 text-caption-sm font-medium backdrop-blur-[8px]">
                 Looking for {intent}
               </span>
             ) : null}
             {profile.interests.length > 0 ? (
-              <div className="mt-0.5 flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.25">
                 {profile.interests.slice(0, 3).map((t) => (
-                  <span key={t} className="inline-flex h-7 items-center rounded-full bg-white/92 px-3 text-caption-sm font-bold text-ocean">
+                  <span key={t} className="inline-flex h-7 items-center rounded-full bg-white/92 px-3 text-caption-sm font-medium text-ocean">
                     {t}
                   </span>
                 ))}

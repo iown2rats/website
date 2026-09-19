@@ -10,7 +10,7 @@ export function PostUnavailable() {
         <Link href="/community" aria-label="Back" className="grid size-11 place-items-center rounded-md text-text hover:bg-surface-muted">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </Link>
-        <h1 className="flex-1 truncate text-prompt font-extrabold text-text">Post</h1>
+        <h1 className="flex-1 truncate text-prompt text-text">Post</h1>
       </header>
       <EmptyState
         className="my-auto"
@@ -22,7 +22,7 @@ export function PostUnavailable() {
         title="This post isn't available."
         description="It may have been removed by its author, or it isn't visible to you."
         actions={
-          <Link href="/community" className="inline-flex h-11 items-center rounded-lg bg-surface-muted px-5 text-body-sm font-bold text-text">
+          <Link href="/community" className="inline-flex h-11 items-center rounded-lg bg-surface-muted px-5 text-body-sm font-medium text-text">
             Back to Community
           </Link>
         }

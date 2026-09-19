@@ -20,7 +20,7 @@ const TONES: Record<ReceiptCheckDto["outcome"], CalloutTone> = {
 };
 
 export function CheckStateIcon({ state, className }: { state: CustomerCheckDto["state"]; className?: string }) {
-  const base = "inline-grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-extrabold";
+  const base = "inline-grid size-5 shrink-0 place-items-center rounded-full text-tiny font-medium";
   if (state === "MATCH") return <span className={cn(base, "bg-success/15 text-success", className)} aria-label="Match"><CheckIcon size={12} /></span>;
   if (state === "MISMATCH") return <span className={cn(base, "bg-danger/10 text-danger", className)} aria-label="Mismatch"><CloseIcon size={12} /></span>;
   if (state === "UNCERTAIN") return <span className={cn(base, "bg-warning/15 text-warning", className)} aria-label="Needs review"><InfoIcon size={12} /></span>;
@@ -38,7 +38,7 @@ export function ReceiptCheckCard({ check, actions }: { check: ReceiptCheckDto; a
               <li key={c.key} className="flex items-start gap-2">
                 <CheckStateIcon state={c.state} className="mt-px" />
                 <div className="min-w-0 flex-1 text-caption leading-snug">
-                  <span className="font-bold text-text">{c.label}</span>
+                  <span className="font-medium text-text">{c.label}</span>
                   {c.detected || c.expected ? (
                     <span className="text-text"> · {c.detected ? `Detected ${c.detected}` : "Not detected"}{c.expected && c.state !== "MATCH" ? ` · Expected ${c.expected}` : ""}</span>
                   ) : null}

@@ -33,7 +33,7 @@ export default async function MembershipPage() {
     <PageOverlay title="Membership" backHref="/profile">
       <OceanCard premium>
         <div><PlusHeroTag /></div>
-        <h2 className="text-[24px] font-extrabold leading-[1.15] tracking-[-.025em] text-text">{m.tier === "PLUS" ? "You're on Mellocrush Plus." : "More of what matters. Nothing you don't need."}</h2>
+        <h2 className="text-h2 text-text">{m.tier === "PLUS" ? "You're on Mellocrush Plus." : "More of what matters. Nothing you don't need."}</h2>
         <p className="text-body-sm leading-normal text-text-secondary">
           {m.tier === "PLUS"
             ? periodEnd
@@ -57,9 +57,9 @@ export default async function MembershipPage() {
             <tbody>
               {m.comparison.map((row) => (
                 <tr key={row.capability} className="border-b border-border last:border-0 align-top">
-                  <th scope="row" className="px-4 py-2.5 text-left font-semibold text-text">{row.capability}</th>
+                  <th scope="row" className="px-4 py-2.5 text-left font-medium text-text">{row.capability}</th>
                   <td className="px-3 py-2.5 text-text-secondary">{row.free}</td>
-                  <td className="px-3 py-2.5 font-semibold text-text">{row.plus}</td>
+                  <td className="px-3 py-2.5 font-medium text-text">{row.plus}</td>
                 </tr>
               ))}
             </tbody>
@@ -70,10 +70,10 @@ export default async function MembershipPage() {
 
       <ListGroup>
         {perks.map(([label, sub]) => (
-          <div key={label} className="flex items-center gap-3.5 px-4.5 py-3.5">
+          <div key={label} className="flex items-center gap-3.5 px-3.5 py-3.5">
             <span className="grid size-9 shrink-0 place-items-center rounded-md bg-surface-muted text-ocean"><CheckIcon size={18} strokeWidth={2.2} /></span>
             <div className="min-w-0">
-              <div className="text-body font-bold text-text">{label}</div>
+              <div className="text-body font-medium text-text">{label}</div>
               <div className="text-caption-sm text-text-secondary">{sub}</div>
             </div>
           </div>

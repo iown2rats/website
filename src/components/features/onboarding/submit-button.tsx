@@ -16,7 +16,7 @@ export function SubmitButton({ children, disabled, ...rest }: ButtonProps) {
 export function FormError({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <p role="alert" className="text-body-sm font-semibold text-danger">
+    <p role="alert" className="text-body-sm font-medium text-danger">
       {message}
     </p>
   );

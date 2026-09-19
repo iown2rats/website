@@ -29,10 +29,15 @@ const variantClasses: Record<ButtonVariant, string> = {
   muted: "bg-surface-muted text-text border-0 hover:bg-border",
 };
 
+/*
+ * Compact pass (docs/DESIGN_SYSTEM.md §32): 38 / 44 / 46 instead of 40 / 48 / 52. `lg` is the default, so the
+ * primary action on every screen is now 46 rather than 52. The weight lives in the type step (cta-lg is 500) or in
+ * one medium utility — never bold, which is what made a row of buttons shout.
+ */
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "h-10 px-4 text-body-sm font-bold rounded-lg",
-  md: "h-12 px-5 text-body-sm font-bold rounded-lg",
-  lg: "h-13 px-6 text-body-lg font-bold rounded-lg",
+  sm: "h-9.5 px-3.5 text-body font-medium rounded-md",
+  md: "h-11 px-4 text-body font-medium rounded-lg",
+  lg: "h-11.5 px-5 text-cta-lg rounded-lg",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -63,7 +68,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   );
 });
 
-export function Spinner({ size = 18, className }: { size?: number; className?: string }) {
+export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={cn("animate-spin", className)} aria-hidden="true">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity=".25" strokeWidth="2.5" />
@@ -74,7 +79,8 @@ export function Spinner({ size = 18, className }: { size?: number; className?: s
 
 /*
  * Icon buttons — 44 × 44 radius 14 bordered surface (headers), round white-on-photo, ghost, muted bg2 circle (composer),
- * and 36 × 36 radius 12 ghost (post options). `aria-label` is required.
+ * and 36 × 36 radius 12 ghost (post options). `aria-label` is required. 44 is the default and the floor: the compact
+ * pass shrinks padding and type, never the box a thumb has to land on.
  */
 export type IconButtonVariant = "bordered" | "ghost" | "onPhoto" | "muted" | "primary" | "ocean";
 export type IconButtonSize = 36 | 44 | 48 | 54 | 56 | 60 | 66;

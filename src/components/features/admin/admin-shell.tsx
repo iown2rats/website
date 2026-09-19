@@ -75,7 +75,7 @@ function NavList({ role, badges, pathname, onNavigate, dense = false }: { role: 
               const active = isActive(it, pathname);
               const count = it.key in badges ? (badges[it.key as keyof AdminNavBadges] ?? 0) : 0;
               return (
-                <Link key={it.key} href={it.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-lg px-3 text-body-sm font-semibold transition-colors", dense ? "h-11" : "h-11", active ? "bg-surface-muted text-text" : "text-text-secondary hover:bg-surface-muted")}>
+                <Link key={it.key} href={it.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-lg px-3 text-body-sm font-medium transition-colors", dense ? "h-11" : "h-11", active ? "bg-surface-muted text-text" : "text-text-secondary hover:bg-surface-muted")}>
                   <it.Icon size={20} className={active ? "text-text" : "text-text-secondary"} />
                   <span className="flex-1">{it.label}</span>
                   {count > 0 ? <CounterBadge count={count} aria-label={`${count} waiting`} /> : null}
@@ -95,29 +95,29 @@ export function AdminShell({ role, badges = {}, children }: { role: AdminRole; b
   const current = GROUPS.flatMap((g) => g.items).find((it) => isActive(it, pathname));
   return (
     <div className="fixed inset-0 flex bg-background text-text">
-      <aside className="hidden desktop:flex w-[var(--sidebar-width)] shrink-0 flex-col gap-5 overflow-y-auto border-r border-border px-4 py-6">
+      <aside className="hidden desktop:flex w-[var(--sidebar-width)] shrink-0 flex-col gap-4 overflow-y-auto border-r border-border px-3.5 py-5">
         <Link href="/admin" className="flex items-center gap-2 px-3 text-h4 text-text" aria-label="Mellocrush admin home">
           <Wordmark height={22} />
-          <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-on-ocean">Admin</span>
+          <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-tag font-medium uppercase text-on-ocean">Admin</span>
         </Link>
         <NavList role={role} badges={badges} pathname={pathname} />
         <div className="mt-auto flex flex-col gap-2">
-          <Link href="/discover" className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-semibold text-text-secondary hover:bg-surface-muted">‹ Back to Mellocrush</Link>
+          <Link href="/discover" className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-medium text-text-secondary hover:bg-surface-muted">‹ Back to Mellocrush</Link>
           <ThemeToggleButton className="h-11 rounded-md" />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 desktop:hidden" style={{ height: "calc(var(--page-header-height) + var(--safe-top))", paddingTop: "var(--safe-top)" }}>
-          <Link href="/admin" className="flex items-center gap-1.5 text-body font-extrabold" aria-label="Admin home">
+          <Link href="/admin" className="flex items-center gap-1.5 text-body font-medium" aria-label="Admin home">
             <BrandMark size={24} />
-            <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.06em] text-on-ocean">Admin</span>
+            <span className="rounded-xs bg-ocean px-1.5 py-0.5 text-tag font-medium uppercase text-on-ocean">Admin</span>
           </Link>
-          <span className="min-w-0 flex-1 truncate text-body-sm font-semibold text-text-secondary">{current?.label ?? "Admin"}</span>
+          <span className="min-w-0 flex-1 truncate text-body-sm font-medium text-text-secondary">{current?.label ?? "Admin"}</span>
           <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open admin menu" className="grid size-11 place-items-center rounded-md text-text hover:bg-surface-muted">
             <MoreIcon size={22} />
           </button>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 desktop:px-8 desktop:py-8" style={{ paddingBottom: "calc(32px + var(--safe-bottom))" }}>
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5 desktop:px-6 desktop:py-6" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
           <div className="mx-auto w-full max-w-[1100px]">{children}</div>
         </main>
       </div>
@@ -125,7 +125,7 @@ export function AdminShell({ role, badges = {}, children }: { role: AdminRole; b
         <DialogTitle>Admin</DialogTitle>
         <NavList role={role} badges={badges} pathname={pathname} onNavigate={() => setMenuOpen(false)} dense />
         <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
-          <Link href="/discover" onClick={() => setMenuOpen(false)} className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-semibold text-text-secondary hover:bg-surface-muted">‹ Back to Mellocrush</Link>
+          <Link href="/discover" onClick={() => setMenuOpen(false)} className="flex h-11 items-center gap-3 rounded-lg px-3 text-body-sm font-medium text-text-secondary hover:bg-surface-muted">‹ Back to Mellocrush</Link>
           <ThemeToggleButton className="h-11 rounded-md" />
         </div>
       </BottomSheet>

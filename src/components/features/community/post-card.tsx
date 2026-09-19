@@ -39,49 +39,49 @@ export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, on
   const commentsLabel = `Comments (${post.commentCount})`;
   const commentsInner = (
     <>
-      <ChatIcon size={18} />
+      <ChatIcon size={16} />
       <span className="tabular-nums">{post.commentCount}</span>
     </>
   );
-  const actionClass = "flex h-9.5 items-center gap-1.5 rounded-md border-0 bg-transparent px-3 text-[13.5px] font-semibold hover:bg-surface-muted";
+  const actionClass = "flex h-8 items-center gap-1.5 rounded-md border-0 bg-transparent px-2.5 text-caption hover:bg-surface-muted";
 
   return (
-    <article className={cn("flex shrink-0 flex-col gap-3.5 rounded-card glass-card p-4.5", className)} aria-label={`Post by ${post.author.name}`}>
-      <div className="flex items-center gap-3">
+    <article className={cn("flex shrink-0 flex-col gap-2.5 rounded-card glass-card p-3.5", className)} aria-label={`Post by ${post.author.name}`}>
+      <div className="flex items-center gap-2.5">
         <button type="button" onClick={() => onOpenAuthor(post.author)} aria-label={post.isMine ? "Your profile" : `View ${post.author.name}'s profile`} className="shrink-0 rounded-full border-0 bg-transparent p-0">
-          <Avatar name="" aria-hidden="true" photo={authorPhotoRef(post.author)} size={44} />
+          <Avatar name="" aria-hidden="true" photo={authorPhotoRef(post.author)} size={36} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.25 text-[15px] font-bold text-text">
-            <button type="button" onClick={() => onOpenAuthor(post.author)} className="truncate border-0 bg-transparent p-0 text-left text-[15px] font-bold text-text">
+          <div className="flex items-center gap-1.25 text-body font-medium text-text">
+            <button type="button" onClick={() => onOpenAuthor(post.author)} className="-my-1 truncate border-0 bg-transparent px-0 py-1 text-left text-body font-medium text-text">
               {post.author.name}
             </button>
-            {post.author.verified ? <VerifiedBadge size={14} className="shrink-0" /> : null}
+            {post.author.verified ? <VerifiedBadge size={13} className="shrink-0" /> : null}
           </div>
-          <div className="text-[12.5px] text-text-secondary">{meta}</div>
+          <div className="text-caption-sm text-text-secondary">{meta}</div>
         </div>
-        <button type="button" onClick={() => onOpenMenu(post)} aria-label="Post options" className="grid size-9 shrink-0 place-items-center rounded-md border-0 bg-transparent text-text-secondary hover:bg-surface-muted">
-          <MoreIcon size={18} />
+        <button type="button" onClick={() => onOpenMenu(post)} aria-label="Post options" className="grid size-8 shrink-0 place-items-center rounded-md border-0 bg-transparent text-text-secondary hover:bg-surface-muted">
+          <MoreIcon size={17} />
         </button>
       </div>
 
       {post.kind === "QUESTION" ? <Tag size="md" className="self-start">Question</Tag> : null}
 
-      <p className="m-0 whitespace-pre-wrap break-words text-body-lg leading-normal text-text [text-wrap:pretty]">{post.body}</p>
+      <p className="m-0 whitespace-pre-wrap break-words text-body leading-normal text-text [text-wrap:pretty]">{post.body}</p>
 
       {photo ? (
-        <div className="relative h-60 overflow-hidden rounded-xl bg-aqua-soft" style={photoBackground(photo)}>
+        <div className="relative h-52 overflow-hidden rounded-lg bg-aqua-soft" style={photoBackground(photo)}>
           {photo.url ? <Image src={photo.url} alt={`Photo posted by ${post.author.name}`} fill unoptimized sizes="(min-width: 900px) 640px, 100vw" className="object-cover" loading="lazy" /> : <span className="sr-only">Photo</span>}
         </div>
       ) : post.photoUnderReview ? (
-        <div className="flex h-30 flex-col items-center justify-center gap-1.5 rounded-xl bg-surface-muted text-text-secondary" role="status">
-          <ImageIcon size={22} />
-          <span className="text-caption font-semibold">Photo under review</span>
+        <div className="flex h-24 flex-col items-center justify-center gap-1 rounded-lg bg-surface-muted text-text-secondary" role="status">
+          <ImageIcon size={19} />
+          <span className="text-caption font-medium">Photo under review</span>
           <span className="text-micro">Only you can see this post until it&apos;s approved.</span>
         </div>
       ) : null}
 
-      <div className="flex gap-1.5 text-text-secondary">
+      <div className="-mb-0.5 flex gap-1 text-text-secondary">
         <button
           type="button"
           onClick={() => onToggleLike(post)}
@@ -89,7 +89,7 @@ export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, on
           aria-label={`${post.likedByMe ? "Unlike" : "Like"} (${post.likeCount})`}
           className={cn(actionClass, post.likedByMe && "text-primary-ink")}
         >
-          <HeartIcon size={18} filled={post.likedByMe} className={post.likedByMe ? "text-primary" : undefined} />
+          <HeartIcon size={16} filled={post.likedByMe} className={post.likedByMe ? "text-primary" : undefined} />
           <span className="tabular-nums">{post.likeCount}</span>
         </button>
         {onComments ? (

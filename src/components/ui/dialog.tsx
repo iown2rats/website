@@ -8,7 +8,7 @@ import { Button, type ButtonVariant } from "./button";
  * One dialog system built on the native <dialog> element (top layer, focus trap, Escape, inert background).
  *  - BottomSheet: prototype sheets — bottom-anchored, max-width 560, max-height 88 % of the SMALL viewport (svh, so
  *    the sheet fits even while a mobile browser is showing its toolbars), radius 26 top corners,
- *    padding 10px 16px calc(16px + safe-bottom), 40 × 4 drag handle, sheet-in 450 ms, scrim rgba(6,59,76,.4) + blur 4.
+ *    padding 8px 16px calc(14px + safe-bottom), 36 × 4 drag handle, sheet-in 450 ms, scrim + blur 4 (§32).
  *  - Modal: centred card (radius 26, max-width 420) with fade-in — used on desktop where a sheet would float oddly.
  *  - ResponsiveDialog: sheet below the desktop breakpoint, modal above.
  *  - ConfirmationDialog: title, body, confirm/cancel in the prototype's button language.
@@ -102,12 +102,12 @@ export function BottomSheet({ open, onClose, label, labelledBy, children, classN
           * to fit, and a section with its own overflow-hidden (the Advanced filters card) silently clips its
           * contents instead — content disappears and scrollHeight never exceeds clientHeight.
           */}
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pt-2.5 pb-4 [&>*]:shrink-0">
-          <span aria-hidden="true" className="mx-auto h-1 w-10 rounded-[2px] bg-border shrink-0" />
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 pt-2 pb-3.5 [&>*]:shrink-0">
+          <span aria-hidden="true" className="mx-auto h-1 w-9 rounded-[2px] bg-border shrink-0" />
           {children}
         </div>
         {footer ? (
-          <div className="shrink-0 border-t border-border bg-surface/80 px-4 pt-3 backdrop-blur-sm" style={{ paddingBottom: "calc(12px + var(--safe-bottom))" }}>
+          <div className="shrink-0 border-t border-border bg-surface/80 px-4 pt-2.5 backdrop-blur-sm" style={{ paddingBottom: "calc(10px + var(--safe-bottom))" }}>
             {footer}
           </div>
         ) : null}
@@ -130,8 +130,8 @@ export function Modal({ open, onClose, label, labelledBy, children, className, d
     >
       {/* Same reason as BottomSheet: the column is a wrapper, so `display` stays the user agent's business. */}
       <div className="flex max-h-[85svh] flex-col">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-5 [&>*]:shrink-0">{children}</div>
-        {footer ? <div className="shrink-0 border-t border-border bg-surface/80 p-5 backdrop-blur-sm">{footer}</div> : null}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4 [&>*]:shrink-0">{children}</div>
+        {footer ? <div className="shrink-0 border-t border-border bg-surface/80 p-4 backdrop-blur-sm">{footer}</div> : null}
       </div>
     </dialog>
   );
@@ -155,14 +155,14 @@ export function ResponsiveDialog(props: DialogBaseProps) {
 
 export function DialogTitle({ id, children, className }: { id?: string; children: ReactNode; className?: string }) {
   return (
-    <h2 id={id} className={cn("text-h3 text-text", className)}>
+    <h2 id={id} className={cn("text-h4 text-text", className)}>
       {children}
     </h2>
   );
 }
 
 export function DialogDescription({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn("text-body-sm text-text-secondary -mt-2", className)}>{children}</p>;
+  return <p className={cn("text-body-sm text-text-secondary -mt-1.5", className)}>{children}</p>;
 }
 
 export interface ConfirmationDialogProps {
@@ -221,7 +221,7 @@ export function ActionSheet({ open, onClose, label, items, cancelLabel = "Cancel
             key={item.label}
             type="button"
             onClick={item.onSelect}
-            className={cn("h-14 px-4.5 text-left text-body-lg font-semibold bg-transparent border-0 hover:bg-surface-muted", item.tone === "danger" ? "text-danger" : "text-text")}
+            className={cn("h-14 px-4.5 text-left text-body-lg font-medium bg-transparent border-0 hover:bg-surface-muted", item.tone === "danger" ? "text-danger" : "text-text")}
           >
             {item.label}
           </button>

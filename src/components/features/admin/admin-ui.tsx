@@ -11,9 +11,9 @@ import { StatusBadge, type TagVariant } from "@/components/ui/badge";
 
 export function AdminPage({ title, description, actions, children, backHref }: { title: string; description?: string; actions?: ReactNode; children: ReactNode; backHref?: { href: string; label: string } }) {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-2">
-        {backHref ? <Link href={backHref.href} className="text-caption font-semibold text-primary-ink hover:underline">‹ {backHref.label}</Link> : null}
+        {backHref ? <Link href={backHref.href} className="text-caption font-medium text-primary-ink hover:underline">‹ {backHref.label}</Link> : null}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-h3 text-text">{title}</h1>
@@ -33,7 +33,7 @@ export function Panel({ title, description, children, className, actions }: { ti
       {title ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <h2 className="text-body font-bold text-text">{title}</h2>
+            <h2 className="text-body font-medium text-text">{title}</h2>
             {description ? <p className="text-caption text-text-secondary">{description}</p> : null}
           </div>
           {actions}
@@ -79,9 +79,9 @@ export function FilterLinks({ items, current, label = "Filter" }: { items: { val
       {items.map((it) => {
         const active = it.value === current;
         return (
-          <Link key={it.value} href={it.href} aria-current={active ? "page" : undefined} className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-caption font-bold", active ? "bg-primary text-on-primary" : "bg-surface-muted text-text-secondary hover:bg-border")}>
+          <Link key={it.value} href={it.href} aria-current={active ? "page" : undefined} className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-caption font-medium", active ? "bg-primary text-on-primary" : "bg-surface-muted text-text-secondary hover:bg-border")}>
             {it.label}
-            {it.count !== undefined ? <span className={cn("rounded-full px-1.5 text-[11px] tabular-nums", active ? "bg-white/40" : "bg-surface-muted")}>{it.count}</span> : null}
+            {it.count !== undefined ? <span className={cn("rounded-full px-1.5 text-tiny tabular-nums", active ? "bg-white/40" : "bg-surface-muted")}>{it.count}</span> : null}
           </Link>
         );
       })}
@@ -94,7 +94,7 @@ export function RowLink({ href, primary, secondary, trailing, badges }: { href: 
   return (
     <Link href={href} className="flex flex-col gap-1.5 border-b border-border px-4 py-3 last:border-0 hover:bg-surface-muted desktop:flex-row desktop:items-center desktop:gap-4">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-body-sm font-bold text-text">{primary}</div>
+        <div className="truncate text-body-sm font-medium text-text">{primary}</div>
         {secondary ? <div className="truncate text-caption text-text-secondary">{secondary}</div> : null}
       </div>
       {badges ? <div className="flex flex-wrap gap-1.5">{badges}</div> : null}
@@ -117,8 +117,8 @@ export function Pagination({ page, pageSize, total, hrefFor }: { page: number; p
         Page {page} of {pages} · {total} total
       </span>
       <div className="flex gap-2">
-        {page > 1 ? <Link href={hrefFor(page - 1)} className="rounded-lg bg-surface-muted px-3 py-1.5 font-semibold hover:bg-border">Previous</Link> : null}
-        {page < pages ? <Link href={hrefFor(page + 1)} className="rounded-lg bg-surface-muted px-3 py-1.5 font-semibold hover:bg-border">Next</Link> : null}
+        {page > 1 ? <Link href={hrefFor(page - 1)} className="rounded-lg bg-surface-muted px-3 py-1.5 font-medium hover:bg-border">Previous</Link> : null}
+        {page < pages ? <Link href={hrefFor(page + 1)} className="rounded-lg bg-surface-muted px-3 py-1.5 font-medium hover:bg-border">Next</Link> : null}
       </div>
     </div>
   );
@@ -170,7 +170,7 @@ export function Mono({ children, className, ...rest }: HTMLAttributes<HTMLSpanEl
 export function DefinitionList({ definitions }: { definitions: Record<string, string> }) {
   return (
     <details className="rounded-2xl glass-card px-4 py-3 text-body-sm">
-      <summary className="cursor-pointer font-bold text-text">What each number means</summary>
+      <summary className="cursor-pointer font-medium text-text">What each number means</summary>
       <dl className="mt-3 flex flex-col gap-2">
         {Object.entries(definitions).map(([k, v]) => (
           <div key={k}>

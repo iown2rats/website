@@ -64,13 +64,13 @@ export function AuthShell({ children, below, priority = false, labelledBy, class
         <section
           aria-labelledby={labelledBy}
           className={cn(
-            "flex w-full max-w-[380px] flex-col items-center rounded-[26px] border border-white/20 bg-white/12 px-5 pb-5 pt-7 text-center shadow-[0_24px_64px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150 md:max-w-[400px] md:px-6",
+            "flex w-full max-w-[380px] flex-col items-center rounded-[26px] border border-white/20 bg-white/12 px-3.5 pb-4 pt-5.5 text-center shadow-[0_24px_64px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150 md:max-w-[400px] md:px-6",
             className,
           )}
         >
           {children}
         </section>
-        {below ? <div className="mt-5 w-full max-w-[400px] text-center md:max-w-[420px]">{below}</div> : null}
+        {below ? <div className="mt-4 w-full max-w-[400px] text-center md:max-w-[420px]">{below}</div> : null}
       </div>
     </main>
   );
@@ -84,7 +84,7 @@ export function AuthHeading({ id, title, subtitle, compact = false }: { id: stri
         <Wordmark tone="light" height={compact ? 26 : 30} priority />
       </div>
       {title ? (
-        <h1 id={id} className="mt-3.5 text-[17px] font-bold leading-tight tracking-[-0.01em] text-white">
+        <h1 id={id} className="mt-2.5 text-h4 font-medium leading-tight tracking-[-0.01em] text-white">
           {title}
         </h1>
       ) : (
@@ -92,19 +92,19 @@ export function AuthHeading({ id, title, subtitle, compact = false }: { id: stri
           Mellocrush
         </h1>
       )}
-      {subtitle ? <p className="mt-2 text-[13px] leading-relaxed text-white/75">{subtitle}</p> : null}
+      {subtitle ? <p className="mt-1.5 text-body-sm leading-relaxed text-white/75">{subtitle}</p> : null}
     </>
   );
 }
 
 /** "Real people. Brighter days." — the welcome screen's tagline, in the supplied treatment. */
 export function AuthTagline() {
-  return <p className="mt-2.5 text-[11px] font-medium uppercase tracking-[0.2em] text-white/70">Real people. Brighter days.</p>;
+  return <p className="mt-2 text-tiny font-medium uppercase tracking-[0.18em] text-white/70">Real people. Brighter days.</p>;
 }
 
 export function AuthLegalLine() {
   return (
-    <p className="mt-4 text-[11.5px] leading-relaxed text-white/75">
+    <p className="mt-3 text-tiny leading-relaxed text-white/75">
       By continuing, you agree to our
       <br />
       <Link href="/legal/terms" className="font-medium text-white underline decoration-white/70 underline-offset-[3px]">
@@ -121,7 +121,7 @@ export function AuthLegalLine() {
 
 export function AuthBackLink({ href = ROUTES.welcome, children = "Back to sign in" }: { href?: string; children?: ReactNode }) {
   return (
-    <Link href={href} className="inline-flex h-11 items-center justify-center text-[14px] font-semibold text-white/85 underline decoration-white/40 underline-offset-[3px]">
+    <Link href={href} className="inline-flex h-10 items-center justify-center text-body font-medium text-white/85 underline decoration-white/40 underline-offset-[3px]">
       {children}
     </Link>
   );
@@ -130,9 +130,9 @@ export function AuthBackLink({ href = ROUTES.welcome, children = "Back to sign i
 /** The "or" rule between the provider buttons and the email form. */
 export function AuthDivider({ label = "or" }: { label?: string }) {
   return (
-    <div className="mt-5 flex w-full items-center gap-3.5" aria-hidden="true">
+    <div className="mt-4 flex w-full items-center gap-3" aria-hidden="true">
       <span className="h-px flex-1 bg-white/30" />
-      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/75">{label}</span>
+      <span className="text-tiny font-medium uppercase tracking-[0.16em] text-white/75">{label}</span>
       <span className="h-px flex-1 bg-white/30" />
     </div>
   );

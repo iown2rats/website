@@ -128,7 +128,7 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
         <Link href="/community" aria-label="Back to Community" className="grid size-11 shrink-0 place-items-center rounded-md text-text hover:bg-surface-muted">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </Link>
-        <h1 className="flex-1 truncate text-prompt font-extrabold text-text">Post</h1>
+        <h1 className="flex-1 truncate text-prompt text-text">Post</h1>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-1">
@@ -142,7 +142,7 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
         />
 
         <section aria-label="Comments" className="flex flex-col gap-1">
-          <h2 className="px-1 pb-1 text-caption font-extrabold uppercase tracking-[.06em] text-text-secondary">
+          <h2 className="px-1 pb-1 text-caption font-medium uppercase tracking-[.06em] text-text-secondary">
             {visibleCount === 0 ? "Comments" : `${visibleCount} ${visibleCount === 1 ? "comment" : "comments"}`}
           </h2>
           {comments.length === 0 ? (
@@ -156,7 +156,7 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.25 text-body-sm">
-                      <span className="truncate font-bold text-text">{c.author.name}</span>
+                      <span className="truncate font-medium text-text">{c.author.name}</span>
                       {c.author.verified ? <VerifiedBadge size={13} className="shrink-0" /> : null}
                       <span className="text-text-secondary">· {c.pending ? "sending" : shortRelativeTime(c.createdAt, new Date(serverNow))}</span>
                     </div>

@@ -74,31 +74,31 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
             </button>
             <div className="absolute inset-x-6 bottom-6 flex flex-col gap-1.5 text-on-photo">
               <div className="flex items-baseline gap-2">
-                <h2 className="text-[30px] font-extrabold leading-none tracking-[-.025em]">{title}</h2>
+                <h2 className="text-name-lg">{title}</h2>
                 {profile.verified ? <VerifiedBadge size={22} className="self-center" /> : null}
               </div>
               {profile.location ? <p className="text-body text-on-photo-muted">{profile.location}</p> : null}
-              {profile.isActiveNow ? <p className="text-caption font-semibold text-aqua">Active now</p> : null}
+              {profile.isActiveNow ? <p className="text-caption font-medium text-aqua">Active now</p> : null}
             </div>
           </div>
 
-          <div className="flex flex-col gap-5 px-4 py-5">
+          <div className="flex flex-col gap-3.5 px-4 py-3.5">
             {profile.bio ? (
               <section className="flex flex-col gap-2">
-                <h3 className="text-tag font-bold uppercase tracking-[.08em] text-text-secondary">About me</h3>
+                <h3 className="text-tag uppercase tracking-[.08em] text-text-secondary">About me</h3>
                 <p className="text-body-lg leading-normal">{profile.bio}</p>
               </section>
             ) : null}
             {intent ? (
-              <span className="inline-flex h-10 items-center gap-2 self-start rounded-full bg-aqua-soft px-4 text-body-sm font-bold text-on-aqua-soft">
+              <span className="inline-flex h-10 items-center gap-2 self-start rounded-full bg-aqua-soft px-4 text-body-sm font-medium text-on-aqua-soft">
                 <HeartIcon size={16} strokeWidth={2.2} />
                 Looking for {intent}
               </span>
             ) : null}
             {firstPrompt ? (
-              <div className="flex flex-col gap-2.5 rounded-3xl glass-card p-5.5">
-                <div className="text-[13px] font-semibold text-text-secondary">{firstPrompt.prompt}</div>
-                <div className="text-prompt font-bold leading-[1.35] tracking-[-.015em] text-pretty">{firstPrompt.answer}</div>
+              <div className="flex flex-col gap-2.5 rounded-3xl glass-card p-4">
+                <div className="text-body-sm font-medium text-text-secondary">{firstPrompt.prompt}</div>
+                <div className="text-prompt leading-[1.35] tracking-[-.015em] text-pretty">{firstPrompt.answer}</div>
               </div>
             ) : null}
             <Photo photo={profile.photos[1]} alt={profile.photos[1]?.alt ?? ""} className="h-80 rounded-[22px]" />
@@ -107,25 +107,25 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
                 {rows.map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-4 px-5 py-3.75 text-body">
                     <dt className="text-text-secondary">{k}</dt>
-                    <dd className="m-0 text-right font-semibold">{v}</dd>
+                    <dd className="m-0 text-right font-medium">{v}</dd>
                   </div>
                 ))}
               </dl>
             ) : null}
             {profile.interests.length > 0 ? (
               <section className="flex flex-col gap-2.5">
-                <h3 className="text-tag font-bold uppercase tracking-[.08em] text-text-secondary">Interests</h3>
+                <h3 className="text-tag uppercase tracking-[.08em] text-text-secondary">Interests</h3>
                 <div className="flex flex-wrap gap-2">
                   {profile.interests.map((t) => (
-                    <span key={t} className="inline-flex h-9.5 items-center rounded-full bg-surface-muted px-4 text-body-sm font-semibold">{t}</span>
+                    <span key={t} className="inline-flex h-9.5 items-center rounded-full bg-surface-muted px-4 text-body-sm font-medium">{t}</span>
                   ))}
                 </div>
               </section>
             ) : null}
             {secondPrompt ? (
-              <div className="flex flex-col gap-2.5 rounded-3xl bg-surface-muted p-5.5 text-text">
-                <div className="text-[13px] font-semibold text-primary-ink">{secondPrompt.prompt}</div>
-                <div className="text-prompt font-bold leading-[1.35] tracking-[-.015em]">{secondPrompt.answer}</div>
+              <div className="flex flex-col gap-2.5 rounded-3xl bg-surface-muted p-4 text-text">
+                <div className="text-body-sm font-medium text-primary-ink">{secondPrompt.prompt}</div>
+                <div className="text-prompt leading-[1.35] tracking-[-.015em]">{secondPrompt.answer}</div>
               </div>
             ) : null}
             <Photo photo={profile.photos[2]} alt={profile.photos[2]?.alt ?? ""} className="h-80 rounded-[22px]" />
@@ -134,7 +134,7 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
         </div>
 
         {onPass && onLike ? (
-          <div className="pointer-events-none absolute inset-x-0 flex justify-center gap-5.5" style={{ bottom: "calc(18px + var(--safe-bottom))" }}>
+          <div className="pointer-events-none absolute inset-x-0 flex justify-center gap-4" style={{ bottom: "calc(14px + var(--safe-bottom))" }}>
             <button type="button" onClick={onPass} aria-label="Pass" className="pointer-events-auto grid size-15 place-items-center rounded-full glass-card text-text pressable-round">
               <CloseIcon size={24} strokeWidth={2.4} />
             </button>

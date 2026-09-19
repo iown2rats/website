@@ -64,7 +64,7 @@ export function AboutForm({ interests, prompts, initialBio, initialInterestIds, 
                 type="button"
                 aria-expanded={isOpen}
                 onClick={() => (isOpen ? setOpen(null) : canOpen ? setOpen(p.id) : undefined)}
-                className="flex h-13.5 w-full items-center justify-between border-0 bg-transparent px-4.5 text-left text-body font-bold text-text"
+                className="flex h-12 w-full items-center justify-between border-0 bg-transparent px-3.5 text-left text-body font-medium text-text"
               >
                 <span>{p.text}</span>
                 <span className="text-micro text-primary-ink">{has ? "Answered" : canOpen ? "Add" : ""}</span>
@@ -78,7 +78,7 @@ export function AboutForm({ interests, prompts, initialBio, initialInterestIds, 
                   autoFocus
                   onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))}
                   placeholder="Your answer"
-                  className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-4.5 py-3.5 text-body leading-normal text-text outline-none"
+                  className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-3.5 py-3.5 text-body leading-normal text-text outline-none"
                 />
               ) : null}
             </div>

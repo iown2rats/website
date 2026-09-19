@@ -20,7 +20,7 @@ export default async function AdminPhotosPage({ searchParams }: { searchParams: 
       <PhotoQueue items={queue.items} />
       <Pagination page={queue.page} pageSize={queue.pageSize} total={queue.total} hrefFor={(p) => `/admin/photos?page=${p}`} />
       <p className="text-caption text-text-secondary">
-        Decisions are recorded in the <Link href="/admin/audit" className="font-semibold text-primary-ink hover:underline">audit log</Link> with the reviewer and the reason.
+        Decisions are recorded in the <Link href="/admin/audit" className="font-medium text-primary-ink hover:underline">audit log</Link> with the reviewer and the reason.
       </p>
     </AdminPage>
   );

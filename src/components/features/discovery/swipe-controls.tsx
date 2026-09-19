@@ -22,33 +22,33 @@ export interface SwipeControlsProps {
 
 export function SwipeControls({ onPass, onLike, onIntro, onOpen, onUndo, undoDisabled = false, disabled = false, className }: SwipeControlsProps) {
   return (
-    <div className={cn("flex h-17 items-center justify-center gap-5", className)}>
+    <div className={cn("flex h-15 items-center justify-center gap-4", className)}>
       {onUndo ? (
-        <IconButton aria-label="Undo last pass" round elevated size={48} onClick={onUndo} disabled={disabled || undoDisabled} className="text-text-secondary">
-          <UndoIcon size={20} strokeWidth={2.2} />
+        <IconButton aria-label="Undo last pass" round elevated size={44} onClick={onUndo} disabled={disabled || undoDisabled} className="text-text-secondary">
+          <UndoIcon size={18} strokeWidth={2} />
         </IconButton>
       ) : null}
-      <IconButton aria-label="Pass" round elevated size={56} onClick={onPass} disabled={disabled}>
-        <CloseIcon size={24} strokeWidth={2.4} />
+      <IconButton aria-label="Pass" round elevated size={48} onClick={onPass} disabled={disabled}>
+        <CloseIcon size={21} strokeWidth={2.1} />
       </IconButton>
       <button
         type="button"
         aria-label="Like"
         onClick={onLike}
         disabled={disabled}
-        className="grid size-16.5 place-items-center rounded-full border-0 like-gradient text-on-primary shadow-like pressable-round disabled:opacity-45"
+        className="grid size-14.5 place-items-center rounded-full border-0 like-gradient text-on-primary shadow-like pressable-round disabled:opacity-45"
       >
-        <HeartIcon size={30} filled strokeWidth={0} />
+        <HeartIcon size={26} filled strokeWidth={0} />
       </button>
       {onIntro ? (
-        <IconButton aria-label="Send intro (Plus)" round elevated size={48} onClick={onIntro} disabled={disabled} className="relative text-ocean overflow-visible">
-          <ChatPlusIcon size={20} strokeWidth={2.2} />
+        <IconButton aria-label="Send intro (Plus)" round elevated size={44} onClick={onIntro} disabled={disabled} className="relative text-ocean overflow-visible">
+          <ChatPlusIcon size={18} strokeWidth={2} />
           <PlusTag size="xs" className="absolute -right-1.5 -top-1" />
         </IconButton>
       ) : null}
       {onOpen ? (
-        <IconButton aria-label="View profile" round elevated size={48} onClick={onOpen} disabled={disabled}>
-          <PersonIcon size={24} strokeWidth={2.2} />
+        <IconButton aria-label="View profile" round elevated size={44} onClick={onOpen} disabled={disabled}>
+          <PersonIcon size={21} strokeWidth={2} />
         </IconButton>
       ) : null}
     </div>

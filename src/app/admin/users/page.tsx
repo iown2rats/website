@@ -23,29 +23,29 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   return (
     <AdminPage title="Users" description="Search by public name, handle or internal id. Filters combine.">
       <form method="get" action="/admin/users" className="grid grid-cols-1 gap-3 rounded-2xl glass-card p-4 desktop:grid-cols-4">
-        <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary desktop:col-span-2">
+        <label className="flex flex-col gap-1 text-caption font-medium text-text-secondary desktop:col-span-2">
           Search
           <Input name="q" defaultValue={sp.q ?? ""} placeholder="Name, handle or user id" className="h-11 text-body-sm" />
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary">
+        <label className="flex flex-col gap-1 text-caption font-medium text-text-secondary">
           Account state
-          <Select name="status" defaultValue={status} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-semibold">
+          <Select name="status" defaultValue={status} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-medium">
             {STATUSES.map((s) => (
               <option key={s} value={s}>{s === "all" ? "Any" : s}</option>
             ))}
           </Select>
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary">
+        <label className="flex flex-col gap-1 text-caption font-medium text-text-secondary">
           Onboarding
-          <Select name="onboarding" defaultValue={sp.onboarding ?? "all"} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-semibold">
+          <Select name="onboarding" defaultValue={sp.onboarding ?? "all"} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-medium">
             <option value="all">Any</option>
             <option value="complete">Complete</option>
             <option value="incomplete">Incomplete</option>
           </Select>
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary">
+        <label className="flex flex-col gap-1 text-caption font-medium text-text-secondary">
           Verification
-          <Select name="verification" defaultValue={sp.verification ?? "all"} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-semibold">
+          <Select name="verification" defaultValue={sp.verification ?? "all"} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-medium">
             <option value="all">Any</option>
             <option value="NONE">Unverified</option>
             <option value="PENDING">Pending</option>
@@ -53,19 +53,19 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <option value="REJECTED">Rejected</option>
           </Select>
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary">
+        <label className="flex flex-col gap-1 text-caption font-medium text-text-secondary">
           Membership
-          <Select name="membership" defaultValue={sp.membership ?? "all"} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-semibold">
+          <Select name="membership" defaultValue={sp.membership ?? "all"} className="[&>select]:h-11 [&>select]:text-body-sm [&>select]:font-medium">
             <option value="all">Any</option>
             <option value="plus">Plus</option>
             <option value="free">Free</option>
           </Select>
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary">
+        <label className="flex flex-col gap-1 text-caption font-medium text-text-secondary">
           Joined from
           <Input type="date" name="from" defaultValue={sp.from ?? ""} className="h-11 text-body-sm" />
         </label>
-        <label className="flex flex-col gap-1 text-caption font-semibold text-text-secondary">
+        <label className="flex flex-col gap-1 text-caption font-medium text-text-secondary">
           Joined to
           <Input type="date" name="to" defaultValue={sp.to ?? ""} className="h-11 text-body-sm" />
         </label>

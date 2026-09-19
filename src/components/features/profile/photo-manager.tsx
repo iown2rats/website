@@ -154,18 +154,18 @@ export function PhotoManager({ initialPhotos, reviewedBeforeVisible = false, lay
         style={photoBackground({ url: null, key: p.demoKey })}
       >
         {p.thumbUrl ? <Image src={p.thumbUrl} alt={`Photo ${i + 1}${i === 0 ? " (main photo)" : ""}`} fill unoptimized sizes="33vw" className="object-cover" draggable={false} /> : <span role="img" aria-label={`Photo ${i + 1}${i === 0 ? " (main photo)" : ""}`} className="absolute inset-0" />}
-        {p.isPrimary ? <span className="absolute left-2.5 top-2.5 inline-flex h-6 items-center rounded-xs bg-white px-2.5 text-micro font-extrabold text-ocean shadow-sm">Main photo</span> : null}
+        {p.isPrimary ? <span className="absolute left-2.5 top-2.5 inline-flex h-6 items-center rounded-xs bg-white px-2.5 text-micro font-medium text-ocean shadow-sm">Main photo</span> : null}
         {p.moderation === "PENDING" ? <Tag variant="warning" size="sm" className="absolute bottom-2.5 left-2.5 bg-white/90">Under review</Tag> : null}
         {p.moderation === "REJECTED" ? <Tag variant="danger" size="md" className="absolute left-2.5 top-2.5">Not allowed</Tag> : null}
-        <button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => remove(p.id)} disabled={busy} className="absolute right-2 top-2 grid size-7 place-items-center rounded-full border-0 bg-[rgba(6,20,26,.55)] text-white">
+        <button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => remove(p.id)} disabled={busy} className="absolute right-1.5 top-1.5 grid size-8 place-items-center rounded-full border-0 bg-[rgba(6,20,26,.55)] text-white">
           <CloseIcon size={14} strokeWidth={2.6} />
         </button>
         <div className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-between gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
-          <button type="button" aria-label={`Move photo ${i + 1} earlier`} onClick={() => move(i, i - 1)} disabled={i === 0 || busy} className="grid size-7 place-items-center rounded-full border-0 bg-white/90 text-ocean disabled:opacity-30"><ChevronLeftIcon size={14} /></button>
+          <button type="button" aria-label={`Move photo ${i + 1} earlier`} onClick={() => move(i, i - 1)} disabled={i === 0 || busy} className="grid size-8 place-items-center rounded-full border-0 bg-white/90 text-ocean disabled:opacity-30"><ChevronLeftIcon size={14} /></button>
           {i > 0 ? (
-            <button type="button" onClick={() => move(i, 0)} disabled={busy} className="h-7 rounded-full border-0 bg-white/90 px-2 text-[10px] font-extrabold text-ocean">Make main</button>
+            <button type="button" onClick={() => move(i, 0)} disabled={busy} className="h-8 rounded-full border-0 bg-white/90 px-2.5 text-tag font-medium text-ocean">Make main</button>
           ) : null}
-          <button type="button" aria-label={`Move photo ${i + 1} later`} onClick={() => move(i, i + 1)} disabled={i === photos.length - 1 || busy} className="grid size-7 place-items-center rounded-full border-0 bg-white/90 text-ocean disabled:opacity-30"><ChevronRightIcon size={14} /></button>
+          <button type="button" aria-label={`Move photo ${i + 1} later`} onClick={() => move(i, i + 1)} disabled={i === photos.length - 1 || busy} className="grid size-8 place-items-center rounded-full border-0 bg-white/90 text-ocean disabled:opacity-30"><ChevronRightIcon size={14} /></button>
         </div>
       </li>,
     );
@@ -178,10 +178,10 @@ export function PhotoManager({ initialPhotos, reviewedBeforeVisible = false, lay
         )}
         {u.error ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[rgba(6,20,26,.6)] p-2 text-center text-white">
-            <span className="text-caption-sm font-semibold leading-snug">{u.error}</span>
+            <span className="text-caption-sm font-medium leading-snug">{u.error}</span>
             <div className="flex gap-2">
-              <button type="button" onClick={() => retry(u)} className="h-7 rounded-full border-0 bg-white px-2.5 text-micro font-bold text-ocean">Retry</button>
-              <button type="button" onClick={() => dismissUpload(u)} className="h-7 rounded-full border border-white/60 bg-transparent px-2.5 text-micro font-bold text-white">Remove</button>
+              <button type="button" onClick={() => retry(u)} className="h-8 rounded-full border-0 bg-white px-2.5 text-micro font-medium text-ocean">Retry</button>
+              <button type="button" onClick={() => dismissUpload(u)} className="h-8 rounded-full border border-white/60 bg-transparent px-2.5 text-micro font-medium text-white">Remove</button>
             </div>
           </div>
         ) : (
@@ -217,7 +217,7 @@ export function PhotoManager({ initialPhotos, reviewedBeforeVisible = false, lay
       <ul className={cn("m-0 grid list-none grid-cols-3 gap-2.5 p-0", featured && "auto-rows-fr")}>{tiles}</ul>
       {reviewedBeforeVisible ? <ReviewNotice photos={photos} /> : null}
       {note ? <p className="text-caption text-text-secondary">{note}</p> : null}
-      {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="text-caption font-medium text-danger">{error}</p> : null}
       {footer ? footer({ photos, activeCount, uploading, busy }) : null}
     </div>
   );

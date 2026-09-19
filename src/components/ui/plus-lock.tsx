@@ -26,7 +26,7 @@ export function PlusLockSheet({ open, onClose, feature, description, children }:
       <DialogDescription>{description}</DialogDescription>
       {children}
       <div className="flex flex-col gap-2.5 pt-1">
-        <Link href="/settings/membership" onClick={onClose} className="flex h-13 items-center justify-center rounded-lg bg-primary text-body-lg font-bold text-on-primary pressable">Upgrade to Plus</Link>
+        <Link href="/settings/membership" onClick={onClose} className="flex h-13 items-center justify-center rounded-lg bg-primary text-body-lg font-medium text-on-primary pressable">Upgrade to Plus</Link>
         <Button variant="muted" size="md" onClick={onClose} fullWidth>Not now</Button>
       </div>
     </ResponsiveDialog>
@@ -36,7 +36,7 @@ export function PlusLockSheet({ open, onClose, feature, description, children }:
 /** Inline lock row for lists: label, "Plus feature", chevron-less button that opens the sheet. */
 export function PlusLockRow({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex h-13 w-full items-center justify-between border-0 bg-surface px-4.5 text-body font-semibold text-text">
+    <button type="button" onClick={onClick} className="flex h-13 w-full items-center justify-between border-0 bg-surface px-4.5 text-body font-medium text-text">
       <span className="flex items-center gap-2">{label}<PlusTag size="xs" /></span>
       <LockIcon size={16} className="text-text-secondary" aria-hidden="true" />
     </button>

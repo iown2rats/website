@@ -67,22 +67,22 @@ export function ContactsSheet({ open, onClose, privacy, onChange }: { open: bool
 
   return (
     <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId} dismissible={!busy}>
-      <DialogTitle id={titleId} className="text-[22px]">Blocked contacts</DialogTitle>
+      <DialogTitle id={titleId}>Blocked contacts</DialogTitle>
       <DialogDescription>
         People whose numbers you add here won&apos;t see your dating profile, and you won&apos;t see theirs. Numbers are hashed on this device — Mellocrush never receives or stores them in plain text.
       </DialogDescription>
-      <p className="text-body-sm font-semibold text-text">{privacy.contactHashCount} number{privacy.contactHashCount === 1 ? "" : "s"} on your list</p>
+      <p className="text-body-sm font-medium text-text">{privacy.contactHashCount} number{privacy.contactHashCount === 1 ? "" : "s"} on your list</p>
       {pickerSupported ? (
         <Button variant="secondary" size="md" onClick={() => void pick()} disabled={busy} fullWidth>Choose from contacts</Button>
       ) : (
         <p className="text-caption text-text-secondary">This browser can&apos;t open your address book. Type or paste numbers below; full address-book blocking is available in the Mellocrush app.</p>
       )}
       <div className="flex flex-col gap-2">
-        <label htmlFor={`${titleId}-numbers`} className="text-body-sm font-semibold text-text">Add numbers to hide from</label>
+        <label htmlFor={`${titleId}-numbers`} className="text-body-sm font-medium text-text">Add numbers to hide from</label>
         <Textarea id={`${titleId}-numbers`} value={numbers} onChange={(e) => setNumbers(e.target.value)} rows={3} placeholder={"One per line, e.g. 777 1234"} disabled={busy} />
         <Button size="md" onClick={() => void submit(numbers.split(/[\n,;]+/), "MANUAL")} loading={busy} disabled={numbers.trim().length === 0} fullWidth>Hide from these numbers</Button>
       </div>
-      {message ? <p role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-caption font-semibold text-danger" : "text-caption font-semibold text-primary-ink"}>{message.text}</p> : null}
+      {message ? <p role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-caption font-medium text-danger" : "text-caption font-medium text-primary-ink"}>{message.text}</p> : null}
       {privacy.contactHashCount > 0 ? (
         <Button variant="ghost" size="md" onClick={() => void clear()} disabled={busy} fullWidth className="text-danger">Clear the list</Button>
       ) : null}

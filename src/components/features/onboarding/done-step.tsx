@@ -36,7 +36,7 @@ export function DoneStep({ completionPercent, missing }: { completionPercent: nu
               return (
                 <span key={m}>
                   {i > 0 ? (i === missing.length - 1 ? " and " : ", ") : ""}
-                  {link ? <Link href={`${ROUTES.onboarding}/${link.slug}`} className="font-semibold text-primary-ink">{link.label}</Link> : m}
+                  {link ? <Link href={`${ROUTES.onboarding}/${link.slug}`} className="font-medium text-primary-ink">{link.label}</Link> : m}
                 </span>
               );
             })}

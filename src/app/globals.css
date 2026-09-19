@@ -45,73 +45,89 @@
   --color-on-photo-muted: var(--on-photo-muted);
   --color-on-photo-glass: var(--on-photo-glass);
 
-  /* Typography */
+  /*
+   * Typography (docs/DESIGN_SYSTEM.md §32). One scale, and every step carries its own weight so a component never
+   * has to add a weight utility on top — that layering is what made the old UI read heavy.
+   *
+   * The rules: body 14–15/400, secondary and captions 12–13/400, labels and navigation up to 500, section
+   * headings 16–18/500–600, page titles 20–24/600. Nothing in normal chrome is heavier than 600; 700+ is reserved
+   * for a rare deliberate emphasis and has no step of its own.
+   *
+   * Line heights are deliberately NOT compressed — 1.5 on reading text — because density here comes from
+   * padding, control heights and gaps, never from crowding the text.
+   */
   --font-sans: var(--font-jakarta), system-ui, sans-serif;
-  --text-display: 34px;
-  --text-display--line-height: 1;
-  --text-display--font-weight: 800;
-  --text-display--letter-spacing: -0.03em;
-  --text-hero: 32px;
-  --text-hero--line-height: 1.08;
-  --text-hero--font-weight: 800;
-  --text-hero--letter-spacing: -0.03em;
-  --text-name-lg: 30px;
-  --text-name-lg--line-height: 1;
-  --text-name-lg--font-weight: 800;
-  --text-name-lg--letter-spacing: -0.025em;
-  --text-name: 28px;
-  --text-name--line-height: 1;
-  --text-name--font-weight: 800;
-  --text-name--letter-spacing: -0.02em;
-  --text-h1: 26px;
-  --text-h1--line-height: 1.15;
-  --text-h1--font-weight: 800;
-  --text-h1--letter-spacing: -0.025em;
-  --text-h2: 24px;
-  --text-h2--line-height: 1.15;
-  --text-h2--font-weight: 800;
-  --text-h2--letter-spacing: -0.025em;
-  --text-h3: 22px;
-  --text-h3--line-height: 1.2;
-  --text-h3--font-weight: 800;
-  --text-h3--letter-spacing: -0.02em;
-  --text-h4: 20px;
-  --text-h4--line-height: 1.25;
-  --text-h4--font-weight: 800;
-  --text-h4--letter-spacing: -0.02em;
-  --text-prompt: 19px;
-  --text-prompt--line-height: 1.35;
-  --text-prompt--font-weight: 700;
-  --text-prompt--letter-spacing: -0.015em;
-  --text-input-lg: 18px;
-  --text-input-lg--line-height: 1.2;
-  --text-input-lg--font-weight: 700;
-  --text-cta-lg: 17px;
-  --text-cta-lg--line-height: 1.2;
-  --text-cta-lg--font-weight: 700;
-  --text-body-lg: 16px;
+  --text-display: 26px;
+  --text-display--line-height: 1.1;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.02em;
+  --text-hero: 24px;
+  --text-hero--line-height: 1.15;
+  --text-hero--font-weight: 600;
+  --text-hero--letter-spacing: -0.015em;
+  --text-name-lg: 24px;
+  --text-name-lg--line-height: 1.1;
+  --text-name-lg--font-weight: 600;
+  --text-name-lg--letter-spacing: -0.015em;
+  --text-name: 22px;
+  --text-name--line-height: 1.15;
+  --text-name--font-weight: 600;
+  --text-name--letter-spacing: -0.012em;
+  --text-h1: 22px;
+  --text-h1--line-height: 1.2;
+  --text-h1--font-weight: 600;
+  --text-h1--letter-spacing: -0.012em;
+  --text-h2: 20px;
+  --text-h2--line-height: 1.25;
+  --text-h2--font-weight: 600;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h3: 18px;
+  --text-h3--line-height: 1.3;
+  --text-h3--font-weight: 600;
+  --text-h3--letter-spacing: -0.008em;
+  --text-h4: 16px;
+  --text-h4--line-height: 1.35;
+  --text-h4--font-weight: 600;
+  --text-h4--letter-spacing: -0.005em;
+  --text-prompt: 16px;
+  --text-prompt--line-height: 1.4;
+  --text-prompt--font-weight: 600;
+  --text-prompt--letter-spacing: -0.005em;
+  --text-input-lg: 16px;
+  --text-input-lg--line-height: 1.3;
+  --text-input-lg--font-weight: 400;
+  --text-cta-lg: 15px;
+  --text-cta-lg--line-height: 1.25;
+  --text-cta-lg--font-weight: 500;
+  --text-body-lg: 15px;
   --text-body-lg--line-height: 1.5;
-  --text-body: 15px;
+  --text-body-lg--font-weight: 400;
+  --text-body: 14px;
   --text-body--line-height: 1.5;
-  --text-body-sm: 14px;
+  --text-body--font-weight: 400;
+  --text-body-sm: 13px;
   --text-body-sm--line-height: 1.5;
-  --text-caption: 13px;
+  --text-body-sm--font-weight: 400;
+  --text-caption: 12.5px;
   --text-caption--line-height: 1.5;
-  --text-caption-sm: 12.5px;
-  --text-caption-sm--line-height: 1.4;
-  --text-label: 12px;
-  --text-label--line-height: 1.2;
-  --text-label--font-weight: 700;
-  --text-label--letter-spacing: 0.08em;
-  --text-micro: 12px;
-  --text-micro--line-height: 1.3;
-  --text-micro--font-weight: 600;
+  --text-caption--font-weight: 400;
+  --text-caption-sm: 12px;
+  --text-caption-sm--line-height: 1.45;
+  --text-caption-sm--font-weight: 400;
+  --text-label: 11.5px;
+  --text-label--line-height: 1.25;
+  --text-label--font-weight: 500;
+  --text-label--letter-spacing: 0.06em;
+  --text-micro: 11.5px;
+  --text-micro--line-height: 1.35;
+  --text-micro--font-weight: 400;
   --text-tiny: 11px;
-  --text-tiny--line-height: 1.3;
-  --text-tag: 11px;
+  --text-tiny--line-height: 1.35;
+  --text-tiny--font-weight: 400;
+  --text-tag: 10.5px;
   --text-tag--line-height: 1;
-  --text-tag--font-weight: 800;
-  --text-tag--letter-spacing: 0.06em;
+  --text-tag--font-weight: 600;
+  --text-tag--letter-spacing: 0.04em;
 
   /* Radius */
   --radius-*: initial;

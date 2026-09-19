@@ -84,7 +84,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
                 </div>
               ))}
             </div>
-            <div className="flex flex-col items-center gap-3 rounded-3xl glass-card p-5 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-3xl glass-card p-4 text-center">
               <span className="grid size-12 place-items-center rounded-full bg-aqua-soft text-accent" aria-hidden="true"><LockIcon size={22} /></span>
               <div>
                 <h2 className="text-h4 text-text">{data.count === 1 ? "1 person likes you" : `${data.count} people like you`}</h2>
@@ -122,10 +122,10 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
               <li key={m.handle} className="flex items-center gap-3 px-4 py-3 wide:rounded-2xl wide:glass-card wide:px-4 wide:py-3.5">
                 <span className="size-12 shrink-0 overflow-hidden rounded-full bg-surface-muted" style={photoBackground(m.photo ? { url: m.photo.url, key: m.photo.demoKey, blurhash: m.photo.blurhash } : null, 160, "thumb")} aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-body font-bold text-text"><span className="truncate">{m.name}</span>{m.verified ? <VerifiedBadge size={14} className="shrink-0" /> : null}</div>
+                  <div className="flex items-center gap-1.5 text-body font-medium text-text"><span className="truncate">{m.name}</span>{m.verified ? <VerifiedBadge size={14} className="shrink-0" /> : null}</div>
                   <div className="text-caption text-text-secondary">Matched</div>
                 </div>
-                {m.conversationId ? <Link href={`/chats/${m.conversationId}`} className="inline-flex h-9 items-center rounded-lg bg-primary px-3.5 text-caption font-bold text-on-primary pressable">Say hello</Link> : null}
+                {m.conversationId ? <Link href={`/chats/${m.conversationId}`} className="inline-flex h-9 items-center rounded-lg bg-primary px-3.5 text-caption font-medium text-on-primary pressable">Say hello</Link> : null}
               </li>
             ))}
           </ul>

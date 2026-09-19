@@ -116,7 +116,7 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
       <BottomSheet open={step === "report" || step === "reported"} onClose={close} labelledBy={titleId} dismissible={!busy}>
         {step === "report" ? (
           <>
-            <DialogTitle id={titleId} className="text-[22px]">Why are you reporting?</DialogTitle>
+            <DialogTitle id={titleId}>Why are you reporting?</DialogTitle>
             <DialogDescription>Reports are anonymous and reviewed within 24 hours. Reporting this {noun} doesn&apos;t block {target.authorName} — you can choose that next.</DialogDescription>
             <div className="flex flex-col gap-2" role="radiogroup" aria-label="Reason">
               {REASONS.map(([value, label]) => (
@@ -126,7 +126,7 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
                   role="radio"
                   aria-checked={reason === value}
                   onClick={() => setReason(value)}
-                  className={cn("h-12.5 rounded-lg px-4.5 text-left text-body font-semibold text-text", reason === value ? "bg-primary-soft" : "bg-surface-muted")}
+                  className={cn("h-11.5 rounded-lg px-3.5 text-left text-body font-medium text-text", reason === value ? "bg-primary-soft" : "bg-surface-muted")}
                 >
                   {label}
                 </button>
@@ -138,11 +138,11 @@ export function ContentMenu({ target, onClose, onDeleted, onBlocked }: ContentMe
           </>
         ) : (
           <>
-            <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <div className="flex flex-col items-center gap-3 py-3 text-center">
               <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-ink" aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
               </span>
-              <DialogTitle id={titleId} className="text-[22px]">Thanks for looking out</DialogTitle>
+              <DialogTitle id={titleId}>Thanks for looking out</DialogTitle>
               <p className="max-w-75 text-body-sm leading-normal text-text-secondary">
                 Our team will review this {noun}. {target.authorName} hasn&apos;t been blocked and won&apos;t know who reported it.
               </p>

@@ -7,8 +7,10 @@ import { NotificationBell } from "@/components/features/notifications/notificati
 
 /*
  * Header patterns from the prototype:
- *  - TabHeader: 48 px row inside the screen gutter; h1 26 px/800 (or the wordmark on Discover); trailing 44 px controls.
- *  - PageHeader: 56 px + safe-top; 44 px ghost back button; 19 px/800 title; optional trailing action (e.g. "Save").
+ *  - TabHeader: 44 px row inside the screen gutter; h1 22 px/600 (or the wordmark on Discover); trailing 44 px controls.
+ *  - PageHeader: 48 px + safe-top; 44 px ghost back button; 16 px/600 title; optional trailing action (e.g. "Save").
+ * Compact pass (docs/DESIGN_SYSTEM.md §32): the rows lost 4–8 px and the titles two weight steps. The 44 px
+ * controls inside them did not shrink — a header is mostly thumb, and only its whitespace was spare.
  *  - GlassHeader: conversation header — glass + blur 16, bottom border.
  */
 
@@ -24,18 +26,18 @@ import { NotificationBell } from "@/components/features/notifications/notificati
  */
 export function TabHeader({ title, logo = false, compactLogo = false, actions, bell = true, className }: { title?: string; logo?: boolean; compactLogo?: boolean; actions?: ReactNode; bell?: boolean; className?: string }) {
   return (
-    <header className={cn("flex h-12 shrink-0 items-center justify-between gap-2", className)}>
+    <header className={cn("flex h-11 shrink-0 items-center justify-between gap-2", className)}>
       {logo ? (
         <div className="flex min-w-0 items-center gap-2 text-h3 text-text">
-          <Wordmark height={24} className={cn(compactLogo && "max-[389px]:hidden")} />
-          {compactLogo ? <BrandMark size={28} className="min-[390px]:hidden" /> : null}
+          <Wordmark height={21} className={cn(compactLogo && "max-[389px]:hidden")} />
+          {compactLogo ? <BrandMark size={24} className="min-[390px]:hidden" /> : null}
           {title ? <span className="sr-only">{title}</span> : null}
         </div>
       ) : (
         <h1 className="text-h1 text-text">{title}</h1>
       )}
       {bell || actions ? (
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           {actions}
           {bell ? <NotificationBell /> : null}
         </div>
@@ -62,21 +64,21 @@ export function PageHeader({
   const back = onBack || backHref;
   return (
     <header
-      className={cn("flex shrink-0 items-center gap-2 px-2", glass && "glass", className)}
+      className={cn("flex shrink-0 items-center gap-1.5 px-2", glass && "glass", className)}
       style={{ height: "calc(var(--page-header-height) + var(--safe-top))", paddingTop: "var(--safe-top)" }}
     >
       {back ? (
         backHref ? (
           <a href={backHref} aria-label="Back" className="grid size-11 place-items-center rounded-md text-text hover:bg-surface-muted">
-            <ChevronLeftIcon size={22} strokeWidth={2.2} />
+            <ChevronLeftIcon size={20} strokeWidth={2} />
           </a>
         ) : (
           <IconButton aria-label="Back" variant="ghost" onClick={onBack}>
-            <ChevronLeftIcon size={22} strokeWidth={2.2} />
+            <ChevronLeftIcon size={20} strokeWidth={2} />
           </IconButton>
         )
       ) : null}
-      <h1 className="flex-1 min-w-0 truncate text-prompt font-extrabold text-text">{title}</h1>
+      <h1 className="flex-1 min-w-0 truncate text-prompt text-text">{title}</h1>
       {action}
     </header>
   );

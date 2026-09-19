@@ -12,7 +12,7 @@ export default function LegalLayout({ children }: { children: ReactNode }) {
           <Wordmark height={24} />
         </Link>
         {children}
-        <Link href={ROUTES.welcome} className="text-body-sm font-semibold text-text-secondary">Back to start</Link>
+        <Link href={ROUTES.welcome} className="text-body-sm font-medium text-text-secondary">Back to start</Link>
       </div>
     </main>
   );

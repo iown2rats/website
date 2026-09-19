@@ -50,7 +50,7 @@ export function DiscoveryClient({ initial, locations }: { initial: DiscoveryFilt
         <ListRow asDiv label={<span className="flex items-center gap-2">Height <PlusTag size="xs" /></span>} meta={filters.advancedEnabled ? (filters.heightMinCm || filters.heightMaxCm ? `${filters.heightMinCm ?? "…"}–${filters.heightMaxCm ?? "…"} cm` : "Any") : "Mellocrush Plus"} />
         <ListRow asDiv label={<span className="flex items-center gap-2">Education <PlusTag size="xs" /></span>} meta={filters.advancedEnabled ? (filters.education || "Any") : "Mellocrush Plus"} />
       </ListGroup>
-      <Button onClick={() => setOpen(true)} className="h-13">Edit preferences</Button>
+      <Button onClick={() => setOpen(true)} className="h-11.5">Edit preferences</Button>
       <FiltersSheet open={open} onClose={() => setOpen(false)} filters={filters} locations={locations} saving={saving} error={error} onApply={(d) => void apply(d)} onLockedAdvanced={() => router.push("/settings/membership")} />
     </PageOverlay>
   );

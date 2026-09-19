@@ -66,18 +66,18 @@ export function ChatsList({ initial, hasEverMatched }: { initial: ChatsListDto; 
   return (
     <AppScreen aria-label="Chats">
       <TabHeader title="Chats" />
-      <div className="mb-4.5 mt-2">
-        <Input leading={<SearchIcon size={18} />} placeholder="Search matches" aria-label="Search matches" value={query} onChange={(e) => setQuery(e.target.value)} className="h-12 rounded-lg border-0 bg-surface-muted" />
+      <div className="mb-3 mt-1.5">
+        <Input leading={<SearchIcon size={16} />} placeholder="Search matches" aria-label="Search matches" value={query} onChange={(e) => setQuery(e.target.value)} className="rounded-lg border-0 bg-surface-muted" />
       </div>
-      <ScrollArea className="flex flex-col gap-4.5">
+      <ScrollArea className="flex flex-col gap-3.5">
         {error ? <ErrorState title="Couldn't refresh chats" description="We'll keep trying in the background." onRetry={() => void refreshChats().then((r) => r?.ok && setData(r))} /> : null}
         {newMatches.length > 0 ? (
           <section>
-            <SectionLabel className="mb-3">New matches</SectionLabel>
-            <div className="-mx-0.5 flex gap-3.5 overflow-x-auto px-0.5 pb-1.5 [scrollbar-width:none]">
+            <SectionLabel className="mb-2">New matches</SectionLabel>
+            <div className="-mx-0.5 flex gap-2.5 overflow-x-auto px-0.5 pb-1 [scrollbar-width:none]">
               {newMatches.map((m) => (
-                <Link key={m.id} href={`/chats/${m.id}`} className="flex w-17 shrink-0 flex-col items-center gap-1.5 text-micro font-semibold text-text" aria-label={`Open chat with ${m.other.name}`}>
-                  <Avatar name={m.other.name} photo={{ url: m.other.photo?.url ?? null, key: m.other.photo?.demoKey ?? null, blurhash: m.other.photo?.blurhash ?? null }} size={64} ring />
+                <Link key={m.id} href={`/chats/${m.id}`} className="flex w-15 shrink-0 flex-col items-center gap-1 text-micro text-text" aria-label={`Open chat with ${m.other.name}`}>
+                  <Avatar name={m.other.name} photo={{ url: m.other.photo?.url ?? null, key: m.other.photo?.demoKey ?? null, blurhash: m.other.photo?.blurhash ?? null }} size={56} ring />
                   <span className="max-w-full truncate">{m.other.name}</span>
                 </Link>
               ))}
@@ -91,13 +91,13 @@ export function ChatsList({ initial, hasEverMatched }: { initial: ChatsListDto; 
         ) : null}
         {nothing ? (
           hasEverMatched ? (
-            <EmptyState icon={<ChatIcon />} title="No active chats." description="When you match with someone new, they'll appear here." actions={<Button size="md" onClick={() => router.push("/discover")}>Keep discovering</Button>} />
+            <EmptyState icon={<ChatIcon />} title="No active chats." description="When you match with someone new, they'll appear here." actions={<Button size="sm" onClick={() => router.push("/discover")}>Keep discovering</Button>} />
           ) : (
             <EmptyState icon={<ChatIcon />} title="Match with someone to start a conversation." />
           )
         ) : null}
         {!nothing && conversations.length === 0 && newMatches.length > 0 && !q ? (
-          <EmptyState icon={<HeartIcon />} title="Say hello to a new match." description="Tap a match above to start the conversation." className="py-8" />
+          <EmptyState icon={<HeartIcon />} title="Say hello to a new match." description="Tap a match above to start the conversation." className="py-3.5" />
         ) : null}
         {!nothing && q && conversations.length === 0 && newMatches.length === 0 ? <p className="px-2 text-body-sm text-text-secondary">No matches called “{query.trim()}”.</p> : null}
       </ScrollArea>
@@ -112,21 +112,21 @@ function ConversationRow({ item, active, now }: { item: ConversationListItemDto;
       <Link
         href={`/chats/${item.id}`}
         aria-current={active ? "page" : undefined}
-        className={cn("flex items-center gap-3.5 rounded-2xl px-1.5 py-3 text-left text-text transition-colors hover:bg-surface-muted", active && "bg-surface-muted")}
+        className={cn("flex items-center gap-3 rounded-2xl px-1.5 py-2 text-left text-text transition-colors hover:bg-surface-muted", active && "bg-surface-muted")}
       >
-        <Avatar name={item.other.name} photo={{ url: item.other.photo?.url ?? null, key: item.other.photo?.demoKey ?? null, blurhash: item.other.photo?.blurhash ?? null }} size={52} />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.75">
-          <span className="flex items-center gap-1.25 text-body-lg font-bold">
+        <Avatar name={item.other.name} photo={{ url: item.other.photo?.url ?? null, key: item.other.photo?.demoKey ?? null, blurhash: item.other.photo?.blurhash ?? null }} size={44} />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.25">
+          <span className="flex items-center gap-1.25 text-body font-medium">
             <span className="truncate">{item.other.name}</span>
-            {item.other.verified ? <VerifiedBadge size={14} className="shrink-0" /> : null}
+            {item.other.verified ? <VerifiedBadge size={13} className="shrink-0" /> : null}
           </span>
-          <span className={cn("truncate text-body-sm", unread ? "font-semibold text-text" : "text-text-secondary")}>
+          <span className={cn("truncate text-caption", unread ? "font-medium text-text" : "text-text-secondary")}>
             {item.lastMessage?.fromMe ? "You: " : ""}{item.lastMessage?.preview}
           </span>
         </span>
-        <span className="flex flex-col items-end gap-1.5 text-micro text-text-secondary">
+        <span className="flex flex-col items-end gap-1 text-micro text-text-secondary">
           <span>{item.lastMessage ? chatTime(item.lastMessage.at, new Date(now)) : ""}</span>
-          <span className={cn("grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-extrabold text-on-primary", !unread && "opacity-0")} aria-label={unread ? `${item.unreadCount} unread` : undefined}>
+          <span className={cn("grid h-4.5 min-w-4.5 place-items-center rounded-full bg-primary px-1.5 text-tiny font-medium text-on-primary", !unread && "opacity-0")} aria-label={unread ? `${item.unreadCount} unread` : undefined}>
             {item.unreadCount}
           </span>
         </span>

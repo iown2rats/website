@@ -547,3 +547,68 @@ zero. Empty is one line — "You're all caught up." — not an illustration.
 The page at `/notifications` is the same rows in a `ListGroup` under the standard page overlay, with "Show older"
 paging and its own mark-all. Its bottom clearance is a spacer rather than padding, because the page-overlay body
 sets `padding-bottom` inline and an inline style beats a class.
+
+## 32. The compact pass: thin type, dense chrome (2026-09-19)
+
+Mellocrush read heavy on a phone. The diagnosis was not the obvious one — the body scale was already right
+(15 / 14 / 13 at weight 400). Three other things made it feel bulky, and all three had to go together:
+
+1. **Twelve of the nineteen type steps carried weight 700–800.** Every heading, label and chip.
+2. **252 weight utilities sat on top of those steps**, overriding them: 36 extra-bold, 78 bold, 138 semi-bold
+   against 13 medium and 3 normal. Retuning the tokens alone would have changed almost nothing.
+3. **Controls and padding were built for a prototype, not a phone**: 52 px buttons and inputs, 18–22 px card
+   padding, 96 px of nav clearance, a 72 px empty-state disc with a 30 px glyph.
+
+### What changed
+
+**One scale, and every step owns its weight.** Body 14–15/400, secondary and captions 12–13/400, labels and
+navigation up to 500, section headings 16–18/500–600, page titles 20–24/600. Nothing in normal chrome is heavier
+than 600 and there is no 700+ step at all — emphasis that rare should be deliberate and local. A component never
+adds a weight utility beside a type step now; where one shares a class string with a weight-bearing step it is
+removed, because it would only ever downgrade it.
+
+**Line heights were left alone.** Reading text stays at 1.5. Density here comes from padding, control heights,
+gaps, avatars and glyphs — never from crowding the text, and never from a transform or a browser-zoom trick.
+
+| | Before | After |
+| --- | --- | --- |
+| Buttons (sm / md / lg) | 40 / 48 / 52 | 38 / 44 / 46 |
+| Inputs, select | 52 | 44 |
+| List rows | 54 / 56 / 60 | 48 / 50 / 54 |
+| Card padding (sm / md / lg) | 16 / 18 / 22 | 12 / 14 / 16 |
+| Tab header · page header | 48 · 56 | 44 · 48 |
+| Bottom nav bar · items | 64 · 48 | 56 · 44 |
+| Nav clearance | 96 | 80 |
+| Section gap (Stack lg) | 20 | 14 |
+| Empty-state disc · glyph | 72 · 30 | 52 · 22 |
+| Default icon · stroke | 20 · 2 | 18 · 1.9 |
+| Default avatar | 44 | 40 |
+
+**The floor is 44 px and it did not move.** Icon buttons stay 44. The Switch pill shrank to 46 × 28 but its button
+is now a 44 px target with the pill drawn inside it, so the visual got smaller and the thumb target did not. The
+chats search field's inner input now fills its container rather than being a clickable text strip. A browser sweep
+at every tested width reports nothing interactive under 32 px except the photo-tile corner chips, which are 32.
+
+**The identity is untouched.** Same coral, same warm page, same gold for Plus, same glass with a soft shadow and no
+outlines, same radii, same dark mode.
+
+### Arbitrary values
+
+97 one-off `text-[Npx]` values across 37 files bypassed the scale; 96 are gone. The six auth screens — a parallel
+white-on-photo glass system — now map onto the shared steps, so they move with it. The one remaining is a 9 px
+micro chip, and the development-only identity-provider page keeps its own values because it deliberately imitates
+somebody else's chrome.
+
+### Measured (390 × 844)
+
+| Screen | Before | After |
+| --- | --- | --- |
+| Community feed | 4177 px, 3 posts above the fold | 3337 px, 4 posts (−20 %) |
+| Settings | 1844 px | 1628 px |
+| Privacy & Safety | 1198 px | 1043 px |
+| Chat list rows | 76 px | 60 px |
+| Notification rows | 65 px | 57 px |
+| Community post | 224 px | 162 px |
+
+Community is a feed and stays a feed — the brief was explicitly not to force a scrolling screen into one viewport.
+Discover, Likes, Chats and Notifications each fit their viewport with no page scroll at every tested width.

@@ -17,16 +17,16 @@ export function VerifyEmailClient({ email, expired = false }: { email: string; e
 
   return (
     <div className="mt-4 flex w-full flex-col gap-2.5">
-      <p className="text-[13px] leading-relaxed text-white/85">
-        We sent a confirmation link to <span className="font-semibold text-white">{email}</span>. Open it to finish setting up your account.
+      <p className="text-body-sm leading-relaxed text-white/85">
+        We sent a confirmation link to <span className="font-medium text-white">{email}</span>. Open it to finish setting up your account.
       </p>
       {notice ? (
-        <p role="status" className="rounded-2xl bg-white/12 px-4 py-2.5 text-[12.5px] leading-relaxed text-white">
+        <p role="status" className="rounded-2xl bg-white/12 px-4 py-2.5 text-caption-sm leading-relaxed text-white">
           {notice}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="rounded-2xl bg-white/12 px-4 py-3 text-[14px] font-semibold leading-relaxed text-[#ffc9c9]">
+        <p role="alert" className="rounded-2xl bg-white/12 px-4 py-3 text-body font-medium leading-relaxed text-[#ffc9c9]">
           {error}
         </p>
       ) : null}
@@ -50,7 +50,7 @@ export function VerifyEmailClient({ email, expired = false }: { email: string; e
         >
           <GlassField label="New email address" name="email" type="email" autoComplete="email" inputMode="email" placeholder="New email address" required disabled={busy} defaultValue={email} />
           <GlassSubmit loading={busy}>{busy ? "Saving…" : "Use this address"}</GlassSubmit>
-          <button type="button" onClick={() => setChanging(false)} disabled={busy} className="h-10 text-[13px] font-medium text-white/85 underline decoration-white/40 underline-offset-[3px]">
+          <button type="button" onClick={() => setChanging(false)} disabled={busy} className="h-10 text-body-sm font-medium text-white/85 underline decoration-white/40 underline-offset-[3px]">
             Cancel
           </button>
         </form>
@@ -70,10 +70,10 @@ export function VerifyEmailClient({ email, expired = false }: { email: string; e
           >
             {busy ? "Sending…" : "Resend verification email"}
           </GlassSubmit>
-          <button type="button" onClick={() => setChanging(true)} disabled={busy} className="h-10 text-[13px] font-semibold text-white underline decoration-white/50 underline-offset-[3px]">
+          <button type="button" onClick={() => setChanging(true)} disabled={busy} className="h-10 text-body-sm font-medium text-white underline decoration-white/50 underline-offset-[3px]">
             Change email
           </button>
-          <button type="button" onClick={() => void signOutAction()} disabled={busy} className="h-10 text-[13px] font-medium text-white/85 underline decoration-white/40 underline-offset-[3px]">
+          <button type="button" onClick={() => void signOutAction()} disabled={busy} className="h-10 text-body-sm font-medium text-white/85 underline decoration-white/40 underline-offset-[3px]">
             Sign out
           </button>
         </div>

@@ -114,7 +114,7 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
 
   return (
     <ResponsiveDialog open={open} onClose={close} labelledBy={titleId} dismissible={!busy}>
-      <DialogTitle id={titleId} className="text-[22px]">New post</DialogTitle>
+      <DialogTitle id={titleId}>New post</DialogTitle>
 
       <div className="flex gap-2" role="radiogroup" aria-label="Post type">
         {KINDS.map((k) => (
@@ -125,7 +125,7 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
             aria-checked={kind === k.value}
             disabled={busy}
             onClick={() => { setKind(k.value); setError(null); }}
-            className={cn("h-11 flex-1 rounded-[14px] text-body-sm font-bold text-text", kind === k.value ? "bg-primary text-on-primary" : "bg-surface-muted")}
+            className={cn("h-11 flex-1 rounded-[14px] text-body-sm font-medium text-text", kind === k.value ? "bg-primary text-on-primary" : "bg-surface-muted")}
           >
             {k.label}
           </button>
@@ -168,14 +168,14 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
           ) : (
             <button type="button" onClick={() => fileInput.current?.click()} disabled={busy} className="flex h-30 flex-col items-center justify-center gap-1.5 rounded-xl bg-surface-muted text-text-secondary hover:bg-surface-muted">
               <ImageIcon size={24} />
-              <span className="text-body-sm font-semibold text-text">Add a photo</span>
+              <span className="text-body-sm font-medium text-text">Add a photo</span>
               <span className="text-micro">JPEG, PNG or WebP · up to 8 MB</span>
             </button>
           )}
         </div>
       ) : null}
 
-      {error ? <p role="alert" className="-mt-1 text-caption font-semibold text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="-mt-1 text-caption font-medium text-danger">{error}</p> : null}
 
       <p className="flex items-center gap-2.5 text-caption text-text-secondary">
         <PinIcon size={16} className="shrink-0" />

@@ -62,10 +62,10 @@ export function ContinueWith({
   purpose = "login",
   returnTo,
   appearance = "white",
-  markSize = 20,
+  markSize = 18,
   shape = "rounded",
   textClass = "text-cta-lg",
-  heightClass = "h-13",
+  heightClass = "h-11",
 }: {
   provider: SignInButtonProvider;
   className?: string;
@@ -94,7 +94,7 @@ export function ContinueWith({
   // stylesheet order rather than by the caller's intent.
   const radius = shape === "pill" ? "rounded-full" : "rounded-lg";
   return (
-    <Link href={href} prefetch={false} className={cn("flex items-center justify-center gap-3 shadow-sm pressable", heightClass, textClass, radius, surface, className)}>
+    <Link href={href} prefetch={false} className={cn("flex items-center justify-center gap-2.5 shadow-sm pressable", heightClass, textClass, radius, surface, className)}>
       {mark}
       {label ?? LABELS[provider]}
     </Link>

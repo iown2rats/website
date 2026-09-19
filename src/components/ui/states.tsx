@@ -4,8 +4,9 @@ import { Button } from "./button";
 import { WifiOffIcon } from "./icons";
 
 /*
- * Empty / error / offline states in the prototype's language: 72 px aqua-soft disc with a 30 px primary-pressed icon,
- * 20–22 px/800 title, 14 px secondary body (max 260 px), optional actions. Centred with 50–60 px vertical padding.
+ * Empty / error / offline states: a 52 px tinted disc with a 22 px icon, a 16 px/600 title and 13 px secondary body
+ * (max 260 px), optional actions. Compact pass (docs/DESIGN_SYSTEM.md §32): the 72 px disc, the 30 px glyph and the
+ * 48 px vertical padding were the single biggest waste of a phone viewport in the app.
  */
 
 export interface EmptyStateProps {
@@ -22,17 +23,17 @@ export function EmptyState({ icon, title, description, actions, className, frame
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center text-center gap-3",
-        framed ? "rounded-card glass-card p-8" : "px-6 py-12",
+        "flex flex-col items-center justify-center text-center gap-2",
+        framed ? "rounded-card glass-card p-5" : "px-5 py-7",
         className,
       )}
     >
-      <span className="grid place-items-center size-18 rounded-full bg-aqua-soft text-primary-ink [&>svg]:size-7.5" aria-hidden="true">
+      <span className="grid place-items-center size-13 rounded-full bg-aqua-soft text-primary-ink [&>svg]:size-5.5" aria-hidden="true">
         {icon}
       </span>
       <h2 className="text-h4 text-text">{title}</h2>
       {description ? <p className="text-body-sm text-text-secondary max-w-65">{description}</p> : null}
-      {actions ? <div className="flex gap-2.5 mt-1.5 flex-wrap justify-center">{actions}</div> : null}
+      {actions ? <div className="flex gap-2 mt-1 flex-wrap justify-center">{actions}</div> : null}
     </div>
   );
 }
@@ -59,7 +60,7 @@ export function ErrorState({
       }
       title={title}
       description={description}
-      actions={onRetry ? <Button variant="secondary" size="md" onClick={onRetry}>Try again</Button> : undefined}
+      actions={onRetry ? <Button variant="secondary" size="sm" onClick={onRetry}>Try again</Button> : undefined}
     />
   );
 }
@@ -67,15 +68,15 @@ export function ErrorState({
 /** Slim banner shown while the browser reports it is offline. Sending is disabled by the owning screen. */
 export function OfflineBanner({ className }: { className?: string }) {
   return (
-    <div role="status" className={cn("flex items-center gap-2.5 px-4 h-11 rounded-lg bg-ocean text-on-ocean text-body-sm font-semibold", className)}>
-      <WifiOffIcon size={18} className="shrink-0 text-aqua" />
+    <div role="status" className={cn("flex items-center gap-2.5 px-3.5 h-10 rounded-lg bg-ocean text-on-ocean text-body-sm", className)}>
+      <WifiOffIcon size={16} className="shrink-0 text-aqua" />
       {"You're offline. We'll reconnect automatically."}
     </div>
   );
 }
 
 /** Success moment: teal disc with check and two ripple rings (prototype onboarding done / match). */
-export function SuccessMark({ size = 120, className, label = "Done" }: { size?: number; className?: string; label?: string }) {
+export function SuccessMark({ size = 96, className, label = "Done" }: { size?: number; className?: string; label?: string }) {
   const inner = Math.round(size * 0.73);
   return (
     <span role="img" aria-label={label} className={cn("relative grid place-items-center", className)} style={{ width: size, height: size }}>

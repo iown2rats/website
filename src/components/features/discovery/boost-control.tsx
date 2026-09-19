@@ -47,7 +47,7 @@ export function BoostControl({ boost, tier, serverTime, onSync, onBoosted, onLoc
     // Compact "Nm" in the header (the full countdown is the accessible name); a 375 px header has no room for seconds.
     const minutesLeft = Math.max(1, Math.ceil(activeMs / 60_000));
     return (
-      <span className="inline-flex h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-accent px-2.5 text-caption font-bold text-on-accent tabular-nums" role="status" aria-live="polite" aria-label={`Boost active, ${formatDuration(activeMs)} left`}>
+      <span className="inline-flex h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-accent px-2.5 text-caption font-medium text-on-accent tabular-nums" role="status" aria-live="polite" aria-label={`Boost active, ${formatDuration(activeMs)} left`}>
         <BoltIcon size={14} /> {minutesLeft}m
       </span>
     );

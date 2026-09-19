@@ -57,7 +57,7 @@ export default async function AdminVerificationDetailPage({ params }: { params: 
                   ) : (
                     <span className="grid size-full place-items-center text-caption text-text-secondary">demo</span>
                   )}
-                  <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">{p.moderation.toLowerCase()}</span>
+                  <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1.5 py-0.5 text-tag font-medium uppercase text-white">{p.moderation.toLowerCase()}</span>
                 </li>
               ))}
             </ul>
@@ -68,7 +68,7 @@ export default async function AdminVerificationDetailPage({ params }: { params: 
         <Panel title="Submission">
           <KeyValueList
             items={[
-              { label: "Member", value: <Link href={`/admin/users/${d.userId}`} className="font-semibold text-primary-ink hover:underline">Open member page</Link> },
+              { label: "Member", value: <Link href={`/admin/users/${d.userId}`} className="font-medium text-primary-ink hover:underline">Open member page</Link> },
               { label: "Account state", value: <StatusPill status={d.accountStatus} /> },
               { label: "Status", value: <StatusPill status={d.status} /> },
               { label: "Submitted", value: formatDateTime(d.submittedAt) },

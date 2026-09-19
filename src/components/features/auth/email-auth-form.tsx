@@ -22,12 +22,12 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
 
   if (state.sentTo) {
     return (
-      <div className="mt-4 flex w-full flex-col gap-2 text-[13px] leading-relaxed text-white/85">
+      <div className="mt-4 flex w-full flex-col gap-2 text-body-sm leading-relaxed text-white/85">
         <p>
-          If <span className="font-semibold text-white">{state.sentTo}</span> can be used, a confirmation link is on its way. Open it to finish setting up your account.
+          If <span className="font-medium text-white">{state.sentTo}</span> can be used, a confirmation link is on its way. Open it to finish setting up your account.
         </p>
-        <p className="text-[12px] text-white/70">The link works once and expires in 24 hours. Check your spam folder if it hasn&apos;t arrived in a few minutes.</p>
-        <button type="button" onClick={() => dispatch({ type: "switchMode", mode: "signin" })} className="h-10 text-[12.5px] font-semibold text-primary underline decoration-primary/50 underline-offset-[3px]">
+        <p className="text-caption-sm text-white/70">The link works once and expires in 24 hours. Check your spam folder if it hasn&apos;t arrived in a few minutes.</p>
+        <button type="button" onClick={() => dispatch({ type: "switchMode", mode: "signin" })} className="h-10 text-caption-sm font-medium text-primary underline decoration-primary/50 underline-offset-[3px]">
           Back to sign in
         </button>
       </div>
@@ -82,11 +82,11 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
             disabled={pending}
             error={fieldError("confirmPassword")}
           />
-          <p className="px-4 text-left text-[12px] text-white/70">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
+          <p className="px-4 text-left text-caption-sm text-white/70">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
         </>
       ) : null}
       {state.error && !state.error.field ? (
-        <p role="alert" className="px-4 text-left text-[12px] font-semibold text-[#ffc9c9]">
+        <p role="alert" className="px-4 text-left text-caption-sm font-medium text-[#ffc9c9]">
           {state.error.message}
         </p>
       ) : null}
@@ -94,13 +94,13 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
       <GlassSubmit loading={pending}>{pending ? copy.busy : copy.submit}</GlassSubmit>
 
       {state.mode === "signin" ? (
-        <Link href={ROUTES.forgotPassword} className="mt-0.5 h-8 text-[12.5px] font-medium text-white/75 underline decoration-white/35 underline-offset-[3px]">
+        <Link href={ROUTES.forgotPassword} className="mt-0.5 h-8 text-caption-sm font-medium text-white/75 underline decoration-white/35 underline-offset-[3px]">
           Forgot password?
         </Link>
       ) : null}
-      <p className="mt-0.5 text-[12.5px] text-white/75">
+      <p className="mt-0.5 text-caption-sm text-white/75">
         {copy.prompt}{" "}
-        <button type="button" onClick={() => dispatch({ type: "switchMode", mode: copy.to })} disabled={pending} className="font-semibold text-primary underline decoration-primary/50 underline-offset-[3px]">
+        <button type="button" onClick={() => dispatch({ type: "switchMode", mode: copy.to })} disabled={pending} className="font-medium text-primary underline decoration-primary/50 underline-offset-[3px]">
           {copy.action}
         </button>
       </p>

@@ -94,7 +94,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
       <div className="mx-auto flex max-w-[1100px] flex-col gap-12 px-4 py-8 pb-32">
         <nav aria-label="Sections" className="flex flex-wrap gap-2">
           {["typography", "colors", "buttons", "inputs", "choice", "badges", "avatars", "surfaces", "tabs", "states", "dialogs", "plus", "card", "deck"].map((s) => (
-            <a key={s} href={`#${s}`} className="rounded-full border border-border bg-surface px-3 py-1.5 text-caption font-semibold capitalize text-text hover:bg-surface-muted">
+            <a key={s} href={`#${s}`} className="rounded-full border border-border bg-surface px-3 py-1.5 text-caption font-medium capitalize text-text hover:bg-surface-muted">
               {s}
             </a>
           ))}
@@ -230,24 +230,24 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
         <Section id="surfaces" title="Surfaces & lists">
           <div className="grid gap-4 md:grid-cols-2">
             <Card elevated className="flex flex-col gap-2.5">
-              <div className="text-caption font-semibold text-text-secondary">My perfect weekend...</div>
+              <div className="text-caption font-medium text-text-secondary">My perfect weekend...</div>
               <div className="text-prompt">A ferry to a quiet island, a book, and no signal until Sunday evening.</div>
             </Card>
             <OceanCard>
-              <div className="text-caption font-semibold text-aqua">My ideal first date...</div>
+              <div className="text-caption font-medium text-aqua">My ideal first date...</div>
               <div className="text-prompt text-on-ocean">Somewhere with a view of the water and nowhere to be after.</div>
             </OceanCard>
             <ListGroup>
-              <ListRow height={60} label="My Likes" meta="0" />
-              <ListRow height={60} label="My Matches" meta="3" />
-              <ListRow height={60} label="Membership" meta="Free" />
-              <ListRow height={60} label="Delete account" tone="danger" chevron={false} />
+              <ListRow height={54} label="My Likes" meta="0" />
+              <ListRow height={54} label="My Matches" meta="3" />
+              <ListRow height={54} label="Membership" meta="Free" />
+              <ListRow height={54} label="Delete account" tone="danger" chevron={false} />
             </ListGroup>
             <div className="flex flex-col gap-3">
               <SectionLabel>Section label</SectionLabel>
               <Surface className="flex flex-col gap-1.5">
                 <div className="text-micro text-text-secondary">The quickest way to win me over...</div>
-                <div className="text-body font-semibold">Bring good hedhikaa and a strong opinion about football.</div>
+                <div className="text-body font-medium">Bring good hedhikaa and a strong opinion about football.</div>
               </Surface>
               <Divider />
               <Callout>{"Mellocrush is 18+ only. Your age is shown, your birthday isn't."}</Callout>
@@ -298,7 +298,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
           </div>
           <BottomSheet open={sheet} onClose={() => setSheet(false)} labelledBy="ds-sheet-title">
             <div className="flex items-center justify-between"><DialogTitle id="ds-sheet-title">Filters</DialogTitle><Button variant="ghost" size="sm" className="text-primary-ink" onClick={() => setSheet(false)}>Reset</Button></div>
-            <div className="flex flex-col gap-2.5"><div className="text-body font-semibold">Show me</div><div className="flex gap-2">{["Women", "Men", "Everyone"].map((g, i) => <Chip key={g} selected={i === 0} className="flex-1 justify-center rounded-md">{g}</Chip>)}</div></div>
+            <div className="flex flex-col gap-2.5"><div className="text-body font-medium">Show me</div><div className="flex gap-2">{["Women", "Men", "Everyone"].map((g, i) => <Chip key={g} selected={i === 0} className="flex-1 justify-center rounded-md">{g}</Chip>)}</div></div>
             <Button onClick={() => setSheet(false)} className="text-cta-lg">Apply</Button>
           </BottomSheet>
           <Modal open={modal} onClose={() => setModal(false)} labelledBy="ds-modal-title">
@@ -320,13 +320,13 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
             </OceanCard>
             <div className="flex flex-col gap-3">
               <OceanCard className="gap-2">
-                <div className="flex items-center gap-2 text-body-lg font-extrabold text-on-ocean"><EyeOffIcon size={20} className="text-aqua" /> Invisible Mode</div>
+                <div className="flex items-center gap-2 text-body-lg font-medium text-on-ocean"><EyeOffIcon size={20} className="text-aqua" /> Invisible Mode</div>
                 <p className="text-body-sm text-on-ocean-muted">Only people you like can discover your profile. Existing matches and chats stay available.</p>
                 <Button variant="plus" size="md" onClick={() => setPlusSheet(true)}>Enable Invisible Mode</Button>
               </OceanCard>
               <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface px-4.5 py-3.5">
                 <span className="grid size-9 place-items-center rounded-sm bg-surface-muted text-ocean"><LockIcon size={18} /></span>
-                <div className="flex-1"><div className="text-body font-bold">Chat without waiting</div><div className="text-caption-sm text-text-secondary">No 9-minute message cooldown.</div></div>
+                <div className="flex-1"><div className="text-body font-medium">Chat without waiting</div><div className="text-caption-sm text-text-secondary">No 9-minute message cooldown.</div></div>
                 <PlusTag />
               </div>
               <Button variant="plus" className="text-cta-lg">Continue with Plus</Button>
@@ -335,7 +335,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
           <BottomSheet open={plusSheet} onClose={() => setPlusSheet(false)} labelledBy="ds-plus-title">
             <div className="flex items-start gap-3">
               <span className="grid size-11 shrink-0 place-items-center rounded-md bg-aqua-soft text-on-aqua-soft"><EyeOffIcon size={22} /></span>
-              <div className="flex-1"><DialogTitle id="ds-plus-title" className="text-prompt font-extrabold">Invisible Mode</DialogTitle><p className="text-caption text-text-secondary">Choose who can see you.</p></div>
+              <div className="flex-1"><DialogTitle id="ds-plus-title" className="text-prompt">Invisible Mode</DialogTitle><p className="text-caption text-text-secondary">Choose who can see you.</p></div>
               <PlusTag />
             </div>
             <ul className="flex flex-col gap-2 text-body-sm">

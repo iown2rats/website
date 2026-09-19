@@ -95,7 +95,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             <ul className="mt-4 flex flex-col divide-y divide-border text-caption">
               {d.membership.subscriptions.map((s) => (
                 <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span className="font-semibold text-text">{s.planName}</span>
+                  <span className="font-medium text-text">{s.planName}</span>
                   <span className="text-text-secondary">{formatShortDate(s.currentPeriodStart)} → {formatShortDate(s.currentPeriodEnd)}</span>
                   <StatusPill status={s.status} />
                   {s.orderReference ? <span className="font-mono">{s.orderReference}</span> : null}
@@ -130,17 +130,17 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             {d.audit.map((e) => (
               <li key={e.id} className="flex flex-col gap-1 py-2.5 text-caption">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono font-semibold text-text">{e.action}</span>
+                  <span className="font-mono font-medium text-text">{e.action}</span>
                   <span className="text-text-secondary">by {e.actor}</span>
                   <span className="ml-auto text-text-secondary">{formatDateTime(e.createdAt)}</span>
                 </div>
-                {e.data ? <pre className="overflow-x-auto rounded-lg bg-surface-muted p-2 text-[11px] leading-snug text-text-secondary">{JSON.stringify(e.data, null, 1)}</pre> : null}
+                {e.data ? <pre className="overflow-x-auto rounded-lg bg-surface-muted p-2 text-tiny leading-snug text-text-secondary">{JSON.stringify(e.data, null, 1)}</pre> : null}
               </li>
             ))}
           </ul>
         )}
         <p className="mt-3 text-caption text-text-secondary">
-          Full log: <Link href={`/admin/audit?targetId=${a.userId}`} className="font-semibold text-primary-ink hover:underline">audit entries for this user</Link>
+          Full log: <Link href={`/admin/audit?targetId=${a.userId}`} className="font-medium text-primary-ink hover:underline">audit entries for this user</Link>
         </p>
       </Panel>
     </AdminPage>

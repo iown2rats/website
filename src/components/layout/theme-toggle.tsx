@@ -55,7 +55,7 @@ export function ThemeToggleButton({ className }: { className?: string }) {
   const [theme, toggle] = useTheme();
   return (
     <Button variant="secondary" size="sm" onClick={toggle} className={className} aria-pressed={theme === "dark"}>
-      <span className="text-caption font-semibold text-text-secondary">{theme === "dark" ? "Light appearance" : "Dark appearance"}</span>
+      <span className="text-caption font-medium text-text-secondary">{theme === "dark" ? "Light appearance" : "Dark appearance"}</span>
     </Button>
   );
 }

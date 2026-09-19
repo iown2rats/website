@@ -41,7 +41,7 @@ function CheckRow({ label, check }: { label: string; check: ReceiptCheck }) {
       <CheckStateIcon state={check.state} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-body-sm font-bold text-text">{label}</span>
+          <span className="text-body-sm font-medium text-text">{label}</span>
           <span className="text-caption text-text-secondary">{STATE_LABELS[check.state]}</span>
         </div>
         {check.detected !== undefined || check.expected ? (
@@ -79,7 +79,7 @@ export function ReceiptCheckPanel({ orderId, verification, history, canRerun, ch
           {dupMeta && typeof dupMeta.orderId === "string" ? (
             <>
               {" "}
-              <Link href={`/admin/payments/${dupMeta.orderId}`} className="font-bold underline">
+              <Link href={`/admin/payments/${dupMeta.orderId}`} className="font-medium underline">
                 Open order {String(dupMeta.reference ?? "")}
               </Link>
               . This is a review signal, not a verdict: the customer may have uploaded the same slip twice.
@@ -109,7 +109,7 @@ export function ReceiptCheckPanel({ orderId, verification, history, canRerun, ch
       />
       {history.length > 1 ? (
         <details className="text-caption text-text-secondary">
-          <summary className="cursor-pointer font-bold text-text">Earlier readings ({history.length - 1})</summary>
+          <summary className="cursor-pointer font-medium text-text">Earlier readings ({history.length - 1})</summary>
           <ul className="mt-2 flex flex-col gap-1">
             {history.slice(1).map((h) => (
               <li key={h.id}>

@@ -4,11 +4,13 @@ import { photoBackground, type PhotoRef } from "@/lib/photos";
 import { VerifiedBadge } from "./icons";
 
 /*
- * Avatars from the prototype: plain circles at 40/44/48/52/56/64; "new match" ring = 2.5 px primary border
- * with 2–3 px padding; profile ring 104 px with r=49 4 px arc showing completion.
+ * Avatars: plain circles from 28 to 88; "new match" ring = 2.5 px primary border with 2–3 px padding; profile
+ * ring with a 4 px arc showing completion. The compact pass (docs/DESIGN_SYSTEM.md §32) took the default from 44
+ * to 40 and moved feed and list rows down a step — an avatar is the tallest thing in most rows, so it sets the
+ * row height more than the text does.
  */
 
-export type AvatarSize = 32 | 40 | 44 | 48 | 52 | 56 | 64 | 88;
+export type AvatarSize = 28 | 32 | 36 | 40 | 44 | 48 | 52 | 56 | 64 | 88;
 
 export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   photo?: PhotoRef | null;
@@ -17,7 +19,7 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   ring?: boolean;
 }
 
-export function Avatar({ photo, name, size = 44, ring = false, className, style, ...rest }: AvatarProps) {
+export function Avatar({ photo, name, size = 40, ring = false, className, style, ...rest }: AvatarProps) {
   const pad = ring ? (size >= 64 ? 3 : 2) : 0;
   const inner: CSSProperties = { ...photoBackground(photo ?? null) };
   return (
@@ -36,7 +38,7 @@ export function Avatar({ photo, name, size = 44, ring = false, className, style,
 export interface ProfileAvatarProps {
   photo?: PhotoRef | null;
   name: string;
-  size?: 88 | 104;
+  size?: 76 | 88 | 104;
   verified?: boolean;
   /** 0–100. Renders the completion arc when provided. */
   completion?: number;
@@ -45,7 +47,7 @@ export interface ProfileAvatarProps {
 }
 
 /** Profile-tab avatar: optional completion ring (prototype 104 px, r 49, 4 px stroke) and teal "n% complete" pill. */
-export function ProfileAvatar({ photo, name, size = 104, verified = false, completion, completionLabel, className }: ProfileAvatarProps) {
+export function ProfileAvatar({ photo, name, size = 88, verified = false, completion, completionLabel, className }: ProfileAvatarProps) {
   const r = size / 2 - 3;
   const c = 2 * Math.PI * r;
   const pct = completion == null ? null : Math.max(0, Math.min(100, completion));
@@ -68,9 +70,9 @@ export function ProfileAvatar({ photo, name, size = 104, verified = false, compl
         </svg>
       ) : null}
       <span role="img" aria-label={name} className="absolute inset-2 rounded-full bg-aqua-soft" style={photoBackground(photo ?? null)} />
-      {verified ? <VerifiedBadge size={22} className="absolute right-1 top-1" /> : null}
+      {verified ? <VerifiedBadge size={20} className="absolute right-1 top-1" /> : null}
       {pct != null ? (
-        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-5.5 px-2.25 rounded-full bg-accent text-on-accent text-[11px] font-extrabold flex items-center whitespace-nowrap">
+        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-5 px-2 rounded-full bg-accent text-on-accent text-tag flex items-center whitespace-nowrap">
           {completionLabel ?? `${pct}% complete`}
         </span>
       ) : null}

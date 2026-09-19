@@ -16,8 +16,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (done) {
     return (
       <div className="mt-4 flex w-full flex-col gap-3">
-        <p className="text-[13px] leading-relaxed text-white/85">Your password is changed and every device has been signed out. Sign in with the new password.</p>
-        <Link href={ROUTES.welcome} className="pressable flex h-12 w-full items-center justify-center rounded-full bg-primary text-[15px] font-bold text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
+        <p className="text-body-sm leading-relaxed text-white/85">Your password is changed and every device has been signed out. Sign in with the new password.</p>
+        <Link href={ROUTES.welcome} className="pressable flex h-11 w-full items-center justify-center rounded-full bg-primary text-cta-lg font-medium text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
           Go to sign in
         </Link>
       </div>
@@ -60,9 +60,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
         disabled={busy}
         error={error?.field === "confirmPassword" ? error.message : undefined}
       />
-      <p className="px-4 text-left text-[12px] text-white/70">At least {PASSWORD_RULES.minLength} characters.</p>
+      <p className="px-4 text-left text-caption-sm text-white/70">At least {PASSWORD_RULES.minLength} characters.</p>
       {error && !error.field ? (
-        <p role="alert" className="px-4 text-left text-[12px] font-semibold text-[#ffc9c9]">
+        <p role="alert" className="px-4 text-left text-caption-sm font-medium text-[#ffc9c9]">
           {error.message}
         </p>
       ) : null}

@@ -36,7 +36,7 @@ export function PrivacyForm({ initial }: { initial: { hideLocation: boolean; hid
         <p className="text-caption text-text-secondary">
           Full address-book blocking is available in the Mellocrush app. On the web you can add numbers to hide from later in Privacy &amp; Safety.
         </p>
-        <Button type="button" variant={blockContacts ? "secondary" : "primary"} size="md" className="h-13 text-body font-bold" onClick={() => setBlockContacts((v) => !v)} aria-pressed={blockContacts}>
+        <Button type="button" variant={blockContacts ? "secondary" : "primary"} size="md" className="h-11.5 text-body font-medium" onClick={() => setBlockContacts((v) => !v)} aria-pressed={blockContacts}>
           {blockContacts ? "Contact blocking on ✓" : "Turn on contact blocking"}
         </Button>
       </OceanCard>
@@ -45,14 +45,14 @@ export function PrivacyForm({ initial }: { initial: { hideLocation: boolean; hid
         <ListRow asDiv label="Hide my location" meta={undefined} className="py-3.5" trailing={<Switch checked={hideLocation} onCheckedChange={setHideLocation} aria-label="Hide my location" />} />
         <ListRow asDiv label="Hide my age" className="py-3.5" trailing={<Switch checked={hideAge} onCheckedChange={setHideAge} aria-label="Hide my age" />} />
       </ListGroup>
-      <div className="-mt-2 px-4.5 text-caption-sm text-text-secondary">
+      <div className="-mt-2 px-3.5 text-caption-sm text-text-secondary">
         Hide my location shows nothing instead of your island. Hide my age means others see only your name.
       </div>
 
-      <div className="flex items-center gap-3.5 rounded-2xl glass-card px-4.5 py-3.5">
+      <div className="flex items-center gap-3.5 rounded-2xl glass-card px-3.5 py-3.5">
         <span className="grid size-9 shrink-0 place-items-center rounded-sm bg-aqua-soft text-on-aqua-soft"><EyeOffIcon size={18} /></span>
         <div className="min-w-0 flex-1">
-          <div className="text-body font-bold">Invisible Mode</div>
+          <div className="text-body font-medium">Invisible Mode</div>
           <div className="text-caption-sm text-text-secondary">Only people you like can discover you. Available with Mellocrush Plus.</div>
         </div>
         <PlusTag />

@@ -65,7 +65,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
     setDraft({ interestedIn: draft.interestedIn, ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: null, heightMaxCm: null, education: null });
     setShowPicker(false);
   };
-  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md text-body-sm font-semibold text-text", on ? "bg-primary text-on-primary" : "bg-surface-muted");
+  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md text-body-sm font-medium text-text", on ? "bg-primary text-on-primary" : "bg-surface-muted");
   const specificName = locations.find((l) => l.id === draft.locationId)?.name;
 
   return (
@@ -76,14 +76,14 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       className="desktop:max-w-[560px]"
       footer={
         <div className="flex flex-col gap-2.5">
-          {error ? <p role="alert" className="text-body-sm font-semibold text-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-body-sm font-medium text-danger">{error}</p> : null}
           <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={draft.locationScope === "SPECIFIC" && !draft.locationId}>Apply</Button>
         </div>
       }
     >
       <div className="flex items-center justify-between">
-        <h2 id={titleId} className="text-[22px] font-extrabold tracking-[-.02em]">Filters</h2>
-        <button type="button" onClick={reset} className="h-10 border-0 bg-transparent text-body-sm font-bold text-primary-ink">Reset</button>
+        <h2 id={titleId} className="text-h3">Filters</h2>
+        <button type="button" onClick={reset} className="h-10 border-0 bg-transparent text-body-sm font-medium text-primary-ink">Reset</button>
       </div>
 
       {/*
@@ -91,9 +91,9 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         * each taking a full row of a 560 px panel. The wrapper is a plain column below that, which keeps the phone
         * sheet exactly as it was — and keeps it a direct child of the scrolling body, which must not shrink.
         */}
-      <div className="flex flex-col gap-4 desktop:grid desktop:grid-cols-2 desktop:gap-5">
+      <div className="flex flex-col gap-4 desktop:grid desktop:grid-cols-2 desktop:gap-3.5">
         <section className="flex flex-col gap-3">
-          <div className="flex justify-between text-body font-semibold">
+          <div className="flex justify-between text-body font-medium">
             <span>Age range</span>
             <span className="text-text-secondary tabular-nums">{draft.ageMin}–{draft.ageMax}</span>
           </div>
@@ -105,7 +105,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         </section>
 
         <section className="flex flex-col gap-2.5">
-          <div className="text-body font-semibold">Show me</div>
+          <div className="text-body font-medium">Show me</div>
           <div className="flex gap-2" role="radiogroup" aria-label="Show me">
             {([["WOMEN", "Women"], ["MEN", "Men"], ["EVERYONE", "Everyone"]] as const).map(([v, label]) => (
               <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => set("interestedIn", v)} className={segment(draft.interestedIn === v)}>{label}</button>
@@ -115,7 +115,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       </div>
 
       <section className="flex flex-col gap-2.5">
-        <div className="text-body font-semibold">Location</div>
+        <div className="text-body font-medium">Location</div>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Location">
           <Chip role="radio" aria-checked={draft.locationScope === "ANYWHERE"} selected={draft.locationScope === "ANYWHERE"} onClick={() => { set("locationScope", "ANYWHERE"); setShowPicker(false); }}>Anywhere in Maldives</Chip>
           <Chip role="radio" aria-checked={draft.locationScope === "GREATER_MALE"} selected={draft.locationScope === "GREATER_MALE"} onClick={() => { set("locationScope", "GREATER_MALE"); setShowPicker(false); }}>Greater Malé</Chip>
@@ -133,7 +133,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       </section>
 
       <section className="flex flex-col gap-2.5">
-        <div className="text-body font-semibold">Looking for</div>
+        <div className="text-body font-medium">Looking for</div>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Looking for">
           <Chip role="radio" aria-checked={draft.intent === null} selected={draft.intent === null} onClick={() => set("intent", null)}>Any</Chip>
           {INTENTS.map(([v, label]) => (
@@ -143,7 +143,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       </section>
 
       <section className="overflow-hidden rounded-2xl glass-card">
-        <div className="flex items-center gap-2 bg-surface-muted px-4.5 py-3.5 text-tag font-bold uppercase tracking-[.08em] text-ocean">
+        <div className="flex items-center gap-2 bg-surface-muted px-3.5 py-3.5 text-tag uppercase tracking-[.08em] text-ocean">
           <PlusTag size="sm" label="Premium" />
           Advanced filters
         </div>
@@ -162,7 +162,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         ) : (
           <div className="flex flex-col [&>*+*]:border-t [&>*+*]:border-border">
             {["Height", "Education"].map((label) => (
-              <button key={label} type="button" onClick={onLockedAdvanced} className="flex h-13 w-full items-center justify-between border-0 bg-surface px-4.5 text-body font-semibold text-text">
+              <button key={label} type="button" onClick={onLockedAdvanced} className="flex h-11.5 w-full items-center justify-between border-0 bg-surface px-3.5 text-body font-medium text-text">
                 <span>{label}</span>
                 <LockIcon size={16} className="text-text-secondary" />
               </button>

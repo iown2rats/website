@@ -91,7 +91,7 @@ export function DeckPaused() {
       icon={<EyeOffIcon strokeWidth={2} />}
       title="Dating is paused."
       description="You're hidden from Discover and won't see new people. Your matches and chats keep working."
-      actions={<Link href="/settings/privacy" className="inline-flex h-11 items-center rounded-lg bg-primary px-5 text-body-sm font-bold text-on-primary">Resume in Privacy &amp; Safety</Link>}
+      actions={<Link href="/settings/privacy" className="inline-flex h-11 items-center rounded-lg bg-primary px-5 text-body-sm font-medium text-on-primary">Resume in Privacy &amp; Safety</Link>}
     />
   );
 }

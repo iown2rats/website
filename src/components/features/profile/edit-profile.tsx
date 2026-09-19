@@ -100,8 +100,8 @@ export function EditProfile({ initial, section: initialSection, locations, inter
   const toggleInterest = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= INTEREST_LIMITS.max ? s : [...s, id]));
   const dob = profile.dob ? `${String(profile.dob.day).padStart(2, "0")} · ${String(profile.dob.month).padStart(2, "0")} · ${profile.dob.year}` : "";
 
-  const rowClass = "flex h-14 items-center justify-between gap-4 px-4.5 text-body";
-  const valueInput = "min-w-0 flex-1 border-0 bg-transparent text-right text-body font-semibold text-text outline-none placeholder:font-medium placeholder:text-text-muted";
+  const rowClass = "flex h-12 items-center justify-between gap-4 px-3.5 text-body";
+  const valueInput = "min-w-0 flex-1 border-0 bg-transparent text-right text-body font-medium text-text outline-none placeholder:font-medium placeholder:text-text-muted";
 
   return (
     <PageOverlay
@@ -123,11 +123,11 @@ export function EditProfile({ initial, section: initialSection, locations, inter
           <div className="flex shrink-0 flex-col overflow-hidden rounded-card glass-card [&>*+*]:border-t [&>*+*]:border-border">
             <div className={rowClass}>
               <span className="shrink-0 text-text-secondary">Name</span>
-              <span className="truncate text-right font-semibold text-text opacity-55" aria-readonly="true">{profile.name}</span>
+              <span className="truncate text-right font-medium text-text opacity-55" aria-readonly="true">{profile.name}</span>
             </div>
             <div className={rowClass}>
               <span className="shrink-0 text-text-secondary">Date of birth</span>
-              <span className="text-right font-semibold text-text opacity-55 tabular-nums" aria-readonly="true">{dob}</span>
+              <span className="text-right font-medium text-text opacity-55 tabular-nums" aria-readonly="true">{dob}</span>
             </div>
             <label className={rowClass}>
               <span className="shrink-0 text-text-secondary">Gender</span>
@@ -138,11 +138,11 @@ export function EditProfile({ initial, section: initialSection, locations, inter
             </label>
             <button type="button" onClick={() => setPicker("location")} className={cn(rowClass, "w-full border-0 bg-transparent text-left hover:bg-surface-muted")} aria-haspopup="dialog">
               <span className="shrink-0 text-text-secondary">Location</span>
-              <span className="flex min-w-0 items-center gap-1 font-semibold text-text"><span className="truncate">{locationName(info.locationId) ?? "Choose"}</span><ChevronRightIcon size={16} className="text-text-secondary" /></span>
+              <span className="flex min-w-0 items-center gap-1 font-medium text-text"><span className="truncate">{locationName(info.locationId) ?? "Choose"}</span><ChevronRightIcon size={16} className="text-text-secondary" /></span>
             </button>
             <button type="button" onClick={() => setPicker("home")} className={cn(rowClass, "w-full border-0 bg-transparent text-left hover:bg-surface-muted")} aria-haspopup="dialog">
               <span className="shrink-0 text-text-secondary">Home island</span>
-              <span className="flex min-w-0 items-center gap-1 font-semibold text-text"><span className={cn("truncate", !info.homeLocationId && "font-medium text-text-muted")}>{locationName(info.homeLocationId) ?? "Optional"}</span><ChevronRightIcon size={16} className="text-text-secondary" /></span>
+              <span className="flex min-w-0 items-center gap-1 font-medium text-text"><span className={cn("truncate", !info.homeLocationId && "font-medium text-text-muted")}>{locationName(info.homeLocationId) ?? "Optional"}</span><ChevronRightIcon size={16} className="text-text-secondary" /></span>
             </button>
             <label className={rowClass}>
               <span className="shrink-0 text-text-secondary">Occupation</span>
@@ -172,7 +172,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
           <SectionLabel>Relationship intention</SectionLabel>
           <RadioGroup label="Relationship intention" className="-mt-2 gap-2">
             {INTENTS.map(([value, label]) => (
-              <RadioCard key={value} selected={intent === value} onSelect={() => setIntent(value)} label={label} className="h-13.5" />
+              <RadioCard key={value} selected={intent === value} onSelect={() => setIntent(value)} label={label} className="h-12" />
             ))}
           </RadioGroup>
         </>
@@ -202,12 +202,12 @@ export function EditProfile({ initial, section: initialSection, locations, inter
               const canOpen = has || answered.length < PROMPT_LIMITS.max;
               return (
                 <div key={p.id} className={cn("shrink-0 overflow-hidden rounded-2xl", has ? "bg-primary-soft" : "bg-surface-muted")}>
-                  <button type="button" aria-expanded={isOpen} onClick={() => (isOpen ? setOpenPrompt(null) : canOpen ? setOpenPrompt(p.id) : undefined)} className="flex h-13.5 w-full items-center justify-between border-0 bg-transparent px-4.5 text-left text-body font-bold text-text">
+                  <button type="button" aria-expanded={isOpen} onClick={() => (isOpen ? setOpenPrompt(null) : canOpen ? setOpenPrompt(p.id) : undefined)} className="flex h-12 w-full items-center justify-between border-0 bg-transparent px-3.5 text-left text-body font-medium text-text">
                     <span>{p.text}</span>
                     <span className="text-micro text-primary-ink">{has ? "Answered" : canOpen ? "Add" : ""}</span>
                   </button>
                   {isOpen ? (
-                    <textarea aria-label={p.text} value={answer} maxLength={200} rows={2} autoFocus onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} placeholder="Your answer" className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-4.5 py-3.5 text-body leading-normal text-text outline-none placeholder:text-text-muted" />
+                    <textarea aria-label={p.text} value={answer} maxLength={200} rows={2} autoFocus onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} placeholder="Your answer" className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-3.5 py-3.5 text-body leading-normal text-text outline-none placeholder:text-text-muted" />
                   ) : null}
                 </div>
               );
@@ -216,7 +216,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
         </>
       ) : null}
 
-      {error ? <p role="alert" className="text-caption font-semibold text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="text-caption font-medium text-danger">{error}</p> : null}
 
       <LocationPicker open={picker === "location"} onClose={() => setPicker(null)} title="Where do you live?" locations={locations} selectedId={info.locationId} onSelect={(id) => setInfo({ ...info, locationId: id })} />
       <LocationPicker open={picker === "home"} onClose={() => setPicker(null)} title="Home island" locations={locations} selectedId={info.homeLocationId} onSelect={(id) => setInfo({ ...info, homeLocationId: id })} allowNone />

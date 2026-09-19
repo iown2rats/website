@@ -23,7 +23,7 @@ export function NameForm({ initialName }: { initialName: string }) {
         maxLength={40}
         autoFocus
         aria-invalid={error ? true : undefined}
-        className="h-13 rounded-lg bg-surface-muted px-4 text-input-lg text-text outline-none placeholder:text-text-muted focus-visible:outline-2 focus-visible:outline-primary"
+        className="h-11.5 rounded-lg bg-surface-muted px-4 text-input-lg text-text outline-none placeholder:text-text-muted focus-visible:outline-2 focus-visible:outline-primary"
       />
       <p className="text-caption text-text-secondary">{"Shown on your profile. You can't change it later."}</p>
       <FormError message={error} />

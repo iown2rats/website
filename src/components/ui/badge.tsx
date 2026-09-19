@@ -3,9 +3,10 @@ import { cn } from "@/lib/cn";
 
 /*
  * Tags and badges from the prototype:
- *  - CounterBadge: rose pill, plum text, 11 px/800, min 20 px (nav variant 16 px, 9.5 px).
- *  - PlusTag: Plus gold background, plum text, 8.5–12 px/800, letter-spacing .04em, radius 5–8 (the only gold in the UI).
- *  - Tag: teal-tint background, plum text, 11 px/800 uppercase (QUESTION), radius 8.
+ *  - CounterBadge: rose pill, plum text, 11 px/600, min 18 px (nav variant 14 px).
+ *  - PlusTag: Plus gold background, plum text, 9–10.5 px/600, radius 5–8 (the only gold in the UI).
+ *  - Tag: tinted background, plum text, 10.5 px/600 uppercase (QUESTION), radius 8.
+ * Compact pass (§32): the chips lost a weight step and a size step; the gold and the rose are untouched.
  */
 
 export interface CounterBadgeProps extends HTMLAttributes<HTMLSpanElement> {
@@ -21,8 +22,8 @@ export function CounterBadge({ count, compact = false, max = 99, className, ...r
   return (
     <span
       className={cn(
-        "inline-grid place-items-center rounded-full bg-primary text-on-primary font-extrabold tabular-nums",
-        compact ? "min-w-4 h-4 px-1 text-[9.5px]" : "min-w-5 h-5 px-1.5 text-[11px]",
+        "inline-grid place-items-center rounded-full bg-primary text-on-primary font-medium tabular-nums",
+        compact ? "min-w-3.5 h-3.5 px-1 text-tag" : "min-w-4.5 h-4.5 px-1.5 text-tiny",
         className,
       )}
       {...rest}
@@ -55,10 +56,10 @@ export function Tag({ variant = "aqua", size = "sm", className, children, ...res
   return (
     <span
       className={cn(
-        "inline-flex items-center uppercase font-extrabold tracking-[.06em] whitespace-nowrap",
-        size === "xs" && "h-4 px-1.25 text-[8.5px] rounded-[5px] tracking-[.04em]",
-        size === "sm" && "h-5.5 px-2 text-[10px] rounded-[7px] tracking-[.04em]",
-        size === "md" && "h-6 px-2.5 text-tag rounded-xs",
+        "inline-flex items-center uppercase font-medium tracking-[.04em] whitespace-nowrap",
+        size === "xs" && "h-4 px-1.25 text-[9px] rounded-[5px] tracking-[.03em]",
+        size === "sm" && "h-5 px-1.75 text-tag rounded-[6px]",
+        size === "md" && "h-5.5 px-2 text-tag rounded-xs",
         tagVariant[variant],
         className,
       )}
@@ -81,7 +82,7 @@ export function PlusTag({ size = "sm", className, label = "Plus" }: { size?: "xs
 /** Larger label chip "MELLOCRUSH PLUS" on the Plus hero (26 px, gold background, plum text). */
 export function PlusHeroTag({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center h-6.5 px-2.5 rounded-xs bg-sand text-on-sand text-micro font-extrabold tracking-[.04em] uppercase", className)}>
+    <span className={cn("inline-flex items-center h-6 px-2.5 rounded-xs bg-sand text-on-sand text-tag uppercase", className)}>
       Mellocrush Plus
     </span>
   );
@@ -90,7 +91,7 @@ export function PlusHeroTag({ className }: { className?: string }) {
 /** Generic status badge (Verified / Pending / Free / Plus) for list-row meta. */
 export function StatusBadge({ children, tone = "neutral", className }: { children: ReactNode; tone?: TagVariant; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center h-6 px-2.5 rounded-xs text-tag font-extrabold", tagVariant[tone], className)}>
+    <span className={cn("inline-flex items-center h-5.5 px-2 rounded-xs text-tag", tagVariant[tone], className)}>
       {children}
     </span>
   );

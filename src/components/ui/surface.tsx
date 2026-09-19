@@ -18,7 +18,8 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   radius?: "2xl" | "3xl";
 }
 
-const cardPadding = { none: "", sm: "p-4", md: "p-4.5", lg: "p-5.5" };
+/* Compact pass (docs/DESIGN_SYSTEM.md §32): 16 / 18 / 22 becomes 12 / 14 / 16. Borderless and glass as before. */
+const cardPadding = { none: "", sm: "p-3", md: "p-3.5", lg: "p-4" };
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(function Card({ padding = "md", elevated = false, radius = "3xl", className, ...rest }, ref) {
   return (
@@ -41,9 +42,9 @@ export interface OceanCardProps extends HTMLAttributes<HTMLDivElement> {
 
 export function OceanCard({ className, premium = false, children, ...rest }: OceanCardProps) {
   return (
-    <div className={cn("relative overflow-hidden rounded-3xl p-5.5 flex flex-col gap-3.5", "glass-card text-text", className)} {...rest}>
-      {premium ? <span aria-hidden="true" className="absolute -right-15 -top-15 size-55 rounded-full bg-sand/15" /> : null}
-      <div className="relative flex flex-col gap-3.5">{children}</div>
+    <div className={cn("relative overflow-hidden rounded-3xl p-4 flex flex-col gap-2.5", "glass-card text-text", className)} {...rest}>
+      {premium ? <span aria-hidden="true" className="absolute -right-15 -top-15 size-46 rounded-full bg-sand/15" /> : null}
+      <div className="relative flex flex-col gap-2.5">{children}</div>
     </div>
   );
 }
@@ -67,23 +68,23 @@ export interface ListRowProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   trailing?: ReactNode;
   chevron?: boolean;
   tone?: "default" | "danger";
-  height?: 54 | 56 | 60;
+  height?: 48 | 50 | 54;
   /** Render as a non-interactive row (e.g. toggles live inside). */
   asDiv?: boolean;
 }
 
-export function ListRow({ label, meta, leading, trailing, chevron = true, tone = "default", height = 56, asDiv = false, className, ...rest }: ListRowProps) {
+export function ListRow({ label, meta, leading, trailing, chevron = true, tone = "default", height = 50, asDiv = false, className, ...rest }: ListRowProps) {
   const content = (
     <>
       {leading}
-      <span className="flex-1 min-w-0 text-body font-semibold truncate">{label}</span>
-      {meta ? <span className="text-caption text-text-secondary font-medium shrink-0">{meta}</span> : null}
+      <span className="flex-1 min-w-0 text-body truncate">{label}</span>
+      {meta ? <span className="text-caption text-text-secondary shrink-0">{meta}</span> : null}
       {trailing}
-      {chevron && !asDiv ? <ChevronRightIcon size={18} className="text-text-secondary shrink-0" /> : null}
+      {chevron && !asDiv ? <ChevronRightIcon size={16} className="text-text-secondary shrink-0" /> : null}
     </>
   );
   const classes = cn(
-    "w-full flex items-center gap-3.5 px-4.5 text-left bg-transparent border-0",
+    "w-full flex items-center gap-3 px-3.5 text-left bg-transparent border-0",
     tone === "danger" ? "text-danger" : "text-text",
     !asDiv && "hover:bg-surface-muted transition-colors duration-150",
     className,
@@ -103,24 +104,24 @@ export function ListRow({ label, meta, leading, trailing, chevron = true, tone =
 }
 
 /** ListRow rendered as a navigation link (Profile and Settings rows that open a page). */
-export function LinkRow({ href, label, meta, leading, trailing, chevron = true, tone = "default", height = 56, className, ...rest }: Omit<ListRowProps, "asDiv" | "onClick"> & { href: string } & Omit<React.ComponentProps<typeof Link>, "href">) {
+export function LinkRow({ href, label, meta, leading, trailing, chevron = true, tone = "default", height = 50, className, ...rest }: Omit<ListRowProps, "asDiv" | "onClick"> & { href: string } & Omit<React.ComponentProps<typeof Link>, "href">) {
   return (
     <Link
       href={href}
-      className={cn("w-full flex items-center gap-3.5 px-4.5 text-left bg-transparent border-0 hover:bg-surface-muted transition-colors duration-150", tone === "danger" ? "text-danger" : "text-text", className)}
+      className={cn("w-full flex items-center gap-3 px-3.5 text-left bg-transparent border-0 hover:bg-surface-muted transition-colors duration-150", tone === "danger" ? "text-danger" : "text-text", className)}
       style={{ minHeight: height }}
       {...rest}
     >
       {leading}
-      <span className="flex-1 min-w-0 text-body font-semibold truncate">{label}</span>
-      {meta ? <span className="text-caption text-text-secondary font-medium shrink-0">{meta}</span> : null}
+      <span className="flex-1 min-w-0 text-body truncate">{label}</span>
+      {meta ? <span className="text-caption text-text-secondary shrink-0">{meta}</span> : null}
       {trailing}
-      {chevron ? <ChevronRightIcon size={18} className="text-text-secondary shrink-0" /> : null}
+      {chevron ? <ChevronRightIcon size={16} className="text-text-secondary shrink-0" /> : null}
     </Link>
   );
 }
 
-/** Uppercase 12 px section label ("ABOUT ME", "NEW MATCHES"). */
+/** Uppercase section label ("ABOUT ME", "NEW MATCHES") — 11.5 px / 500, not the old 12 / 700. */
 export function SectionLabel({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("text-label uppercase text-text-secondary", className)} {...rest} />;
 }

@@ -62,7 +62,7 @@ export function PhotoQueue({ items }: { items: PendingPhotoRowDto[] }) {
                 {p.isPrimary ? <Tag variant="onPhoto" size="sm" className="absolute left-2.5 top-2.5">Main photo</Tag> : null}
               </div>
               <div className="flex flex-col gap-0.5">
-                <Link href={`/admin/users/${p.userId}`} className="text-body-sm font-bold text-primary-ink hover:underline">
+                <Link href={`/admin/users/${p.userId}`} className="text-body-sm font-medium text-primary-ink hover:underline">
                   {p.displayName ?? "(no name)"}
                   {p.handle ? <span className="font-normal text-text-secondary"> @{p.handle}</span> : null}
                 </Link>
@@ -72,7 +72,7 @@ export function PhotoQueue({ items }: { items: PendingPhotoRowDto[] }) {
                 {p.accountStatus !== "ACTIVE" ? <Tag variant="warning" size="sm" className="self-start">Account {p.accountStatus.toLowerCase()}</Tag> : null}
               </div>
               {blocked ? (
-                <p role="alert" className="text-caption font-semibold text-danger">{blocked}</p>
+                <p role="alert" className="text-caption font-medium text-danger">{blocked}</p>
               ) : (
                 <div className="flex gap-2">
                   <Button size="md" fullWidth loading={busyId === p.photoId} onClick={() => void decide(p, "APPROVED", "")}>Approve</Button>

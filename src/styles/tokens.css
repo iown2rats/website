@@ -67,14 +67,24 @@
   --radius-nav: 32px;
   --radius-full: 999px;
 
-  /* Layout & navigation */
+  /* Layout & navigation. Compact pass (docs/DESIGN_SYSTEM.md §32): chrome gives its height back to content. */
   --gutter: 16px;
-  --header-height: 48px;
-  --page-header-height: 56px;
-  --nav-height: 64px;
-  --nav-offset: 10px;
+  --header-height: 44px;
+  --page-header-height: 48px;
+  --nav-height: 56px;
+  --nav-offset: 8px;
   --nav-max-width: 480px;
-  --nav-clearance: 96px; /* bottom padding for scroll areas under the floating nav */
+  --nav-clearance: 80px; /* bottom padding for scroll areas under the floating nav: 56 bar + 8 offset + 16 breathing */
+
+  /*
+   * Control geometry. One place for the sizes a finger has to hit, so density never quietly eats a tap target.
+   * 44 is the floor for anything interactive; the small variants are for controls that sit inside a larger row
+   * and are not the row's own hit area.
+   */
+  --control-h: 44px;
+  --control-h-sm: 38px;
+  --control-h-lg: 46px;
+  --row-h: 50px;
   --content-max: 640px;
   --deck-max: 500px;
   --sheet-max: 560px;

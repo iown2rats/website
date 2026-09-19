@@ -51,20 +51,20 @@ export function PlanForm({ plan, onDone }: { plan?: PlanAdminDto; onDone?: () =>
       <Field label="Description (optional)" className="desktop:col-span-2">{(p) => <Textarea {...p} value={d.description} onChange={(e) => set("description", e.target.value)} maxLength={200} rows={2} />}</Field>
       <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>
-          <div className="text-body-sm font-semibold text-text" id={`active-${plan?.id ?? "new"}`}>Enabled</div>
+          <div className="text-body-sm font-medium text-text" id={`active-${plan?.id ?? "new"}`}>Enabled</div>
           <div className="text-caption text-text-secondary">Shown on the Membership screen.</div>
         </div>
         <Switch compact checked={d.active} onCheckedChange={(v) => set("active", v)} aria-labelledby={`active-${plan?.id ?? "new"}`} />
       </div>
       <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>
-          <div className="text-body-sm font-semibold text-text" id={`final-${plan?.id ?? "new"}`}>Price approved</div>
+          <div className="text-body-sm font-medium text-text" id={`final-${plan?.id ?? "new"}`}>Price approved</div>
           <div className="text-caption text-text-secondary">Off = placeholder price, shown as &ldquo;Price TBA&rdquo;, cannot be bought.</div>
         </div>
         <Switch compact checked={d.priceFinal} onCheckedChange={(v) => set("priceFinal", v)} aria-labelledby={`final-${plan?.id ?? "new"}`} />
       </div>
       <p className="text-caption text-text-secondary desktop:col-span-2">{forSale ? "This plan will be for sale." : "This plan will not be for sale (needs enabled + approved price above zero)."} Existing orders keep the price they were created with.</p>
-      {error ? <p role="alert" className="text-caption font-semibold text-danger desktop:col-span-2">{error}</p> : null}
+      {error ? <p role="alert" className="text-caption font-medium text-danger desktop:col-span-2">{error}</p> : null}
       <div className="flex gap-2 desktop:col-span-2">
         <Button type="submit" variant="ocean" size="sm" loading={busy}>{plan ? "Save changes" : "Create plan"}</Button>
         {onDone ? <Button type="button" variant="ghost" size="sm" onClick={onDone} disabled={busy}>Cancel</Button> : null}

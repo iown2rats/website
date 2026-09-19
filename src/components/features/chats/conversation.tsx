@@ -243,7 +243,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
         <button type="button" onClick={() => void openProfile()} className="flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent px-1.5 text-left text-text" aria-label={`View ${header.other.name}'s profile`}>
           <Avatar name={header.other.name} photo={{ url: header.other.photo?.url ?? null, key: header.other.photo?.demoKey ?? null, blurhash: header.other.photo?.blurhash ?? null }} size={40} />
           <span className="min-w-0">
-            <span className="flex items-center gap-1.25 text-body-lg font-bold">
+            <span className="flex items-center gap-1.25 text-body-lg font-medium">
               <span className="truncate">{header.other.name}</span>
               {header.other.verified ? <VerifiedBadge size={14} className="shrink-0" /> : null}
             </span>
@@ -255,9 +255,9 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
         </IconButton>
       </header>
 
-      <div ref={scroller} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden px-4 py-5" aria-live="polite" aria-label="Messages">
+      <div ref={scroller} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden px-4 py-3" aria-live="polite" aria-label="Messages">
         {olderCursor ? (
-          <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className="mx-auto mb-2 h-9 rounded-full bg-surface-muted px-4 text-caption font-semibold text-text-secondary">
+          <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className="mx-auto mb-2 h-9 rounded-full bg-surface-muted px-4 text-caption font-medium text-text-secondary">
             {loadingOlder ? "Loading…" : "Load earlier messages"}
           </button>
         ) : (
@@ -268,11 +268,11 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
           <div key={p.clientId} className="flex max-w-[78%] flex-col items-end self-end">
             <div className={cn("whitespace-pre-wrap break-words rounded-[20px] rounded-br-[6px] bg-primary px-3.75 py-2.75 text-body leading-[1.45] text-on-primary", p.state === "sending" && "opacity-60")}>{p.body}</div>
             {p.state === "failed" ? (
-              <button type="button" onClick={() => void send(p.body, p.clientId)} className="mx-1.5 mt-1 mb-1.5 border-0 bg-transparent text-[11px] font-semibold text-danger">
+              <button type="button" onClick={() => void send(p.body, p.clientId)} className="mx-1.5 mt-1 mb-1.5 border-0 bg-transparent text-tiny font-medium text-danger">
                 {p.error ?? "Not sent"} · Tap to retry
               </button>
             ) : (
-              <div className="mx-1.5 mt-1 mb-1.5 text-[11px] text-text-secondary">Sending…</div>
+              <div className="mx-1.5 mt-1 mb-1.5 text-tiny text-text-secondary">Sending…</div>
             )}
           </div>
         ))}
@@ -280,18 +280,18 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
       </div>
 
       {closed ? (
-        <div className="flex shrink-0 items-center gap-2.5 border-t border-border bg-background px-4 pt-3.5 text-[13px] leading-snug text-text-secondary" style={{ paddingBottom: "calc(14px + var(--safe-bottom))" }}>
+        <div className="flex shrink-0 items-center gap-2.5 border-t border-border bg-background px-4 pt-3.5 text-body-sm leading-snug text-text-secondary" style={{ paddingBottom: "calc(14px + var(--safe-bottom))" }}>
           <LockIcon size={18} className="shrink-0" />
           This conversation has ended. You can still read what was said.
         </div>
       ) : (
         <div className="shrink-0 border-t border-border bg-background">
           {showCooldown ? (
-            <div className="flex items-center justify-between gap-3 px-4 pt-2.5 text-[13px] text-text-secondary" data-testid="cooldown-note">
+            <div className="flex items-center justify-between gap-3 px-4 pt-2.5 text-body-sm text-text-secondary" data-testid="cooldown-note">
               <span>
                 Next free message in <b className="tabular-nums text-text">{mmss(waitingMs)}</b>. Chat anytime with Mellocrush Plus.
               </span>
-              <Link href="/settings/membership" className="shrink-0 text-[13px] font-bold text-primary-ink">Get Mellocrush Plus</Link>
+              <Link href="/settings/membership" className="shrink-0 text-body-sm font-medium text-primary-ink">Get Mellocrush Plus</Link>
             </div>
           ) : null}
           <form
@@ -354,11 +354,11 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
       <BottomSheet open={reportStep !== null} onClose={() => (reportBusy ? undefined : setReportStep(null))} labelledBy={reportTitleId} dismissible={!reportBusy}>
         {reportStep === "reason" ? (
           <>
-            <DialogTitle id={reportTitleId} className="text-[22px]">Why are you reporting?</DialogTitle>
+            <DialogTitle id={reportTitleId}>Why are you reporting?</DialogTitle>
             <DialogDescription>Reports are anonymous. We&apos;ll review within 24 hours. Submitting also blocks {header.other.name}.</DialogDescription>
             <div className="flex flex-col gap-2" role="radiogroup" aria-label="Reason">
               {REASONS.map(([value, label]) => (
-                <button key={value} type="button" role="radio" aria-checked={reportReason === value} onClick={() => setReportReason(value)} className={cn("h-12.5 rounded-lg px-4.5 text-left text-body font-semibold text-text", reportReason === value ? "bg-primary-soft" : "bg-surface-muted")}>
+                <button key={value} type="button" role="radio" aria-checked={reportReason === value} onClick={() => setReportReason(value)} className={cn("h-11.5 rounded-lg px-3.5 text-left text-body font-medium text-text", reportReason === value ? "bg-primary-soft" : "bg-surface-muted")}>
                   {label}
                 </button>
               ))}
@@ -367,11 +367,11 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
           </>
         ) : (
           <>
-            <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <div className="flex flex-col items-center gap-3 py-3 text-center">
               <span className="grid size-16 place-items-center rounded-full bg-aqua-soft text-primary-ink" aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
               </span>
-              <DialogTitle id={reportTitleId} className="text-[22px]">Thanks for looking out</DialogTitle>
+              <DialogTitle id={reportTitleId}>Thanks for looking out</DialogTitle>
               <p className="max-w-75 text-body-sm leading-normal text-text-secondary">They&apos;ve been blocked and won&apos;t see your profile. Our team will review the report.</p>
             </div>
             <Button onClick={() => { setReportStep(null); router.replace("/chats"); router.refresh(); }} fullWidth>Done</Button>
@@ -393,7 +393,7 @@ function Bubble({ message, now }: { message: MessageDto; now: () => number }) {
     <div className={cn("flex max-w-[78%] flex-col", me ? "items-end self-end" : "items-start self-start")}>
       {/* User text is rendered as text: React escapes it and white-space keeps the author's line breaks. */}
       <div className={cn("whitespace-pre-wrap break-words rounded-[20px] px-3.75 py-2.75 text-body leading-[1.45]", me ? "rounded-br-[6px] bg-primary text-on-primary" : "rounded-bl-[6px] bg-aqua-soft text-text")}>{message.body}</div>
-      <div className="mx-1.5 mt-1 mb-1.5 text-[11px] text-text-secondary">{bubbleTime(message.at, new Date(now()))}</div>
+      <div className="mx-1.5 mt-1 mb-1.5 text-tiny text-text-secondary">{bubbleTime(message.at, new Date(now()))}</div>
     </div>
   );
 }

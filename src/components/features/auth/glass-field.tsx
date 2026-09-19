@@ -15,7 +15,7 @@ export interface GlassFieldProps extends Omit<InputHTMLAttributes<HTMLInputEleme
 }
 
 const base =
-  "h-11 w-full rounded-full border border-white/25 bg-white/10 px-3.5 text-body text-white placeholder:text-white/55 " +
+  "h-11 w-full rounded-full border border-white/25 bg-white/10 px-3.5 text-field text-white placeholder:text-white/55 " +
   "outline-none focus-visible:border-white/60 focus-visible:outline-2 focus-visible:outline-white/80 " +
   "aria-[invalid=true]:border-[#ffb3b3] disabled:opacity-60";
 

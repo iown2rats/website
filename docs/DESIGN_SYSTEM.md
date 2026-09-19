@@ -612,3 +612,86 @@ somebody else's chrome.
 
 Community is a feed and stays a feed — the brief was explicitly not to force a scrolling screen into one viewport.
 Discover, Likes, Chats and Notifications each fit their viewport with no page scroll at every tested width.
+
+## 33. The responsive contract (2026-09-19)
+
+The rule, on every route, at every width:
+
+```
+document.documentElement.scrollWidth <= document.documentElement.clientWidth
+```
+
+A user must never drag the page sideways to reach a button, a message or a menu. `scripts/responsive-audit.mjs`
+checks it; `npm run test:responsive` runs it.
+
+### The bug this came from, and why it was invisible
+
+Mellocrush was reported as draggable sideways on an iPhone. Screenshots came from a different screen each time, so
+it was fixed screen by screen and kept coming back. The instrumentation said the app was clean: 367 route×viewport
+checks passed, including with hostile content and the keyboard open.
+
+Both were true. **The document never overflowed. The viewport shrank.**
+
+iOS Safari zooms the page whenever a focused `input`, `textarea` or `select` computes below **16px**, and modern
+iOS does not undo the zoom on blur. §32 took every field to 14–15px. So one tap on one field — the sign-in
+password box, the chat composer, a search — left the whole app pannable sideways on every screen for the rest of
+the session, until the user pinched out. Different screen every time, because the cause was not on any screen.
+
+`scrollWidth <= clientWidth` stays true throughout: the layout viewport is unchanged, the *visual* viewport is
+what got smaller. That is why a document-level check could not see it, and why no amount of per-screen fixing
+would ever have found it.
+
+### The floor
+
+`--text-field: 16px` is a floor, not a preference. It sits outside the body scale so a density pass moves the
+other nineteen steps without touching it. `globals.css` also enforces it **outside `@layer`**, which beats
+`@layer utilities` and therefore beats every Tailwind `text-*` class:
+
+```css
+input, textarea, select { font-size: max(var(--text-field), var(--field-font-size, 0px)); }
+```
+
+A field that wants to be bigger sets `--field-font-size`. Nothing can make one smaller — not a `className`, not a
+regex sweep across the repo, which is exactly how §32 introduced this.
+
+Density comes from the 44px control height, the padding and the weight. It never comes from the type size again.
+
+**`maximum-scale=1` and `user-scalable=no` also stop the zoom, and are banned.** They take pinch-to-zoom from
+anyone who needs to magnify. `tests/unit/responsive-contract.test.ts` fails the build if either appears.
+
+### Scroller
+
+A chip row or carousel is the one shape that may legitimately scroll sideways, so the exception is declared rather
+than improvised. `src/components/ui/scroller.tsx` replaced three hand-written `overflow-x-auto` strips and adds:
+
+- `overscroll-behavior-x: contain` — without it, flicking a carousel past its end chains the scroll to the page on
+  iOS and the whole app slides under the thumb. Another horizontal-drag bug invisible to a desktop mouse.
+- One number for the bleed. Going edge to edge means cancelling the parent's padding with a negative margin and
+  putting it back inside; the two were written separately in all three places (`-mx-4`/`px-4`, `-mx-0.5`/`px-0.5`,
+  and one with neither). `bleed` derives both, so they cannot drift.
+
+A standalone `Bleed` was proposed and deliberately not built: every bleed in the app is part of a scroller, so it
+would have had no callers and would have been one more way to write the arithmetic.
+
+### What the audit checks
+
+1. The document does not scroll sideways.
+2. Nothing escapes the viewport — reporting the **deepest** offending node, including text that spills out of a
+   box whose own rect still fits. An earlier version reported the widest ancestor instead, which named a wrapper
+   rather than the fix.
+3. Every visible editable control computes at 16px or more.
+
+It runs signed-out routes in a signed-out context, and **fails loudly when a navigation lands somewhere else**.
+An earlier version probed `/auth/register` while signed in, was bounced to `/discover`, measured Discover, and
+reported a pass for eight auth and legal screens it never rendered. `/auth/verify-email` exists only in one
+session state, so a flow registers a throwaway account to reach it; flows write, so they refuse to run off
+localhost.
+
+### The limitation, stated plainly
+
+**Only Chromium is available in the authoring sandbox.** WebKit cannot be installed. Chromium does not implement
+iOS focus-zoom, so the `visualViewport.scale === 1` clause *cannot fail here* and proves nothing about Safari. It
+is recorded so a WebKit run checks it, and so clause 3 — which is a real measurement — is never mistaken for it.
+
+Clause 3 is the proxy: it verifies the documented precondition for the zoom, not the zoom. Final confirmation is a
+real iPhone.

@@ -34,7 +34,7 @@ export function SubscriptionAdjust({ subscriptionId, currentPeriodEnd }: { subsc
     <>
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>Adjust period</Button>
       <ReasonDialog open={open} onClose={() => setOpen(false)} onConfirm={submit} loading={busy} title="Adjust subscription period" description="Use this only for support cases (a lost day, a goodwill extension). The previous and new dates are written to the audit log." confirmLabel="Save new end date">
-        <Field label="New period end (your local time)">{(p) => <Input {...p} type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} className="h-11 text-body-sm" />}</Field>
+        <Field label="New period end (your local time)">{(p) => <Input {...p} type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} className="h-11" />}</Field>
       </ReasonDialog>
     </>
   );

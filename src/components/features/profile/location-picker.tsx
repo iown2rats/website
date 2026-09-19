@@ -51,7 +51,7 @@ export function LocationPicker({ open, onClose, title, locations, selectedId, on
       <div className="flex h-11 items-center gap-2.5 rounded-lg bg-surface-muted px-3.5 focus-within:outline-2 focus-within:outline-primary">
         <SearchIcon size={20} className="shrink-0 text-text-secondary" />
         <label htmlFor={`${titleId}-q`} className="sr-only">Search island or atoll</label>
-        <input id={`${titleId}-q`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search island or atoll" autoComplete="off" className="min-w-0 flex-1 border-0 bg-transparent text-body-lg text-text outline-none placeholder:text-text-muted" />
+        <input id={`${titleId}-q`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search island or atoll" autoComplete="off" className="min-w-0 flex-1 border-0 bg-transparent text-field text-text outline-none placeholder:text-text-muted" />
       </div>
       <div role="listbox" aria-label={title} className="flex shrink-0 flex-col overflow-hidden rounded-2xl glass-card [&>*+*]:border-t [&>*+*]:border-border">
         {allowNone ? (

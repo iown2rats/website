@@ -42,12 +42,12 @@ export function PlanForm({ plan, onDone }: { plan?: PlanAdminDto; onDone?: () =>
         router.refresh();
       }}
     >
-      <Field label="Code" hint="Stable identifier, e.g. MONTHLY">{(p) => <Input {...p} value={d.code} onChange={(e) => set("code", e.target.value.toUpperCase())} maxLength={32} required className="h-11 font-mono text-body-sm" />}</Field>
-      <Field label="Display name" hint="e.g. 1 month">{(p) => <Input {...p} value={d.name} onChange={(e) => set("name", e.target.value)} maxLength={40} required className="h-11 text-body-sm" />}</Field>
-      <Field label="Duration (days)">{(p) => <Input {...p} type="number" min={1} max={730} value={d.intervalDays} onChange={(e) => set("intervalDays", Number(e.target.value))} required className="h-11 text-body-sm" />}</Field>
-      <Field label="Price (MVR)" hint="Whole rufiyaa or with laari, e.g. 149 or 149.50">{(p) => <Input {...p} inputMode="decimal" value={d.price} onChange={(e) => set("price", e.target.value.replace(/[^0-9.]/g, ""))} className="h-11 text-body-sm" />}</Field>
-      <Field label="Badge (optional)" hint="e.g. Most popular">{(p) => <Input {...p} value={d.badge} onChange={(e) => set("badge", e.target.value)} maxLength={24} className="h-11 text-body-sm" />}</Field>
-      <Field label="Sort order">{(p) => <Input {...p} type="number" min={0} max={1000} value={d.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value))} className="h-11 text-body-sm" />}</Field>
+      <Field label="Code" hint="Stable identifier, e.g. MONTHLY">{(p) => <Input {...p} value={d.code} onChange={(e) => set("code", e.target.value.toUpperCase())} maxLength={32} required className="h-11 font-mono" />}</Field>
+      <Field label="Display name" hint="e.g. 1 month">{(p) => <Input {...p} value={d.name} onChange={(e) => set("name", e.target.value)} maxLength={40} required className="h-11" />}</Field>
+      <Field label="Duration (days)">{(p) => <Input {...p} type="number" min={1} max={730} value={d.intervalDays} onChange={(e) => set("intervalDays", Number(e.target.value))} required className="h-11" />}</Field>
+      <Field label="Price (MVR)" hint="Whole rufiyaa or with laari, e.g. 149 or 149.50">{(p) => <Input {...p} inputMode="decimal" value={d.price} onChange={(e) => set("price", e.target.value.replace(/[^0-9.]/g, ""))} className="h-11" />}</Field>
+      <Field label="Badge (optional)" hint="e.g. Most popular">{(p) => <Input {...p} value={d.badge} onChange={(e) => set("badge", e.target.value)} maxLength={24} className="h-11" />}</Field>
+      <Field label="Sort order">{(p) => <Input {...p} type="number" min={0} max={1000} value={d.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value))} className="h-11" />}</Field>
       <Field label="Description (optional)" className="desktop:col-span-2">{(p) => <Textarea {...p} value={d.description} onChange={(e) => set("description", e.target.value)} maxLength={200} rows={2} />}</Field>
       <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>

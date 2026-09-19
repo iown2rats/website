@@ -3,9 +3,12 @@ import { cn } from "@/lib/cn";
 import { ChevronDownIcon } from "./icons";
 
 /*
- * Fields. The prototype's 52 px control is now 44 (docs/DESIGN_SYSTEM.md §32) with 15 px text instead of 16–18 and
- * no bold anywhere: an input's value is content, not a heading. Radius and the surface-muted fill are unchanged, so
- * the identity is the same shape at a smaller scale.
+ * Fields. The prototype's 52 px control is now 44 (docs/DESIGN_SYSTEM.md §32): the density comes from the height,
+ * the padding and the weight — an input's value is content, not a heading — never from the type size.
+ *
+ * The type size is `text-field`, which is 16 px and is a floor, not a preference: below it iOS Safari zooms the
+ * page on focus and leaves it pannable sideways on every screen (docs/DESIGN_SYSTEM.md §33). globals.css enforces
+ * the same floor outside @layer, so passing a smaller `text-*` through `className` cannot lower it either.
  */
 
 const fieldBase =
@@ -13,7 +16,7 @@ const fieldBase =
   "focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-55 aria-[invalid=true]:outline-2 aria-[invalid=true]:outline-danger";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  /** Larger 16 px entry for phone and name, still weight 400. */
+  /** Opens the tracking for entry that is read back character by character — a phone number, a code. */
   emphasis?: boolean;
   leading?: ReactNode;
 }
@@ -23,15 +26,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ c
     return (
       <div className={cn("flex items-center gap-2 h-11 px-3.5 bg-surface-muted rounded-lg focus-within:outline-2 focus-within:outline-primary", className)}>
         <span className="text-text-secondary shrink-0 inline-flex">{leading}</span>
-        <input ref={ref} className={cn("h-full flex-1 min-w-0 bg-transparent border-0 outline-none text-body-lg text-text placeholder:text-text-muted")} {...rest} />
+        <input ref={ref} className={cn("h-full flex-1 min-w-0 bg-transparent border-0 outline-none text-field text-text placeholder:text-text-muted")} {...rest} />
       </div>
     );
   }
-  return <input ref={ref} className={cn(fieldBase, "h-11 px-3.5", emphasis ? "text-input-lg tracking-[.03em]" : "text-body-lg", className)} {...rest} />;
+  return <input ref={ref} className={cn(fieldBase, "h-11 px-3.5 text-field", emphasis && "tracking-[.03em]", className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, rows = 3, ...rest }, ref) {
-  return <textarea ref={ref} rows={rows} className={cn(fieldBase, "rounded-lg px-3.5 py-2.5 text-body-lg leading-normal resize-none", className)} {...rest} />;
+  return <textarea ref={ref} rows={rows} className={cn(fieldBase, "rounded-lg px-3.5 py-2.5 text-field leading-normal resize-none", className)} {...rest} />;
 });
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement> & { placeholder?: string }>(function Select(
@@ -45,7 +48,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
         ref={ref}
         value={value}
         defaultValue={defaultValue}
-        className={cn(fieldBase, "h-11 pl-3 pr-7 text-body-lg appearance-none cursor-pointer", empty && "text-text-secondary")}
+        className={cn(fieldBase, "h-11 pl-3 pr-7 text-field appearance-none cursor-pointer", empty && "text-text-secondary")}
         {...rest}
       >
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}

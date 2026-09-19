@@ -93,9 +93,17 @@
   --text-prompt--line-height: 1.4;
   --text-prompt--font-weight: 600;
   --text-prompt--letter-spacing: -0.005em;
-  --text-input-lg: 16px;
-  --text-input-lg--line-height: 1.3;
-  --text-input-lg--font-weight: 400;
+  /*
+   * The field step. 16px is not a taste decision and must never be tuned down: iOS Safari zooms the page whenever
+   * a focused input, textarea or select computes below 16px, and it does not zoom back out on blur — one tap on
+   * one field leaves the whole app pannable sideways for the rest of the session. That is the bug the compact pass
+   * shipped, and it is why this step sits apart from the body scale rather than inside it. A density pass may move
+   * every other step; this one is a floor. The unlayered rule at the end of this file enforces it at runtime so a
+   * stray `text-body` on an <input> cannot undercut it.
+   */
+  --text-field: 16px;
+  --text-field--line-height: 1.3;
+  --text-field--font-weight: 400;
   --text-cta-lg: 15px;
   --text-cta-lg--line-height: 1.25;
   --text-cta-lg--font-weight: 500;
@@ -191,6 +199,9 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
+    /* Stop Safari inflating text on its own; the scale is ours to choose. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   * {
     box-sizing: border-box;
@@ -284,4 +295,28 @@
 
 @utility pt-safe-header {
   padding-top: calc(6px + var(--safe-top));
+}
+
+/*
+ * The iOS field floor (docs/DESIGN_SYSTEM.md §33).
+ *
+ * iOS Safari zooms the page whenever a focused editable control computes below 16px, and modern iOS does not undo
+ * the zoom on blur. The page is then pannable sideways on every screen until the user pinches out — which reads as
+ * "the app is wider than my phone" even though no element overflows and `scrollWidth <= clientWidth` still holds.
+ * A compact pass took every field to 14–15px and shipped exactly that.
+ *
+ * This rule is deliberately OUTSIDE @layer, so it beats `@layer utilities` and therefore beats every Tailwind
+ * `text-*` class. A future density sweep can lower any step it likes and a field will still not drop below 16px.
+ * That is the point: the floor is structural, not a convention someone has to remember.
+ *
+ * A field that wants to be BIGGER sets --field-font-size; nothing can make one smaller. Checkboxes, radios, ranges
+ * and file inputs are matched too and are unaffected — they render no text of their own here.
+ *
+ * The fix is the type size, never the viewport: `maximum-scale` / `user-scalable=no` would also stop the zoom and
+ * would take pinch-to-zoom away from anyone who needs it. Do not add them.
+ */
+input,
+textarea,
+select {
+  font-size: max(var(--text-field), var(--field-font-size, 0px));
 }

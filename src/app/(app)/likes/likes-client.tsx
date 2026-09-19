@@ -73,10 +73,10 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
 
       {tab === "you" && data.tier === "FREE" ? (
         data.count === 0 ? (
-          <EmptyState icon={<HeartIcon />} title="No new likes yet." description="When someone likes you, they'll appear here." />
+          <EmptyState className="wide:rounded-card wide:glass-card wide:py-24" icon={<HeartIcon />} title="No new likes yet." description="When someone likes you, they'll appear here." />
         ) : (
           <section aria-label="People who like you" className="flex flex-col gap-4">
-            <div className="grid grid-cols-3 gap-2.5" aria-hidden="true">
+            <div className="grid grid-cols-3 gap-2.5 wide:grid-cols-4 wide:gap-4" aria-hidden="true">
               {data.placeholders!.map((p, i) => (
                 <div key={i} className="relative aspect-[3/4] overflow-hidden rounded-2xl">
                   <BlurhashCanvas hash={p.blurhash} />
@@ -99,9 +99,9 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
 
       {tab === "you" && data.tier === "PLUS" ? (
         cards.length === 0 ? (
-          <EmptyState icon={<HeartIcon />} title="No new likes yet." description="When someone likes you, they'll appear here." />
+          <EmptyState className="wide:rounded-card wide:glass-card wide:py-24" icon={<HeartIcon />} title="No new likes yet." description="When someone likes you, they'll appear here." />
         ) : (
-          <ul className="grid grid-cols-2 gap-2.5 desktop:grid-cols-3" aria-label="People who like you">
+          <ul className="grid grid-cols-2 gap-2.5 desktop:grid-cols-3 wide:grid-cols-4 wide:gap-4" aria-label="People who like you">
             {cards.map((c) => (
               <li key={c.handle} className="relative aspect-[3/4]">
                 <button type="button" onClick={() => setOpen(c)} className="absolute inset-0 overflow-hidden rounded-2xl border-0 bg-transparent p-0 text-left pressable" aria-label={`Open ${c.name}'s profile`}>
@@ -115,11 +115,11 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
 
       {tab === "matches" ? (
         data.matches.length === 0 ? (
-          <EmptyState icon={<HeartIcon />} title="Your next match could be one swipe away." actions={<Button size="md" onClick={() => router.push("/discover")}>Start swiping</Button>} />
+          <EmptyState className="wide:rounded-card wide:glass-card wide:py-24" icon={<HeartIcon />} title="Your next match could be one swipe away." actions={<Button size="md" onClick={() => router.push("/discover")}>Start swiping</Button>} />
         ) : (
-          <ul className="flex flex-col divide-y divide-border rounded-3xl glass-card" aria-label="Your matches">
+          <ul className="flex flex-col divide-y divide-border rounded-3xl glass-card wide:grid wide:grid-cols-3 wide:gap-4 wide:divide-y-0 wide:rounded-none wide:bg-transparent wide:shadow-none wide:backdrop-blur-none" aria-label="Your matches">
             {data.matches.map((m) => (
-              <li key={m.handle} className="flex items-center gap-3 px-4 py-3">
+              <li key={m.handle} className="flex items-center gap-3 px-4 py-3 wide:rounded-2xl wide:glass-card wide:px-4 wide:py-3.5">
                 <span className="size-12 shrink-0 overflow-hidden rounded-full bg-surface-muted" style={photoBackground(m.photo ? { url: m.photo.url, key: m.photo.demoKey, blurhash: m.photo.blurhash } : null, 160, "thumb")} aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-body font-bold text-text"><span className="truncate">{m.name}</span>{m.verified ? <VerifiedBadge size={14} className="shrink-0" /> : null}</div>

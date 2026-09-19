@@ -84,6 +84,21 @@
   --aside-width: 300px;
   --chat-list-width: 360px;
 
+  /*
+   * Desktop tier (>= 1280, the `wide` variant). Below this the tablet layout is unchanged: one centred column.
+   * Here the shell stops floating in the middle of the viewport — the sidebar is pinned left and the content group
+   * (main plus any panel) is capped and centred in what remains, with real page gutters.
+   */
+  --sidebar-wide: 248px;
+  --content-wide: 1360px;
+  --page-gutter-wide: 40px;
+  --deck-wide: 560px;
+  --aside-wide: 320px;
+  --feed-wide: 690px;
+  --feed-aside-wide: 312px;
+  --chat-list-wide: 352px;
+  --profile-side-wide: 400px;
+
   /* Safe areas */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

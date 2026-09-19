@@ -30,6 +30,10 @@ import { useServerClock } from "./use-server-clock";
  *  - like/pass remove the head immediately; a rejected like puts the card back and shows why
  *  - the next batch is requested when `refillThreshold` cards remain, excluding the handles still held
  *  - the allowance and countdowns come from server time (useServerClock)
+ *
+ * At the desktop tier the whole screen — header row and deck — is one 560 px column centred between the sidebar and
+ * the activity panel. Capping only the deck would leave the likes pill, Boost and Filters stranded against the far
+ * edge of a much wider main column, pointing at a card several hundred pixels away.
  */
 export interface DiscoverClientProps {
   initial: DeckPage;
@@ -234,7 +238,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     <DeckExhausted onAdjustFilters={() => setFiltersOpen(true)} onRefresh={() => void loadMore("retry")} />;
 
   return (
-    <AppScreen aria-label="Discover">
+    <AppScreen aria-label="Discover" className="wide:mx-auto wide:w-full wide:max-w-[var(--deck-wide)]">
       <TabHeader
         logo
         compactLogo={boost.activeEndsAt != null && Date.parse(boost.activeEndsAt) > serverTime()}

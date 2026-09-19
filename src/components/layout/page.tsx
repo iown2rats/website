@@ -5,7 +5,8 @@ import { cn } from "@/lib/cn";
  * Layout primitives so screens never recompute safe-area / nav maths.
  *  - AppScreen: tab screen column with the prototype padding `calc(6px + safe-top) 16px 0`.
  *  - ScrollArea: internal scroller; `navSafe` reserves bottom clearance for the floating nav.
- *  - DiscoveryFrame: deck area — flex-1, relative, max-width 500, phone bottom margin 74 px + safe (nav clearance).
+ *  - DiscoveryFrame: deck area — flex-1, relative, max-width 500 (560 at the desktop tier, where the card is the
+ *    subject of the screen rather than a phone card floating in a large viewport).
  *  - PageFrame: full-screen page overlay body (max-width 640, or 900 for settings) centred.
  *  - SettingsFrame: desktop two-column (220 px section nav + content).
  *  - ModalBody: consistent dialog padding/gap.
@@ -30,7 +31,7 @@ export function ScrollArea({ className, children, navSafe = true, ...rest }: HTM
 export function DiscoveryFrame({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={cn("relative mx-auto mt-1.5 min-h-0 w-full max-w-[var(--deck-max)] flex-1 mb-[calc(74px+var(--safe-bottom))] desktop:mb-0", className)}
+      className={cn("relative mx-auto mt-1.5 min-h-0 w-full max-w-[var(--deck-max)] flex-1 mb-[calc(74px+var(--safe-bottom))] desktop:mb-0 wide:max-w-[var(--deck-wide)]", className)}
     >
       {children}
     </div>

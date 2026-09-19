@@ -466,3 +466,36 @@ Two related corrections in the same file:
   trapped, and no control looks activated.
 - The `display` utility on a `<dialog>` must be `open:flex`, never `flex`. An author `display` declaration beats the
   user-agent rule that hides a closed dialog, which leaves every sheet in the page laid out and swallowing taps.
+
+## 29. The desktop tier (2026-09-19)
+
+Above 900 px the app was the tablet layout in a larger window: a 640 px column with the sidebar floating beside it and
+the rest of the display empty. Measured before the change, at 1920 the main column was 640 px starting at x = 756 on
+Likes, Community and Profile — more than 700 px of nothing on the left and 500 on the right.
+
+Four causes, all in the shell:
+
+1. `AppShell` centred the whole row (`justify-center`), so the sidebar floated in mid-viewport and the dead space was
+   split symmetrically either side of the group rather than being usable width.
+2. `--content-max: 640px` capped main on every route but Chats and Settings.
+3. `--deck-max: 500px` capped the Discover card at phone size.
+4. There was one desktop breakpoint (900). Nothing changed between a small laptop and a 1920 display.
+
+`@custom-variant wide (min-width: 1280px)` is now the desktop tier. Everything below it is unchanged: phones keep the
+single column and the floating nav, and the tablet composition between 900 and 1279 is exactly what it was. At the
+wide tier the row is left-aligned, the sidebar is 248, and main plus any panel form one content group capped at
+`--content-wide` (1360) and centred in what remains, with 40 px gutters. Each screen then composes inside that group:
+
+| Screen | Wide composition |
+| --- | --- |
+| Discover | Header and deck are one 560 px column centred between the sidebar and a 320 px activity panel. Capping the deck alone would leave the likes pill, Boost and Filters against the far edge, pointing at a card hundreds of pixels away. |
+| Community | 690 px feed centred in main, with the same new-matches and activity panel at 312 px. The panel is the data the app layout already loads — a composition of existing features, not a new one invented to fill space. |
+| Likes | Four cards per row (three on tablet, two on phones). Matches become a three-column card grid. Empty states become a full-width panel instead of a small block adrift in the content area. |
+| Chats | 352 px conversation list; the thread takes the rest of the group. The detail pane with nothing selected is a proper empty state, not one grey sentence in an empty half-screen. |
+| Profile | Two columns: identity and completion at 400 px on the left, account sections on the right capped at 640. Rows are bounded, because a row dragged across 800 px puts its label and its value at opposite ends of the display. |
+| Settings | Still a bounded 900 px column — settings rows do not benefit from width — but centred in the group rather than pinned left beside a void. |
+| Filters | The desktop panel is 560 px. Age and "Show me" sit side by side from 900 px instead of each taking a full row, and the two age sliders stack within their half rather than becoming 120 px each. |
+
+Measured after, at 1920: sidebar at x = 0, content group 1280 wide with 196 px margins either side; at 1440 the group
+fills the remaining width with its 40 px gutters. No horizontal overflow and no page errors at 1920, 1440, 1280, 1024
+or 390; the 1024 and 390 measurements are identical to before.

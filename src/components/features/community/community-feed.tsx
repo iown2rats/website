@@ -154,7 +154,7 @@ export function CommunityFeed({ initial, serverNow, island, canPost }: Community
     );
 
   return (
-    <AppScreen aria-label="Community" className="relative">
+    <AppScreen aria-label="Community" className="relative wide:mx-auto wide:w-full wide:max-w-[var(--feed-wide)]">
       <TabHeader title="Community" />
       <PillTabs
         label="Community feeds"

@@ -86,25 +86,33 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         <button type="button" onClick={reset} className="h-10 border-0 bg-transparent text-body-sm font-bold text-primary-ink">Reset</button>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex justify-between text-body font-semibold">
-          <span>Age range</span>
-          <span className="text-text-secondary tabular-nums">{draft.ageMin}–{draft.ageMax}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMin} onChange={(e) => set("ageMin", Math.min(Number(e.target.value), draft.ageMax))} aria-label="Minimum age" className="w-full accent-primary" />
-          <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMax} onChange={(e) => set("ageMax", Math.max(Number(e.target.value), draft.ageMin))} aria-label="Maximum age" className="w-full accent-primary" />
-        </div>
-      </section>
+      {/*
+        * Age and "Show me" are both short controls, so from the desktop breakpoint they sit side by side instead of
+        * each taking a full row of a 560 px panel. The wrapper is a plain column below that, which keeps the phone
+        * sheet exactly as it was — and keeps it a direct child of the scrolling body, which must not shrink.
+        */}
+      <div className="flex flex-col gap-4 desktop:grid desktop:grid-cols-2 desktop:gap-5">
+        <section className="flex flex-col gap-3">
+          <div className="flex justify-between text-body font-semibold">
+            <span>Age range</span>
+            <span className="text-text-secondary tabular-nums">{draft.ageMin}–{draft.ageMax}</span>
+          </div>
+          {/* Half-width on desktop, so the two sliders stack rather than becoming 120 px each. */}
+          <div className="grid grid-cols-2 gap-3 desktop:grid-cols-1 desktop:gap-4">
+            <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMin} onChange={(e) => set("ageMin", Math.min(Number(e.target.value), draft.ageMax))} aria-label="Minimum age" className="w-full accent-primary" />
+            <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMax} onChange={(e) => set("ageMax", Math.max(Number(e.target.value), draft.ageMin))} aria-label="Maximum age" className="w-full accent-primary" />
+          </div>
+        </section>
 
-      <section className="flex flex-col gap-2.5">
-        <div className="text-body font-semibold">Show me</div>
-        <div className="flex gap-2" role="radiogroup" aria-label="Show me">
-          {([["WOMEN", "Women"], ["MEN", "Men"], ["EVERYONE", "Everyone"]] as const).map(([v, label]) => (
-            <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => set("interestedIn", v)} className={segment(draft.interestedIn === v)}>{label}</button>
-          ))}
-        </div>
-      </section>
+        <section className="flex flex-col gap-2.5">
+          <div className="text-body font-semibold">Show me</div>
+          <div className="flex gap-2" role="radiogroup" aria-label="Show me">
+            {([["WOMEN", "Women"], ["MEN", "Men"], ["EVERYONE", "Everyone"]] as const).map(([v, label]) => (
+              <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => set("interestedIn", v)} className={segment(draft.interestedIn === v)}>{label}</button>
+            ))}
+          </div>
+        </section>
+      </div>
 
       <section className="flex flex-col gap-2.5">
         <div className="text-body font-semibold">Location</div>

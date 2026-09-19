@@ -16,7 +16,7 @@ export function Sidebar({ badges = {} }: { badges?: NavBadges }) {
   const pathname = usePathname();
   const active = activeNavKey(pathname);
   return (
-    <nav aria-label="Primary" className="hidden desktop:flex w-[var(--sidebar-width)] shrink-0 flex-col gap-1.5 border-r border-border px-4.5 py-7">
+    <nav aria-label="Primary" className="hidden desktop:flex w-[var(--sidebar-width)] shrink-0 flex-col gap-1.5 border-r border-border px-4.5 py-7 wide:w-[var(--sidebar-wide)] wide:px-5">
       <Link href="/discover" className="flex items-center gap-2 px-3 pb-6 text-h3 text-text" aria-label="Mellocrush home">
         <Wordmark height={26} />
       </Link>

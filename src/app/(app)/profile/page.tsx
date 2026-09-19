@@ -21,7 +21,14 @@ const SUGGESTION_HREF: Record<string, string> = {
   bio: "/profile/edit?section=about",
 };
 
-/** Profile tab (prototype): completion ring, name + seal, island · occupation, Edit / Preview, suggestions, rows. */
+/**
+ * Profile tab: completion ring, name + seal, island · occupation, Edit / Preview, suggestions, account rows.
+ *
+ * One column on phones and tablets. At the desktop tier it becomes two: identity and completion stay together on
+ * the left at a fixed 400 px, where they remain the subject of the screen, and the account sections move into a
+ * structured second column. The rows are capped rather than stretched — an account row dragged across 700 px puts
+ * its label and its value at opposite ends of the display and is harder to read, not easier.
+ */
 export default async function ProfilePage() {
   const actor = await requireActiveUser();
   const me = await getMyProfileSummary(actor);
@@ -40,8 +47,9 @@ export default async function ProfilePage() {
     <AppScreen aria-label="Profile">
       <TabHeader title="Profile" actions={<ThemeToggleIcon />} />
       <ScrollArea>
-        <Stack className="pt-2">
-          <div className="flex flex-col items-center gap-2.5 text-center">
+        <div className="flex flex-col gap-5 pt-2 wide:flex-row wide:items-start wide:gap-10">
+        <Stack className="wide:w-[var(--profile-side-wide)] wide:shrink-0">
+          <div className="flex flex-col items-center gap-2.5 text-center wide:rounded-card wide:glass-card wide:px-6 wide:py-7">
             <ProfileAvatar name={me.name} photo={me.primaryPhoto ? { url: me.primaryPhoto.url, key: me.primaryPhoto.key, blurhash: me.primaryPhoto.blurhash } : null} completion={me.completion.percent} verified={me.verified} />
             <div className="mt-2 flex items-center gap-1.5 text-h3 text-text">
               <span>{me.age != null ? `${me.name}, ${me.age}` : me.name}</span>
@@ -75,13 +83,17 @@ export default async function ProfilePage() {
               </ListGroup>
             </Stack>
           ) : null}
+        </Stack>
 
+        <Stack gap="sm" className="min-w-0 flex-1 wide:max-w-[640px]">
+          <SectionLabel className="hidden wide:block">Account</SectionLabel>
           <ListGroup>
             {rows.map((r) => (
               <LinkRow key={r.label} href={r.href} height={60} label={r.label} meta={r.meta || undefined} />
             ))}
           </ListGroup>
         </Stack>
+        </div>
       </ScrollArea>
     </AppScreen>
   );

@@ -2,6 +2,8 @@
 @import "../styles/tokens.css";
 
 @custom-variant desktop (@media (min-width: 900px));
+/* Desktop-native tier. `desktop` keeps the tablet composition; `wide` is where the real desktop layout begins. */
+@custom-variant wide (@media (min-width: 1280px));
 @custom-variant motion-ok (@media (prefers-reduced-motion: no-preference));
 
 @theme inline {

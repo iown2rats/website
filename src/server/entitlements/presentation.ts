@@ -32,7 +32,6 @@ export interface MembershipDto {
   cancelAtPeriodEnd: boolean;
   capabilities: {
     dailyLikeLimit: number;
-    messageCooldownMinutes: number;
     seeWhoLikesYou: boolean;
     invisibleMode: boolean;
     boostsPerWeek: number;
@@ -54,7 +53,9 @@ function describeRules(): MembershipDto["comparison"] {
   return [
     { capability: "Profile, photos, Discover, matching and chat", free: "Included", plus: "Included" },
     { capability: "Likes per day", free: String(f.dailyLikeLimit), plus: String(p.dailyLikeLimit) },
-    { capability: "Sending messages", free: f.messageCooldownMs ? `One every ${Math.round(f.messageCooldownMs / 60_000)} minutes` : "No wait", plus: p.messageCooldownMs ? `One every ${Math.round(p.messageCooldownMs / 60_000)} minutes` : "No wait" },
+    // Messaging a match is free and unlimited on both tiers and is never a Plus upsell; the row stays so the
+    // comparison answers the question rather than leaving a reader to wonder (§12.4).
+    { capability: "Messaging your matches", free: "Unlimited", plus: "Unlimited" },
     { capability: "See who likes you", free: f.canSeeIncomingLikes ? "Included" : "Count only", plus: yesNo(p.canSeeIncomingLikes) },
     { capability: "Invisible Mode", free: yesNo(f.canUseInvisibleMode), plus: yesNo(p.canUseInvisibleMode) },
     { capability: "Profile Boosts", free: f.boostsPerWindow ? `${f.boostsPerWindow} a week` : "—", plus: p.boostsPerWindow ? `${p.boostsPerWindow} a week` : "—" },
@@ -84,7 +85,6 @@ export async function getMembership(actor: Actor, deps: { db?: Db; now?: Date } 
     cancelAtPeriodEnd: e.subscription?.cancelAtPeriodEnd ?? false,
     capabilities: {
       dailyLikeLimit: e.rules.dailyLikeLimit,
-      messageCooldownMinutes: Math.round(e.rules.messageCooldownMs / 60_000),
       seeWhoLikesYou: e.rules.canSeeIncomingLikes,
       invisibleMode: e.rules.canUseInvisibleMode,
       boostsPerWeek: e.rules.boostsPerWindow,

@@ -73,7 +73,7 @@ describe("Plus-only capabilities are server-enforced", () => {
     await createSubscription(db, u.userId, { periodStart: T0, periodEnd: at(T0, days(30)) });
     const active = await getEntitlements(db, u.userId, at(T0, days(10)));
     expect(active.tier).toBe("PLUS");
-    expect(active.rules).toMatchObject({ dailyLikeLimit: 90, messageCooldownMs: 0, canSeeIncomingLikes: true, canUseInvisibleMode: true, boostsPerWindow: 2, canUseAdvancedFilters: true, canUndoPass: true, introsPerWeek: null });
+    expect(active.rules).toMatchObject({ dailyLikeLimit: 90, canSeeIncomingLikes: true, canUseInvisibleMode: true, boostsPerWindow: 2, canUseAdvancedFilters: true, canUndoPass: true, introsPerWeek: null });
     await setInvisibleMode(u, true, { db, now: at(T0, days(10)) });
     await passUser(u, other.userId, { db, now: at(T0, days(10)) });
     expect((await undoLastPass(u, { db, now: at(T0, days(10) + 1000) })).restoredUserId).toBe(other.userId);

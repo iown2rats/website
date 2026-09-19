@@ -9,7 +9,6 @@ export type DomainErrorCode =
   | "INVALID_STATE"
   | "ENTITLEMENT_REQUIRED"
   | "LIKE_LIMIT_REACHED"
-  | "MESSAGE_COOLDOWN"
   | "MESSAGE_RATE_LIMIT"
   | "BOOST_LIMIT_REACHED"
   | "BOOST_ALREADY_ACTIVE"
@@ -63,15 +62,6 @@ export class LikeLimitReachedError extends DomainError {
     this.name = "LikeLimitReachedError";
     this.limit = limit;
     this.resetsAt = resetsAt;
-  }
-}
-
-export class MessageCooldownError extends DomainError {
-  readonly availableAt: Date;
-  constructor(availableAt: Date) {
-    super("MESSAGE_COOLDOWN", "Your next free message is not available yet");
-    this.name = "MessageCooldownError";
-    this.availableAt = availableAt;
   }
 }
 

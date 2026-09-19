@@ -326,7 +326,7 @@ export function DesignSystemShowcase({ cards }: { cards: CardProfile[] }) {
               </OceanCard>
               <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface px-4.5 py-3.5">
                 <span className="grid size-9 place-items-center rounded-sm bg-surface-muted text-ocean"><LockIcon size={18} /></span>
-                <div className="flex-1"><div className="text-body font-medium">Chat without waiting</div><div className="text-caption-sm text-text-secondary">No 9-minute message cooldown.</div></div>
+                <div className="flex-1"><div className="text-body font-medium">Undo your last Pass</div><div className="text-caption-sm text-text-secondary">Bring back the person you just skipped.</div></div>
                 <PlusTag />
               </div>
               <Button variant="plus" className="text-cta-lg">Continue with Plus</Button>

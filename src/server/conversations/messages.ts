@@ -2,15 +2,16 @@
  * Conversation authorization, message sending, history, polling and read state
  * (docs/ARCHITECTURE.md §9, §12.4, §12.11). Built in Phase 3, completed in Phase 7.
  *
- * Cooldown semantics (Free): one outgoing TEXT message per 9 minutes, global per sender, measured from the last
- * successfully persisted TEXT message. Rejected attempts, received messages, reads, INTRO and SYSTEM messages
- * never start or restart the timer. The 30/min ceiling is anti-abuse and applies to every tier.
+ * Messaging a match is free and unlimited on every tier. There is no cooldown, no quota and no per-message
+ * charge, and no tier can reintroduce one — the rule does not exist in PRODUCT_RULES. What DOES still guard this
+ * path, unchanged, is authorization and safety: the sender must be a participant in an ACTIVE conversation whose
+ * match is ACTIVE, neither party may have blocked the other, and the 30-messages-per-minute anti-spam ceiling
+ * applies to everybody, Plus included.
  */
 import { MESSAGE_LIMITS, MESSAGE_SPAM_CEILING } from "@/config/product";
 import { getDb, type Db, type DbLike } from "@/lib/db";
-import { InvalidStateError, MessageCooldownError, MessageRateLimitError, NotFoundError, ValidationError } from "@/lib/errors";
+import { InvalidStateError, MessageRateLimitError, NotFoundError, ValidationError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
-import { getEntitlements, getMessageAvailability, type MessageAvailability } from "@/server/entitlements";
 import { lockPair } from "@/server/locks";
 import { isBlockedEitherWay } from "@/server/safety/block";
 
@@ -18,9 +19,6 @@ export interface MessageOptions {
   now?: Date;
   db?: Db;
 }
-
-/** Message kinds whose successful send starts the Free cooldown. */
-export const COOLDOWN_QUALIFYING_KINDS = ["TEXT"] as const;
 
 /** Normalises line endings and strips control characters (keeps newlines and tabs); rendering is always as text. */
 export function normalizeMessageBody(raw: string): string {
@@ -51,15 +49,12 @@ export interface SentMessage {
   conversationId: string;
   body: string;
   createdAt: Date;
-  /** For Free users: when the next message may be sent. Equals createdAt for Plus. */
-  nextAvailableAt: Date;
 }
 
 /**
  * Sends a text message. Transaction: per-sender advisory lock → participant check → pair lock → block re-check →
- * conversation/match status → entitlement → cooldown against the sender's last TEXT message → spam ceiling →
- * insert → conversation activity → notify. Lock order (sender lock, then pair lock) never conflicts with
- * blockUser/unmatch (pair lock only) or likeUser (usage row, then pair lock).
+ * conversation/match status → spam ceiling → insert → conversation activity → notify. Lock order (sender lock,
+ * then pair lock) never conflicts with blockUser/unmatch (pair lock only) or likeUser (usage row, then pair lock).
  */
 export async function sendMessage(actor: Actor, conversationId: string, rawBody: string, options: MessageOptions = {}): Promise<SentMessage> {
   const db = options.db ?? getDb();
@@ -79,22 +74,8 @@ export async function sendMessage(actor: Actor, conversationId: string, rawBody:
     const fresh = await tx.conversation.findUniqueOrThrow({ where: { id: conversationId }, select: { status: true, match: { select: { status: true } } } });
     if (fresh.status !== "ACTIVE" || (fresh.match && fresh.match.status !== "ACTIVE")) throw new InvalidStateError("This conversation is not open for messages");
 
-    // Entitlement is resolved at send time; the cooldown is measured from the last persisted qualifying message.
-    const entitlements = await getEntitlements(tx, actor.userId, now);
-    const cooldownMs = entitlements.rules.messageCooldownMs;
-    if (cooldownMs > 0) {
-      const last = await tx.message.findFirst({
-        where: { senderId: actor.userId, kind: { in: [...COOLDOWN_QUALIFYING_KINDS] } },
-        orderBy: { createdAt: "desc" },
-        select: { createdAt: true },
-      });
-      if (last) {
-        const availableAt = new Date(last.createdAt.getTime() + cooldownMs);
-        if (availableAt.getTime() > now.getTime()) throw new MessageCooldownError(availableAt);
-      }
-    }
-
-    // Anti-spam ceiling for every tier (safety, not monetization).
+    // No entitlement check here, deliberately: messaging a match is unlimited on every tier. The only remaining
+    // ceiling is anti-spam, and it applies to Free and Plus alike.
     const recent = await tx.message.count({
       where: { senderId: actor.userId, createdAt: { gt: new Date(now.getTime() - 60_000) } },
     });
@@ -125,7 +106,7 @@ export async function sendMessage(actor: Actor, conversationId: string, rawBody:
       }
     }
 
-    return { ...message, nextAvailableAt: new Date(now.getTime() + cooldownMs) };
+    return message;
   });
 }
 
@@ -151,7 +132,7 @@ function toMessageDto(actorId: string, m: { id: string; senderId: string; kind: 
   return { id: m.id, fromMe: m.senderId === actorId, kind: m.kind as MessageDto["kind"], body: m.body, at: m.createdAt.toISOString() };
 }
 
-/** History, newest first, cursor-paginated (bounded). Reading is never subject to any cooldown. */
+/** History, newest first, cursor-paginated (bounded). */
 export async function listMessages(actor: Actor, conversationId: string, options: { cursor?: string; limit?: number; db?: Db; now?: Date } = {}): Promise<MessagePageDto> {
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
@@ -169,22 +150,10 @@ export async function listMessages(actor: Actor, conversationId: string, options
   return { messages: page.map((m) => toMessageDto(actor.userId, m)), nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, serverNow: now.toISOString() };
 }
 
-export interface AvailabilityDto {
-  canSendNow: boolean;
-  availableAt: string;
-  cooldownMs: number;
-  tier: "FREE" | "PLUS";
-}
-
-export function toAvailabilityDto(a: MessageAvailability): AvailabilityDto {
-  return { canSendNow: a.canSendNow, availableAt: a.availableAt.toISOString(), cooldownMs: a.cooldownMs, tier: a.tier };
-}
-
 export interface PollDto {
   /** Messages newer than `afterId`, oldest first (bounded). */
   messages: MessageDto[];
   status: "ACTIVE" | "PENDING" | "LOCKED";
-  availability: AvailabilityDto;
   serverNow: string;
 }
 
@@ -208,8 +177,7 @@ export async function pollConversation(actor: Actor, conversationId: string, opt
     take: limit,
     select: { id: true, senderId: true, kind: true, body: true, createdAt: true },
   });
-  const availability = toAvailabilityDto(await getMessageAvailability(db, actor.userId, now));
-  return { messages: rows.map((m) => toMessageDto(actor.userId, m)), status: conversation.status, availability, serverNow: now.toISOString() };
+  return { messages: rows.map((m) => toMessageDto(actor.userId, m)), status: conversation.status, serverNow: now.toISOString() };
 }
 
 /**

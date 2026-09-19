@@ -6,8 +6,6 @@ describe("product rules (approved 2026-09-17)", () => {
   it("encode the approved Free and Plus values", () => {
     expect(PRODUCT_RULES.FREE.dailyLikeLimit).toBe(30);
     expect(PRODUCT_RULES.PLUS.dailyLikeLimit).toBe(90);
-    expect(PRODUCT_RULES.FREE.messageCooldownMs).toBe(9 * 60_000);
-    expect(PRODUCT_RULES.PLUS.messageCooldownMs).toBe(0);
     expect(PRODUCT_RULES.FREE.canSeeIncomingLikes).toBe(false);
     expect(PRODUCT_RULES.PLUS.canSeeIncomingLikes).toBe(true);
     expect(PRODUCT_RULES.FREE.canUseInvisibleMode).toBe(false);
@@ -15,6 +13,10 @@ describe("product rules (approved 2026-09-17)", () => {
     expect(PRODUCT_RULES.FREE.boostsPerWindow).toBe(0);
     expect(PRODUCT_RULES.PLUS.boostsPerWindow).toBe(2);
     expect(PRODUCT_RULES.PLUS.canUndoPass).toBe(true);
+    // Messaging a match is unlimited on every tier, so there is deliberately no tier field for it: a cooldown
+    // cannot be reintroduced by editing a value (docs/ARCHITECTURE.md §12.4).
+    expect(PRODUCT_RULES.FREE).not.toHaveProperty("messageCooldownMs");
+    expect(PRODUCT_RULES.PLUS).not.toHaveProperty("messageCooldownMs");
     expect(USAGE_WINDOWS.LIKES).toBe(24 * 3_600_000);
     expect(USAGE_WINDOWS.BOOSTS).toBe(7 * 24 * 3_600_000);
   });

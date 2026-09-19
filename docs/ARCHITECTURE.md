@@ -333,15 +333,15 @@ The prototype's Filters sheet (age range sliders, Show me, Location chips, Looki
 
 - **Authorization** is one function, `getConversationForActor(db, actor, conversationId)` (`src/server/conversations/messages.ts`): the conversation must have the session user as a participant and neither side may have blocked the other; otherwise `NotFound` (never `Forbidden`), so ids cannot be probed and a changed URL reveals nothing. Every read model, poll, read-mark, unmatch, report and profile view goes through it. A LOCKED conversation is still readable by its participants (history is evidence); only sending checks the status. Invisible Mode is a discovery rule and is never consulted here: matches always keep their conversations.
 - **Match requirement.** A conversation exists only because `createMatchIfMutual` created it (one per sorted pair, `Conversation.userAId < userBId` unique). Sending additionally re-checks that the Conversation is ACTIVE and its Match is ACTIVE inside the transaction.
-- **`sendMessage`** transaction: per-sender advisory lock (`msg:<userId>`) → participant check → pair advisory lock → block re-check → conversation/match status → entitlement at send time → Free cooldown against the sender's last persisted TEXT message → anti-spam ceiling → insert TEXT → `lastMessageAt` → sender's own read pointer → one unread `MESSAGE` notification per conversation for the other participant. Lock order (sender, then pair) is compatible with `blockUser`/`unmatchConversation` (pair only) and `likeUser` (usage row, then pair), so a send racing a block or unmatch either commits before it (and the conversation then locks) or is refused; tested five rounds.
-- **Free 9-minute rule** (§12.4): one outgoing TEXT message per 9 minutes, global per sender across all conversations. Only successfully persisted TEXT messages start the timer (`COOLDOWN_QUALIFYING_KINDS`); rejected attempts, incoming messages, reads, INTRO and SYSTEM rows never do. Receiving, reading and opening chats are never delayed. **Plus** has no monetization cooldown; entitlement is resolved inside the send transaction, so Plus lapsing or activating takes effect on the very next send. The **30 messages/minute ceiling** is anti-abuse and applies to every tier, Plus included; it is never described as a subscription feature.
+- **`sendMessage`** transaction: per-sender advisory lock (`msg:<userId>`) → participant check → pair advisory lock → block re-check → conversation/match status → anti-spam ceiling → insert TEXT → `lastMessageAt` → sender's own read pointer → one unread `MESSAGE` notification per conversation for the other participant. Lock order (sender, then pair) is compatible with `blockUser`/`unmatchConversation` (pair only) and `likeUser` (usage row, then pair), so a send racing a block or unmatch either commits before it (and the conversation then locks) or is refused; tested five rounds.
+- **Unlimited matched messaging** (§12.4): once two people are matched, messaging between them is free and unlimited on every tier. No cooldown, no quota, no per-message charge, and no entitlement lookup in the send path at all. The **30 messages/minute ceiling** is anti-abuse and applies to every tier, Plus included; it is never described as a subscription feature.
 - **Validation:** trimmed, control characters stripped (newlines kept), 1–2000 characters (`MESSAGE_LIMITS`), TEXT only in this phase. Bodies are stored verbatim and rendered as text by React (`white-space: pre-wrap`); no HTML is ever interpreted.
 - **History and polling:** `listMessages` returns the newest page (40, max 100) with a cursor for older pages; `pollConversation(afterId)` returns only messages newer than the client's newest id, oldest first, plus conversation status and the sender's availability. The client polls every 4 s while the tab is visible and online, pauses otherwise, and polls the Chats list every 10 s. `MessagingTransport` remains the seam for Supabase Realtime later: the UI consumes "new messages since X" and would not change.
 - **Read state:** `markConversationRead` sets the participant's `lastReadAt`/`lastReadMessageId` and clears that conversation's `MESSAGE` notifications. It runs only when the conversation is on screen (on open, and when new incoming messages arrive while visible), never from the list. Unread counts and the Chats badge (`countUnreadConversations`) derive from persisted read state: conversations with incoming messages newer than `lastReadAt`.
 - **DTOs** (`src/server/conversations/list.ts`, `messages.ts`): list rows carry the other person's handle, name, verified flag and displayable primary thumb (photo visibility policy), a 90-character preview with a "You:" flag, unread count and activity time; the header adds location (or null when hidden) and whether Unmatch is offered; messages carry `id, fromMe, kind, body, at`. No database ids of people, phone, DOB, storage keys, sender ids, moderation, subscription or report data appear; payload audits are tested. The list needs two bounded queries (rows with the latest message and participant fields; unread counts grouped by conversation).
 - **Ordering:** by `lastMessageAt` (falling back to match time for unmessaged matches). Background writes (read state, `updatedAt`) never reorder. "New matches" are ACTIVE matches with no message yet; a conversation appears in one section only.
-- **Optimistic send:** the bubble appears as "Sending…", is replaced by the persisted message on success, drops back into the composer on a cooldown refusal, and shows "Not sent · Tap to retry" on a network error. A refused message is never left looking sent.
-- **UI:** prototype Chats list (search, New matches row, rows with unread pills), glass conversation header (avatar, name, seal, island), aqua/primary bubbles with times, 44 px composer (multiline textarea, Enter sends, Shift+Enter newline). Free cooldown copy under the composer: "Next free message in 8:42. Chat anytime with Mellocrush Plus." with a Get Mellocrush Plus text button; no automatic modals. Plus users see the plain composer. Desktop uses the prototype's master–detail (360 px list, conversation pane); the phone bottom nav hides on the conversation screen. `/chats` and `/chats/[id]` are `force-dynamic` and all mutations are session-scoped server actions.
+- **Optimistic send:** the bubble appears as "Sending…", is replaced by the persisted message on success, and shows "Not sent · Tap to retry" on a network error. A refused message is never left looking sent.
+- **UI:** prototype Chats list (search, New matches row, rows with unread pills), glass conversation header (avatar, name, seal, island), aqua/primary bubbles with times, 44 px composer (multiline textarea, Enter sends, Shift+Enter newline). The composer is the same on every tier: no countdown, no timer-driven disabled state and no upsell, because matched messaging is unlimited. Send is enabled whenever there is text and the conversation is open. Desktop uses the prototype's master–detail (360 px list, conversation pane); the phone bottom nav hides on the conversation screen. `/chats` and `/chats/[id]` are `force-dynamic` and all mutations are session-scoped server actions.
 
 ## 10. Safety: block, report, unmatch (as built in Phase 7; settings UI in Phase 10)
 
@@ -380,7 +380,7 @@ This section supersedes every earlier statement about like caps, incognito mode,
 | Likes | 30 per rolling 24-hour window | 90 per rolling 24-hour window |
 | Pass | unlimited, never consumes likes | unlimited |
 | Chat with matches | included | included |
-| Sending messages | 1 outgoing message every 9 minutes, global across all conversations | no cooldown |
+| Messaging your matches | unlimited | unlimited |
 | Receiving and reading messages | never delayed | never delayed |
 | Likes You | count and anonymised placeholders only | full profiles |
 | Invisible Mode | not available (upsell) | enabled |
@@ -397,10 +397,10 @@ All numbers live in one typed module, `src/config/product.ts`:
 
 ```ts
 export const PRODUCT_RULES = {
-  FREE: { dailyLikeLimit: 30, messageCooldownMs: 9 * 60_000, canSeeIncomingLikes: false,
+  FREE: { dailyLikeLimit: 30, canSeeIncomingLikes: false,
           canUseInvisibleMode: false, boostsPerWindow: 0, canUseAdvancedFilters: false,
           canUndoPass: false, introsPerWeek: 1 },
-  PLUS: { dailyLikeLimit: 90, messageCooldownMs: 0, canSeeIncomingLikes: true,
+  PLUS: { dailyLikeLimit: 90, canSeeIncomingLikes: true,
           canUseInvisibleMode: true, boostsPerWindow: 2, canUseAdvancedFilters: true,
           canUndoPass: true, introsPerWeek: null /* unlimited */ },
 } as const satisfies Record<Tier, TierRules>;
@@ -417,7 +417,6 @@ The entitlement service (`src/server/entitlements`) is the only code that reads 
 resolveTier(userId, now): Promise<Tier>                 // FREE | PLUS, from Subscription + EntitlementOverride
 getEntitlements(userId, now): Promise<Entitlements>      // tier + the TierRules row + subscription summary
 getLikeAllowance(userId, now): Promise<{ limit, used, remaining, resetsAt }>
-getMessageAvailability(userId, now): Promise<{ canSendNow, availableAt, cooldownMs }>
 getBoostAllowance(userId, now): Promise<{ limit, used, remaining, resetsAt, activeBoostEndsAt }>
 can(entitlements, "seeIncomingLikes" | "invisibleMode" | "advancedFilters" | "undoPass")
 ```
@@ -439,17 +438,42 @@ Implementation: table `UsageCounter (userId, kind, windowStart, windowEnd, used)
 
 Because step 1 takes an exclusive row lock, five simultaneous requests with one like remaining execute one after another: the first increments `used` to the limit and the other four see `used >= limit`. Refreshing, changing device or logging out cannot affect the row. The UI reads `getLikeAllowance` to show "12 likes left today" or "Your 30 free likes will refresh in 6h 24m" using `resetsAt` from the server. Changing the policy later (for example sliding windows or per-day anchors) means changing steps 2 and 3 in one function.
 
-### 12.4 Message cooldown: 9 minutes, global, server-enforced
+### 12.4 Matched messaging is free and unlimited (revised 2026-09-19)
 
-Semantics: a Free user's outgoing messages to matches are spaced at least 9 minutes apart, measured from the previous outgoing message regardless of conversation. Receiving and reading are unaffected. Plus has no cooldown.
+**Rule: once two people are matched, messaging between them is unlimited on every tier.** No cooldown, no quota,
+no per-message charge, in any combination of Free and Plus. This is a product rule, not a tuning value.
 
-Implementation uses existing message rows plus a per-user transaction lock, with no extra table:
+It used to be otherwise: Free senders were limited to one outgoing TEXT message per 9 minutes, measured globally
+across all their conversations, and lifting that wait was sold as a Plus feature. That contradicted the intended
+product — a dating app whose core loop is conversation cannot meter the conversation — so it was removed
+entirely rather than set to zero.
 
-1. `sendMessage()` opens a transaction and calls `pg_advisory_xact_lock(hashtext('msg:' || userId))`, serialising all sends by this user for the duration of the transaction.
-2. Resolve entitlements. If `messageCooldownMs > 0`, read `MAX("createdAt") FROM "Message" WHERE "senderId" = $1 AND kind = 'TEXT'` (indexed on `(senderId, createdAt)`). If `now - last < cooldownMs`, roll back and return `MessageCooldown { availableAt: last + cooldownMs }`.
-3. Check the conversation is `ACTIVE` and the sender is a participant (section 9), apply the anti-spam ceiling, insert the message, commit.
+"Removed entirely" is deliberate and worth stating, because it is what stops the rule coming back:
 
-Two simultaneous sends therefore run sequentially; the second sees the first message's timestamp and is rejected. Disabling the Send button is a courtesy only; any direct call to the action during the cooldown gets the same rejection with `availableAt`, which the client renders as "Free message available in 6:42" and uses to re-enable Send at the right moment. A user who downgrades from Plus is measured from their last message like anyone else.
+- There is **no `messageCooldownMs` field in `TierRules`**. No tier can express a wait, so it cannot be
+  reintroduced by editing a config value; it would take a schema change to the rules table and would be visible
+  in review. `tests/unit/rules.test.ts` asserts the absence of the property, not merely that it is zero.
+- `sendMessage()` performs **no entitlement lookup at all**. The send path does not know or care what tier the
+  sender is on.
+- `MessageCooldownError`, the `MESSAGE_COOLDOWN` domain code, the `COOLDOWN` action code, `getMessageAvailability`,
+  `AvailabilityDto` and the composer's countdown are all gone. There is no plumbing left to re-wire.
+
+What still guards the send path, unchanged:
+
+1. `sendMessage()` opens a transaction and takes `pg_advisory_xact_lock(hashtext('msg:' || userId))`, then the
+   pair lock, so a send racing a block or an unmatch either commits before it or is refused.
+2. The sender must be a **participant** in a conversation whose status and match are both `ACTIVE`; a
+   non-participant gets `NotFound` and cannot tell the conversation exists.
+3. Neither party may have **blocked** the other; the check is repeated inside the transaction.
+4. The body is validated (non-empty, at most `MESSAGE_LIMITS.maxLength`, control characters stripped).
+5. The **30 messages/minute anti-spam ceiling** applies — identical on Free and Plus. It is a safety rule and is
+   never presented as something an upgrade removes.
+
+Because the advisory lock still serialises a sender's concurrent sends, six simultaneous sends now all commit
+(they queue, they do not contend for a quota), and each one's spam-ceiling count sees every committed predecessor.
+
+The one messaging limit that is still tier-dependent is the **Intro** (`introsPerWeek`), and it applies *before*
+a match exists — an intro is a note attached to a like, not a message in a conversation.
 
 ### 12.5 Likes You
 
@@ -479,7 +503,7 @@ Settings surface (Phase 9): Invisible Mode is the "Only people I like" option of
 
 ### 12.6a Anti-abuse ceilings are not monetization
 
-The 30-messages-per-minute ceiling (`MESSAGE_SPAM_CEILING`) and the OTP/upload rate limits are **safety rules**. They apply to every tier, Plus included, and are never presented as something an upgrade removes. The Free 9-minute cooldown is the only messaging rule that Plus lifts.
+The 30-messages-per-minute ceiling (`MESSAGE_SPAM_CEILING`) and the OTP/upload rate limits are **safety rules**. They apply to every tier, Plus included, and are never presented as something an upgrade removes. Plus lifts no messaging rule at all — messaging a match is unlimited for everybody.
 
 ### 12.6b Configuration defaults confirmed 2026-09-17
 
@@ -501,7 +525,7 @@ Free: age range, show me, location (Anywhere / Greater Malé / My atoll / specif
 
 ### 12.9a Lock UX (Phase 10)
 
-One component, `PlusLockSheet`, is the lock state for every paid capability: the feature's name, "Plus feature", one sentence, and a single "Upgrade to Plus" link to Membership. Membership itself shows the honest state when no plan is for sale ("Plus isn't on sale yet"), so a lock never leads into a dead checkout. The like-limit dialog, the chat cooldown note, the locked advanced filters, Undo and Boost all route there. Locks are UX only; every paid action is refused on the server regardless (`tests/integration/plus-enforcement.test.ts`). Membership also shows a Free vs Plus comparison table built from `PRODUCT_RULES` on the server (`MembershipDto.comparison`), never from component constants.
+One component, `PlusLockSheet`, is the lock state for every paid capability: the feature's name, "Plus feature", one sentence, and a single "Upgrade to Plus" link to Membership. Membership itself shows the honest state when no plan is for sale ("Plus isn't on sale yet"), so a lock never leads into a dead checkout. The like-limit dialog, the locked advanced filters, Undo and Boost all route there. Locks are UX only; every paid action is refused on the server regardless (`tests/integration/plus-enforcement.test.ts`). Membership also shows a Free vs Plus comparison table built from `PRODUCT_RULES` on the server (`MembershipDto.comparison`), never from component constants.
 
 ### 12.10 Plans, subscriptions and payments (as built in the Admin + Plus phase)
 
@@ -537,7 +561,7 @@ Flow: Membership → choose plan → order created → bank instructions → tra
 | --- | --- | --- |
 | Likes per window | `SELECT ... FOR UPDATE` on the user's `UsageCounter` row inside the like transaction | Concurrent transactions queue on the row lock; each re-reads `used` after acquiring it. |
 | Duplicate like | unique index `(fromUserId, toUserId)` | Second insert conflicts; treated as idempotent success without consuming quota. |
-| Message cooldown | `pg_advisory_xact_lock` per sender + `MAX(createdAt)` check inside the transaction | Concurrent sends queue on the advisory lock; the second sees the first's committed row. |
+| Message spam ceiling | `pg_advisory_xact_lock` per sender + a count over the last 60 s inside the transaction | Concurrent sends queue on the advisory lock, so the count each one sees includes every committed predecessor. |
 | Boosts per window | same `UsageCounter` row lock, kind BOOSTS, plus a check for an already-active boost | as likes |
 | Undo | row lock on the latest pass + "is latest action" check | Only one reversal can win; nothing else is mutated. |
 | Mutual match | unique `(userAId, userBId)` with `ON CONFLICT DO NOTHING` | as section 8 |
@@ -747,7 +771,7 @@ APP_URL=http://localhost:3000
 
 - Unit (Vitest): age calculation across time zones and leap days, phone normalisation, OTP hashing and attempt rules, entitlement derivation, completion percentage, intro week keys.
 - Integration (Vitest against Postgres): under-18 rejection at onboarding completion; duplicate like idempotency; mutual like creates exactly one match under concurrency (two parallel transactions); blocked users excluded from deck, likes-you and chat; conversation and message authorization for non-participants; intro quota per week; report creation with snapshot; privacy filtering (hidden location/age, hidden visibility); premium checks for likes-you and advanced filters.
-- Monetization (Vitest against Postgres, required): Free allowance is 30 and Plus 90; like consumes, pass does not; 30th succeeds and 31st is rejected with `resetsAt`; allowance restores after the 24-hour window; session/device changes do not reset it; N concurrent likes with one remaining yield exactly one success; expiry of Plus returns the user to Free limits. Messaging: matched Free user sends, immediate second send rejected, allowed after 9 minutes, cooldown spans conversations, receiving/reading unaffected, Plus has no cooldown, direct calls during cooldown rejected, simultaneous sends yield one success. Invisible Mode: normal discoverability, hidden from non-liked users, visible after liking, matches unaffected, lapsed Plus fails closed. Likes You: Free receives no identifying fields, Plus receives profiles. Boosts: Plus allowance 2 per 7 days, window enforced, Free rejected.
+- Monetization (Vitest against Postgres, required): Free allowance is 30 and Plus 90; like consumes, pass does not; 30th succeeds and 31st is rejected with `resetsAt`; allowance restores after the 24-hour window; session/device changes do not reset it; N concurrent likes with one remaining yield exactly one success; expiry of Plus returns the user to Free limits. Messaging (§12.4): a Free sender sends five consecutive messages at the same timestamp; Free↔Free, Free↔Plus and Plus↔Plus are all unlimited; one sender messages several matches at the same instant; Plus lapsing mid-conversation introduces no wait; six concurrent sends all commit; receiving and reading are immediate; the 30/min anti-spam ceiling stops Free and Plus alike and lifts after a rolling minute. Invisible Mode: normal discoverability, hidden from non-liked users, visible after liking, matches unaffected, lapsed Plus fails closed. Likes You: Free receives no identifying fields, Plus receives profiles. Boosts: Plus allowance 2 per 7 days, window enforced, Free rejected.
 - Authentication and onboarding (Vitest): ID-token verification against a fake Google JWKS (valid token; wrong issuer, audience, expiry, nonce, unverified email, unknown kid, tampered payload, HS256/none algorithms rejected); authorization request carries PKCE S256, state, nonce and scopes and the exchange posts the verifier and secret; the dev identity provider's codes are bound to redirect URI, nonce and PKCE and expire; production refuses the dev provider and requires the Google client; first sign-in creates one ONBOARDING account with verification NONE and no phone, returning sign-ins map to the same `User.id`, concurrent first sign-ins converge, suspended/banned get no session; deleted accounts are told and only an explicit choice creates a new `User.id` (old row untouched, identity moved, refused when not deleted); recent authentication marks only the requesting session and identity, expires, and is consumed once; deletion refuses without it; users without a phone are discoverable, can view, post and like, and contact blocking still applies through existing lists; session hashing, expiry, revoke one/all; onboarding persistence and resume, exactly-18 accepted and 17y364d refused, DOB absent from public DTOs, required-field gate; photo pipeline rules.
 - E2E (Playwright, dev identity provider, scripted outside the repo for now): the full sign-up journey through Continue with Google, forged under-age submission, refresh and forward-jump mid-onboarding, logout and re-login resuming the exact stage, upload errors with retry, reorder/remove, completion to Discover, and every route guard; screenshots at 375/390/430/1280 in light and dark.
 - CI: typecheck, lint, unit + integration on a Postgres service container, production build.
@@ -758,7 +782,7 @@ APP_URL=http://localhost:3000
 | --- | --- |
 | 3 Database (done) | `prisma/schema.prisma`, migration `20260917152844_init`, seed (reference + dev-only demo data), `src/lib/db.ts`, `prisma.config.ts`, plus the monetization domain layer (`src/config/product.ts`, `src/server/{entitlements,usage,discovery,likes,matching,conversations,boosts,privacy}`) and its database-backed tests. Applied to the hosted Supabase project on 2026-09-17 together with the later migrations (`docs/DEPLOYMENT.md` §3). |
 | 4 Design system (done) | `tokens.css`, Tailwind theme, `components/ui/*`, layout shell, preview route `/dev/design-system` in development only. |
-| 7 Messaging (done) | `src/server/conversations/{messages,list,unmatch,profile}.ts`, `src/server/safety/report.ts`, `src/actions/messaging.ts`, Chats list, split layout, conversation screen (composer, cooldown, polling, options/report/block/unmatch sheets), badges from read state, 14 new tests. No migration needed. |
+| 7 Messaging (done) | `src/server/conversations/{messages,list,unmatch,profile}.ts`, `src/server/safety/report.ts`, `src/actions/messaging.ts`, Chats list, split layout, conversation screen (composer, polling, options/report/block/unmatch sheets), badges from read state, 14 new tests. No migration needed. |
 | 6 Discovery + likes + matching (done) | `src/server/discovery/{predicate,query,dto,deck,filters}.ts`, `src/server/locks.ts`, `src/server/safety/block.ts`, hardened `likes/like.ts` and `matching/match.ts`, `src/actions/discovery.ts`, Discover client (deck, filters sheet, full profile, match overlay, like-limit dialog, empty states), `/chats/[conversationId]` shell, development discovery scenarios in the seed, 23 new tests. No migration needed. |
 | 5 Auth + onboarding (done) | Migration `20260917170000_onboarding_stage_otp_phone`, `src/server/auth/*`, `src/server/onboarding/*`, `src/server/photos/*`, `src/lib/storage/*`, `src/lib/env.ts`, `proxy.ts`, server actions in `src/actions/*`, routes `/auth/*`, `/onboarding/[stage]`, `/api/photos`, `/api/media`, onboarding and auth components, tests. Hosted Supabase migrated and the private `profile-photos` bucket created with owner approval (`docs/DEPLOYMENT.md`). |
 | 8 Community (done) | Migration `20260917200000_community_media_and_comment_reports`, `src/server/community/{dto,feed,posts,reactions,comments,reports,notify,profile}.ts`, `src/server/media/process-image.ts`, `src/actions/community.ts`, `POST /api/community/posts`, Community feed, compose sheet, thread route `/community/[postId]`, safety menus, profile overlay, dev scenario posts in the seed, 12 new tests. |

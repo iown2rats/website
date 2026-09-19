@@ -11,8 +11,6 @@ export type Tier = "FREE" | "PLUS";
 export interface TierRules {
   /** Likes allowed per rolling 24-hour usage window. */
   readonly dailyLikeLimit: number;
-  /** Minimum spacing between outgoing chat messages, across all conversations. 0 = none. */
-  readonly messageCooldownMs: number;
   /** Full "Likes You" profiles (true) or count + anonymised placeholders (false). */
   readonly canSeeIncomingLikes: boolean;
   /** Invisible Mode: only people the user has liked can discover them. */
@@ -29,7 +27,6 @@ export interface TierRules {
 export const PRODUCT_RULES = {
   FREE: {
     dailyLikeLimit: 30,
-    messageCooldownMs: 9 * 60_000,
     canSeeIncomingLikes: false,
     canUseInvisibleMode: false,
     boostsPerWindow: 0,
@@ -39,7 +36,6 @@ export const PRODUCT_RULES = {
   },
   PLUS: {
     dailyLikeLimit: 90,
-    messageCooldownMs: 0,
     canSeeIncomingLikes: true,
     canUseInvisibleMode: true,
     boostsPerWindow: 2,
@@ -74,8 +70,10 @@ export const UNDO: { readonly maxAgeMs: number | null } = {
 };
 
 /**
- * Anti-abuse ceiling. This is a SAFETY rule, not a monetization rule: it applies to every tier,
- * Plus included, and is independent of the Free message cooldown in PRODUCT_RULES.
+ * Anti-abuse ceiling, and the ONLY limit on messages inside a match. This is a SAFETY rule, not a monetization
+ * rule: it applies to every tier, Plus included, and is never presented as something an upgrade removes. Messaging
+ * a match is free and unlimited on every tier (docs/ARCHITECTURE.md §12.4) — there is no tier field for it,
+ * deliberately, so the rule cannot be reintroduced by flipping a config value.
  */
 export const MESSAGE_SPAM_CEILING = {
   perMinute: 30,

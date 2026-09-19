@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { MessageCooldownError, NotFoundError } from "@/lib/errors";
-import { getMessageAvailability } from "@/server/entitlements";
+import { MESSAGE_SPAM_CEILING } from "@/config/product";
+import { MessageRateLimitError, NotFoundError } from "@/lib/errors";
 import { likeUser } from "@/server/likes/like";
 import { listMessages, markConversationRead, sendMessage } from "@/server/conversations/messages";
 import { disconnectDb, resetDb, testDb } from "../helpers/db";
@@ -19,51 +19,89 @@ async function match(a: TestUser, b: TestUser, now = T0): Promise<string> {
 beforeEach(() => resetDb(db));
 afterAll(() => disconnectDb());
 
-describe("Free messaging cooldown (1 outgoing message per 9 minutes, global)", () => {
-  it("a matched free user can send a message", async () => {
+/*
+ * Messaging a match is free and unlimited on every tier (docs/ARCHITECTURE.md §12.4). These are the tests that
+ * hold that rule down: if anyone reintroduces a per-tier wait, a quota or a charge, they fail. "Immediately"
+ * here means at the very same timestamp — not "a second later" — because a cooldown of any length would show up.
+ */
+describe("matched messaging is unlimited on every tier", () => {
+  it("a Free user sends five consecutive messages at the same instant", async () => {
     const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
     const conv = await match(a, b);
-    const sent = await sendMessage(a, conv, "Hello!", { db, now: T0 });
-    expect(sent.body).toBe("Hello!");
-    expect(sent.nextAvailableAt.getTime()).toBe(at(T0, minutes(9)).getTime());
+    for (let i = 0; i < 5; i += 1) {
+      const sent = await sendMessage(a, conv, `Free ${i}`, { db, now: T0 });
+      expect(sent.body).toBe(`Free ${i}`);
+    }
+    expect(await db.message.count({ where: { senderId: a.userId } })).toBe(5);
   });
 
-  it("an immediate second message is rejected with the exact availability time", async () => {
+  it("Free ↔ Free: both sides send freely, interleaved, with no wait either way", async () => {
     const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
     const conv = await match(a, b);
-    await sendMessage(a, conv, "First", { db, now: T0 });
-    const err = await sendMessage(a, conv, "Second", { db, now: at(T0, minutes(2)) }).catch((e) => e);
-    expect(err).toBeInstanceOf(MessageCooldownError);
-    expect((err as MessageCooldownError).availableAt.getTime()).toBe(at(T0, minutes(9)).getTime());
-    const availability = await getMessageAvailability(db, a.userId, at(T0, minutes(2)));
-    expect(availability.canSendNow).toBe(false);
-    expect(availability.availableAt.getTime()).toBe(at(T0, minutes(9)).getTime());
+    for (let i = 0; i < 4; i += 1) {
+      await sendMessage(a, conv, `A${i}`, { db, now: T0 });
+      await sendMessage(b, conv, `B${i}`, { db, now: T0 });
+    }
+    const page = await listMessages(a, conv, { db, limit: 100 });
+    expect(page.messages).toHaveLength(8);
   });
 
-  it("is allowed again exactly 9 minutes later", async () => {
+  it("Free ↔ Plus: the Free side is not throttled by the other side's tier", async () => {
+    const [free, plus] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
+    await grantPlus(db, plus.userId, at(T0, -hours(1)), at(T0, hours(24)));
+    const conv = await match(free, plus);
+    for (let i = 0; i < 3; i += 1) await sendMessage(free, conv, `free ${i}`, { db, now: T0 });
+    for (let i = 0; i < 3; i += 1) await sendMessage(plus, conv, `plus ${i}`, { db, now: T0 });
+    expect(await db.message.count({ where: { senderId: free.userId } })).toBe(3);
+    expect(await db.message.count({ where: { senderId: plus.userId } })).toBe(3);
+  });
+
+  it("Plus ↔ Plus: unlimited, as before", async () => {
     const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
+    await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
+    await grantPlus(db, b.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const conv = await match(a, b);
-    await sendMessage(a, conv, "First", { db, now: T0 });
-    await expect(sendMessage(a, conv, "Too soon", { db, now: at(T0, minutes(9) - 1) })).rejects.toBeInstanceOf(MessageCooldownError);
-    const ok = await sendMessage(a, conv, "On time", { db, now: at(T0, minutes(9)) });
-    expect(ok.body).toBe("On time");
+    for (let i = 0; i < 5; i += 1) await sendMessage(a, conv, `Msg ${i}`, { db, now: T0 });
+    expect(await db.message.count({ where: { senderId: a.userId } })).toBe(5);
   });
 
-  it("applies across conversations, not per conversation", async () => {
+  it("a Free user messages several matches at the same instant — nothing is global any more", async () => {
     const a = await createUser(db, { now: T0 });
     const b = await createUser(db, { now: T0 });
     const c = await createUser(db, { now: T0 });
     const convB = await match(a, b);
     const convC = await match(a, c);
     await sendMessage(a, convB, "Hi B", { db, now: T0 });
-    await expect(sendMessage(a, convC, "Hi C", { db, now: at(T0, minutes(1)) })).rejects.toBeInstanceOf(MessageCooldownError);
+    await sendMessage(a, convC, "Hi C", { db, now: T0 });
+    expect(await db.message.count({ where: { senderId: a.userId } })).toBe(2);
   });
 
-  it("never delays receiving or reading", async () => {
+  it("Plus lapsing mid-conversation does not reintroduce a wait", async () => {
+    const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
+    await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, minutes(5)));
+    const conv = await match(a, b);
+    await sendMessage(a, conv, "While Plus", { db, now: at(T0, minutes(4)) });
+    // One minute later the subscription is gone. The next message still goes straight through.
+    const afterLapse = await sendMessage(a, conv, "After lapse", { db, now: at(T0, minutes(6)) });
+    expect(afterLapse.body).toBe("After lapse");
+    const again = await sendMessage(a, conv, "And again", { db, now: at(T0, minutes(6)) });
+    expect(again.body).toBe("And again");
+  });
+
+  it("concurrent sends all commit instead of one winning", async () => {
+    const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
+    const conv = await match(a, b);
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, (_, i) => sendMessage(a, conv, `Race ${i}`, { db, now: at(T0, minutes(1)) })),
+    );
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+    expect(await db.message.count({ where: { senderId: a.userId } })).toBe(6);
+  });
+
+  it("receiving and reading are immediate, and a reply needs no wait", async () => {
     const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
     const conv = await match(a, b);
     await sendMessage(a, conv, "One", { db, now: T0 });
-    // b, also Free and also inside their own (empty) cooldown state, receives and reads instantly.
     const page = await listMessages(b, conv, { db });
     expect(page.messages.map((m) => m.body)).toEqual(["One"]);
     await markConversationRead(b, conv, { db, now: at(T0, 1000) });
@@ -71,53 +109,38 @@ describe("Free messaging cooldown (1 outgoing message per 9 minutes, global)", (
       where: { conversationId_userId: { conversationId: conv, userId: b.userId } },
     });
     expect(participant.lastReadMessageId).toBe(page.messages[0]!.id);
-    // b can reply immediately; their own cooldown starts only with their own first message.
-    const reply = await sendMessage(b, conv, "Two", { db, now: at(T0, 2000) });
-    expect(reply.body).toBe("Two");
-    await expect(sendMessage(b, conv, "Three", { db, now: at(T0, 3000) })).rejects.toBeInstanceOf(MessageCooldownError);
-  });
-
-  it("a direct call during the cooldown is rejected by the server regardless of UI state", async () => {
-    const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
-    const conv = await match(a, b);
-    await sendMessage(a, conv, "First", { db, now: T0 });
-    // Simulates a client that ignores the disabled Send button and calls the action repeatedly.
-    for (let i = 0; i < 3; i++) {
-      await expect(sendMessage(a, conv, `Bypass ${i}`, { db, now: at(T0, minutes(4)) })).rejects.toBeInstanceOf(MessageCooldownError);
-    }
-    expect(await db.message.count({ where: { senderId: a.userId } })).toBe(1);
-  });
-
-  it("simultaneous sends yield exactly one message", async () => {
-    const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
-    const conv = await match(a, b);
-    const results = await Promise.allSettled(
-      Array.from({ length: 6 }, (_, i) => sendMessage(a, conv, `Race ${i}`, { db, now: at(T0, minutes(1)) })),
-    );
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    expect(results.filter((r) => r.status === "rejected")).toHaveLength(5);
-    expect(await db.message.count({ where: { senderId: a.userId } })).toBe(1);
+    await sendMessage(b, conv, "Two", { db, now: at(T0, 2000) });
+    const three = await sendMessage(b, conv, "Three", { db, now: at(T0, 2000) });
+    expect(three.body).toBe("Three");
   });
 });
 
-describe("Plus messaging", () => {
-  it("has no cooldown", async () => {
-    const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
-    await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
-    const conv = await match(a, b);
-    for (let i = 0; i < 5; i++) await sendMessage(a, conv, `Msg ${i}`, { db, now: at(T0, i * 1000) });
-    expect(await db.message.count({ where: { senderId: a.userId } })).toBe(5);
-    expect((await getMessageAvailability(db, a.userId, T0)).canSendNow).toBe(true);
+/*
+ * The one ceiling that remains. It is a SAFETY rule: identical on Free and Plus, and never presented as something
+ * an upgrade removes. A normal conversation never approaches it.
+ */
+describe("anti-spam ceiling (safety, every tier)", () => {
+  it("stops a Free sender at the ceiling and applies the same limit to Plus", async () => {
+    for (const plus of [false, true]) {
+      await resetDb(db);
+      const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
+      if (plus) await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
+      const conv = await match(a, b);
+      for (let i = 0; i < MESSAGE_SPAM_CEILING.perMinute; i += 1) {
+        await sendMessage(a, conv, `m${i}`, { db, now: T0 });
+      }
+      await expect(sendMessage(a, conv, "over", { db, now: T0 })).rejects.toBeInstanceOf(MessageRateLimitError);
+      expect(await db.message.count({ where: { senderId: a.userId } })).toBe(MESSAGE_SPAM_CEILING.perMinute);
+    }
   });
 
-  it("returns to the Free cooldown when Plus lapses, measured from the last message", async () => {
+  it("the ceiling is a rolling minute, not a lockout", async () => {
     const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
-    await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, minutes(5)));
     const conv = await match(a, b);
-    await sendMessage(a, conv, "While Plus", { db, now: at(T0, minutes(4)) });
-    await expect(sendMessage(a, conv, "After lapse", { db, now: at(T0, minutes(6)) })).rejects.toBeInstanceOf(MessageCooldownError);
-    const ok = await sendMessage(a, conv, "Cooled", { db, now: at(T0, minutes(13)) });
-    expect(ok.body).toBe("Cooled");
+    for (let i = 0; i < MESSAGE_SPAM_CEILING.perMinute; i += 1) await sendMessage(a, conv, `m${i}`, { db, now: T0 });
+    await expect(sendMessage(a, conv, "over", { db, now: T0 })).rejects.toBeInstanceOf(MessageRateLimitError);
+    const later = await sendMessage(a, conv, "a minute later", { db, now: at(T0, minutes(1) + 1000) });
+    expect(later.body).toBe("a minute later");
   });
 });
 

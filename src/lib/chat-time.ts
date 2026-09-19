@@ -18,9 +18,3 @@ export function bubbleTime(iso: string, now: Date = new Date()): string {
   const hm = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
   return d.toDateString() === now.toDateString() ? hm : `${chatTime(iso, now)} · ${hm}`;
 }
-
-/** mm:ss countdown for the composer ("8:42"). */
-export function mmss(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}

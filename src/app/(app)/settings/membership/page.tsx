@@ -22,7 +22,6 @@ export default async function MembershipPage() {
   const perks: [string, string][] = [
     ["See who likes you", "Full profiles in Likes You instead of blurred placeholders"],
     ["90 likes a day", "Instead of 30, in every rolling 24 hours"],
-    ["Message any time", "No 9-minute wait between messages to your matches"],
     ["Invisible Mode", "Only people you like can find you in Discover"],
     ["Advanced filters", "Height and education"],
     ["Undo your last Pass", "Bring back the person you just skipped"],

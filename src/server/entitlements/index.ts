@@ -113,32 +113,6 @@ export async function getLikeAllowance(db: DbLike, userId: string, now: Date = n
   return { limit, used: usage.used, remaining: Math.max(0, limit - usage.used), resetsAt: usage.windowEnd, tier: e.tier };
 }
 
-export interface MessageAvailability {
-  canSendNow: boolean;
-  /** When the next outgoing message becomes available. Equals `now` when sending is allowed. */
-  availableAt: Date;
-  cooldownMs: number;
-  tier: Tier;
-}
-
-/** Read-only view for the composer ("Free message available in 6:42"). The send path re-checks under lock. */
-export async function getMessageAvailability(
-  db: DbLike,
-  userId: string,
-  now: Date = new Date(),
-): Promise<MessageAvailability> {
-  const e = await getEntitlements(db, userId, now);
-  const cooldownMs = e.rules.messageCooldownMs;
-  if (cooldownMs === 0) return { canSendNow: true, availableAt: now, cooldownMs, tier: e.tier };
-  const last = await db.message.findFirst({
-    where: { senderId: userId, kind: "TEXT" },
-    orderBy: { createdAt: "desc" },
-    select: { createdAt: true },
-  });
-  const availableAt = last ? new Date(last.createdAt.getTime() + cooldownMs) : now;
-  return { canSendNow: availableAt.getTime() <= now.getTime(), availableAt: availableAt > now ? availableAt : now, cooldownMs, tier: e.tier };
-}
-
 export interface BoostAllowance {
   limit: number;
   used: number;

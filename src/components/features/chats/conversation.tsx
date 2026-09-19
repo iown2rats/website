@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { blockChatPartner, loadMatchProfile, loadOlderMessages, markChatRead, pollChatMessages, refreshAvailability, reportChatPartner, sendChatMessage, unmatchChat, type MessagingFailure } from "@/actions/messaging";
+import { blockChatPartner, loadMatchProfile, loadOlderMessages, markChatRead, pollChatMessages, reportChatPartner, sendChatMessage, unmatchChat, type MessagingFailure } from "@/actions/messaging";
 import { REPORT_REASON_LABELS } from "@/constants/labels";
 import { MESSAGE_LIMITS } from "@/config/product";
-import { bubbleTime, mmss } from "@/lib/chat-time";
+import { bubbleTime } from "@/lib/chat-time";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { FullProfile } from "@/components/features/discovery/full-profile";
 import { toDeckCard, type DeckCard } from "@/components/features/discovery/types";
 import { useServerClock } from "@/components/features/discovery/use-server-clock";
 import type { ConversationHeaderDto } from "@/server/conversations/list";
-import type { AvailabilityDto, MessageDto, MessagePageDto } from "@/server/conversations/messages";
+import type { MessageDto, MessagePageDto } from "@/server/conversations/messages";
 
 /*
  * Prototype conversation screen: glass header (56 + safe-top) with 44 px back (phone), 40 px avatar, 16/700 name +
@@ -27,12 +27,15 @@ import type { AvailabilityDto, MessageDto, MessagePageDto } from "@/server/conve
  * primary send. The prototype's "Add photo" button is omitted — image messaging is not in scope.
  *
  * Data: newest page from the server, older pages on scroll-up (scroll position preserved), incremental polling
- * every 4 s while visible (paused when hidden/offline). Cooldown copy and countdown derive from server time.
+ * every 4 s while visible (paused when hidden/offline).
+ *
+ * Messaging a match is unlimited on every tier, so the composer has no countdown, no disabled state waiting on a
+ * timer and no upsell: Send is enabled whenever there is text and the conversation is open. The only things that
+ * close it are the conversation ending, being blocked or being unmatched, which the server decides.
  */
 export interface ConversationProps {
   header: ConversationHeaderDto;
   initialPage: MessagePageDto;
-  initialAvailability: AvailabilityDto;
   serverNow: string;
 }
 
@@ -40,7 +43,7 @@ type Pending = { clientId: string; body: string; at: string; state: "sending" | 
 const POLL_MS = 4000;
 const REASONS = Object.entries(REPORT_REASON_LABELS) as [keyof typeof REPORT_REASON_LABELS, string][];
 
-export function Conversation({ header: initialHeader, initialPage, initialAvailability, serverNow }: ConversationProps) {
+export function Conversation({ header: initialHeader, initialPage, serverNow }: ConversationProps) {
   const router = useRouter();
   const toast = useToast();
   const { sync, serverTime } = useServerClock(serverNow);
@@ -50,7 +53,6 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
   const [olderCursor, setOlderCursor] = useState<string | null>(initialPage.nextCursor);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [pending, setPending] = useState<Pending[]>([]);
-  const [availability, setAvailability] = useState(initialAvailability);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -60,7 +62,6 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
   const [confirm, setConfirm] = useState<null | "block" | "unmatch">(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [profile, setProfile] = useState<DeckCard | null>(null);
-  const [tick, setTick] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const stickToBottom = useRef(true);
@@ -88,7 +89,6 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
         if (cancelled) return;
         if (result && result.ok) {
           sync(result.serverNow);
-          setAvailability(result.availability);
           if (result.status !== header.status) setHeader((h) => ({ ...h, status: result.status, canUnmatch: false }));
           if (result.messages.length) {
             latest = result.messages[result.messages.length - 1]!.id;
@@ -112,19 +112,6 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
     // `newestId` intentionally not a dependency: `latest` advances locally so sends don't restart the loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [header.id, header.status, sync, router, markRead]);
-
-  // Countdown ticker only while a Free cooldown is running.
-  const waitingMs = availability.canSendNow ? 0 : Math.max(0, Date.parse(availability.availableAt) - serverTime());
-  useEffect(() => {
-    if (availability.canSendNow) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, [availability]);
-  useEffect(() => {
-    if (availability.canSendNow || waitingMs > 0) return;
-    // Countdown reached zero: re-validate with the server before enabling the composer.
-    void refreshAvailability().then((r) => { if (r.ok) { sync(r.serverNow); setAvailability(r.availability); } });
-  }, [availability, waitingMs, sync]);
 
   // Scrolling: stick to the bottom for new messages; preserve position when older messages are prepended.
   useLayoutEffect(() => {
@@ -163,7 +150,6 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
   const send = async (text: string, existingClientId?: string) => {
     const body = text.trim();
     if (!body || sending || closed) return;
-    if (!availability.canSendNow && waitingMs > 0) return;
     const clientId = existingClientId ?? crypto.randomUUID();
     setSending(true);
     setDraft("");
@@ -173,19 +159,11 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
     setSending(false);
     if (result.ok) {
       sync(result.serverNow);
-      setAvailability(result.availability);
       setPending((p) => p.filter((x) => x.clientId !== clientId));
       setMessages((prev) => (prev.some((m) => m.id === result.message.id) ? prev : [...prev, result.message]));
       return;
     }
     sync(result.serverNow);
-    if (result.availability) setAvailability(result.availability);
-    if (result.code === "COOLDOWN") {
-      // Never leave a refused message looking sent: drop it and give the text back.
-      setPending((p) => p.filter((x) => x.clientId !== clientId));
-      setDraft(body);
-      return;
-    }
     if (result.code === "CLOSED" || result.code === "NOT_FOUND") {
       setPending((p) => p.filter((x) => x.clientId !== clientId));
       setHeader((h) => ({ ...h, status: "LOCKED", canUnmatch: false }));
@@ -230,9 +208,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
   };
 
   const canType = !closed;
-  const canSend = canType && draft.trim().length > 0 && !sending && (availability.canSendNow || waitingMs <= 0);
-  const showCooldown = canType && !availability.canSendNow && waitingMs > 0 && availability.tier === "FREE";
-  void tick;
+  const canSend = canType && draft.trim().length > 0 && !sending;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background animate-fade-in">
@@ -286,14 +262,6 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
         </div>
       ) : (
         <div className="shrink-0 border-t border-border bg-background">
-          {showCooldown ? (
-            <div className="flex items-center justify-between gap-3 px-4 pt-2.5 text-body-sm text-text-secondary" data-testid="cooldown-note">
-              <span>
-                Next free message in <b className="tabular-nums text-text">{mmss(waitingMs)}</b>. Chat anytime with Mellocrush Plus.
-              </span>
-              <Link href="/settings/membership" className="shrink-0 text-body-sm font-medium text-primary-ink">Get Mellocrush Plus</Link>
-            </div>
-          ) : null}
           <form
             onSubmit={(e) => { e.preventDefault(); void send(draft); }}
             className="flex items-end gap-2 px-3 pt-2.5"
@@ -306,7 +274,7 @@ export function Conversation({ header: initialHeader, initialPage, initialAvaila
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, MESSAGE_LIMITS.maxLength))}
               onKeyDown={onKeyDown}
-              placeholder={showCooldown ? `Next message in ${mmss(waitingMs)}` : "Message"}
+              placeholder="Message"
               rows={1}
               maxLength={MESSAGE_LIMITS.maxLength}
               enterKeyHint="send"

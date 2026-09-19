@@ -6,11 +6,10 @@ import { getDb } from "@/lib/db";
 import { isDomainError } from "@/lib/errors";
 import { requireActor } from "@/server/auth/current-user";
 import { listConversations, type ChatsListDto } from "@/server/conversations/list";
-import { getConversationForActor, listMessages, markConversationRead, pollConversation, sendMessage, toAvailabilityDto, type AvailabilityDto, type MessageDto, type MessagePageDto, type PollDto } from "@/server/conversations/messages";
+import { getConversationForActor, listMessages, markConversationRead, pollConversation, sendMessage, type MessageDto, type MessagePageDto, type PollDto } from "@/server/conversations/messages";
 import { getMatchProfile } from "@/server/conversations/profile";
 import { unmatchConversation } from "@/server/conversations/unmatch";
 import type { DiscoveryCardDto } from "@/server/discovery/dto";
-import { getMessageAvailability } from "@/server/entitlements";
 import { blockUser } from "@/server/safety/block";
 import { reportConversationPartner } from "@/server/safety/report";
 
@@ -28,21 +27,17 @@ const convSchema = z.object({ conversationId: idSchema });
 
 export type MessagingFailure = {
   ok: false;
-  code: "NOT_FOUND" | "COOLDOWN" | "RATE_LIMIT" | "CLOSED" | "VALIDATION" | "ERROR";
+  code: "NOT_FOUND" | "RATE_LIMIT" | "CLOSED" | "VALIDATION" | "ERROR";
   message: string;
-  /** For COOLDOWN: the authoritative availability. */
-  availability?: AvailabilityDto;
   serverNow: string;
 };
 
-function failure(e: unknown, availability?: AvailabilityDto): MessagingFailure {
+function failure(e: unknown): MessagingFailure {
   const serverNow = new Date().toISOString();
   if (isDomainError(e)) {
     switch (e.code) {
       case "NOT_FOUND":
         return { ok: false, code: "NOT_FOUND", message: "This conversation isn't available.", serverNow };
-      case "MESSAGE_COOLDOWN":
-        return { ok: false, code: "COOLDOWN", message: "Your next free message isn't available yet.", availability, serverNow };
       case "MESSAGE_RATE_LIMIT":
         return { ok: false, code: "RATE_LIMIT", message: "You're sending messages too quickly. Take a breath and try again.", serverNow };
       case "INVALID_STATE":
@@ -57,17 +52,14 @@ function failure(e: unknown, availability?: AvailabilityDto): MessagingFailure {
   return { ok: false, code: "ERROR", message: "Mellocrush couldn't send that right now. Try again.", serverNow };
 }
 
-export async function sendChatMessage(input: unknown): Promise<{ ok: true; message: MessageDto; availability: AvailabilityDto; serverNow: string } | MessagingFailure> {
-  let actor;
+export async function sendChatMessage(input: unknown): Promise<{ ok: true; message: MessageDto; serverNow: string } | MessagingFailure> {
   try {
-    actor = await requireActor();
+    const actor = await requireActor();
     const parsed = sendSchema.parse(input);
     const sent = await sendMessage(actor, parsed.conversationId, parsed.body);
-    const availability = toAvailabilityDto(await getMessageAvailability(getDb(), actor.userId));
-    return { ok: true, message: { id: sent.id, fromMe: true, kind: "TEXT", body: sent.body, at: sent.createdAt.toISOString() }, availability, serverNow: new Date().toISOString() };
+    return { ok: true, message: { id: sent.id, fromMe: true, kind: "TEXT", body: sent.body, at: sent.createdAt.toISOString() }, serverNow: new Date().toISOString() };
   } catch (e) {
-    const availability = actor ? await getMessageAvailability(getDb(), actor.userId).then(toAvailabilityDto).catch(() => undefined) : undefined;
-    return failure(e, availability);
+    return failure(e);
   }
 }
 
@@ -106,15 +98,6 @@ export async function refreshChats(): Promise<({ ok: true } & ChatsListDto) | Me
   try {
     const actor = await requireActor();
     return { ok: true, ...(await listConversations(actor)) };
-  } catch (e) {
-    return failure(e);
-  }
-}
-
-export async function refreshAvailability(): Promise<{ ok: true; availability: AvailabilityDto; serverNow: string } | MessagingFailure> {
-  try {
-    const actor = await requireActor();
-    return { ok: true, availability: toAvailabilityDto(await getMessageAvailability(getDb(), actor.userId)), serverNow: new Date().toISOString() };
   } catch (e) {
     return failure(e);
   }

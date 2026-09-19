@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { MESSAGE_LIMITS, MESSAGE_SPAM_CEILING } from "@/config/product";
-import { InvalidStateError, MessageCooldownError, MessageRateLimitError, NotFoundError, ValidationError } from "@/lib/errors";
+import { InvalidStateError, MessageRateLimitError, NotFoundError, ValidationError } from "@/lib/errors";
 import { LocalDiskStorageProvider } from "@/lib/storage/local";
 import { getConversationHeader, listConversations } from "@/server/conversations/list";
 import { countUnreadConversations, listMessages, markConversationRead, pollConversation, sendMessage } from "@/server/conversations/messages";
@@ -148,7 +148,7 @@ describe("history, polling and read state", () => {
   });
 });
 
-describe("validation and cooldown edge cases", () => {
+describe("validation and send edge cases", () => {
   it("stores markup as text, rejects empty and oversized messages, strips control characters", async () => {
     const me = await createUser(db, { now: T0 });
     const a = await createUser(db, { now: T0 });
@@ -163,15 +163,15 @@ describe("validation and cooldown edge cases", () => {
     expect(await db.message.count({ where: { senderId: a.userId } })).toBe(1);
   });
 
-  it("failed attempts never restart the 9-minute timer; system messages do not count", async () => {
+  it("a rejected send leaves no trace and does not affect the next one", async () => {
     const me = await createUser(db, { now: T0 });
     const a = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);
     await sendMessage(me, conv, "first", { db, now: T0 });
-    await expect(sendMessage(me, conv, "8:59", { db, now: at(T0, minutes(9) - 1000) })).rejects.toBeInstanceOf(MessageCooldownError);
-    await db.message.create({ data: { conversationId: conv, senderId: me.userId, kind: "SYSTEM", body: "system", createdAt: at(T0, minutes(8)) } });
-    const ok = await sendMessage(me, conv, "9:00", { db, now: at(T0, minutes(9)) });
-    expect(ok.body).toBe("9:00");
+    await expect(sendMessage(me, conv, "   ", { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);
+    const ok = await sendMessage(me, conv, "second", { db, now: T0 });
+    expect(ok.body).toBe("second");
+    expect(await db.message.count({ where: { senderId: me.userId, kind: "TEXT" } })).toBe(2);
   });
 
   it("Plus is still subject to the anti-spam ceiling, which is not an entitlement", async () => {
@@ -185,15 +185,17 @@ describe("validation and cooldown edge cases", () => {
     expect(later.body).toBe("next minute");
   });
 
-  it("activating Plus removes the monetization cooldown immediately; entitlement is resolved at send time", async () => {
+  it("a Free sender is never gated on tier: consecutive sends succeed with and without Plus", async () => {
     const me = await createUser(db, { now: T0 });
     const a = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);
-    await sendMessage(me, conv, "free", { db, now: T0 });
-    await expect(sendMessage(me, conv, "blocked", { db, now: at(T0, minutes(1)) })).rejects.toBeInstanceOf(MessageCooldownError);
+    await sendMessage(me, conv, "free one", { db, now: T0 });
+    const second = await sendMessage(me, conv, "free two", { db, now: T0 });
+    expect(second.body).toBe("free two");
     await grantPlus(db, me.userId, at(T0, minutes(2)), at(T0, hours(24)));
-    const ok = await sendMessage(me, conv, "plus now", { db, now: at(T0, minutes(2)) });
-    expect(ok.nextAvailableAt.getTime()).toBe(at(T0, minutes(2)).getTime());
+    const third = await sendMessage(me, conv, "plus now", { db, now: at(T0, minutes(2)) });
+    expect(third.body).toBe("plus now");
+    expect(await db.message.count({ where: { senderId: me.userId, kind: "TEXT" } })).toBe(3);
   });
 
   it("Invisible Mode has no effect on an existing match's conversation", async () => {

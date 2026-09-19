@@ -73,10 +73,43 @@ be reachable through the Data API at all.
 
 ## 3a. First administrator and selling Plus
 
-1. Add `ADMIN_BOOTSTRAP_TOKEN` (Production, Sensitive), redeploy, sign in as the owner, open `https://thundi.vercel.app/admin-setup`, paste the token. Your account becomes ADMIN (audited). Delete the variable and redeploy. **Done on 2026-09-18**: the owner's account is the single ADMIN and the variable has been removed; `/admin-setup` is a 404 from now on. Further admins are granted from `/admin/users/<id>` or with `scripts/grant-admin.ts`.
+1. Add `ADMIN_BOOTSTRAP_TOKEN` (Production, Sensitive), redeploy, sign in as the owner, open `https://thundi.vercel.app/admin-setup`, paste the token. Your account becomes ADMIN (audited). Delete the variable and redeploy. **Done on 2026-09-18**: the owner's account is the single ADMIN and the variable has been removed; `/admin-setup` is a 404 from now on. Further staff are added from `/admin/staff` (§3c); `scripts/grant-admin.ts` is retired.
 2. `/admin/payments/methods`: add the bank account customers transfer to and switch it on. Bank details live only in this table.
 3. `/admin/plans`: set the MVR price for each plan, switch on "Price approved" and "Enabled". Only then is anything for sale.
 4. Review transfers at `/admin/payments`; approving activates Plus, rejecting notifies the customer with your reason. Every decision is in `/admin/audit`.
+
+## 3c. Staff account separation (migration `20260919224949_staff_accounts`) — NOT YET APPLIED
+
+Separates operational accounts from dating accounts (docs/ARCHITECTURE.md §22). The migration is **additive only**:
+one `AccountType` enum, one `StaffGrantStatus` enum, `User.accountType` (NOT NULL DEFAULT 'MEMBER'), the
+`StaffGrant` and `StaffInvite` tables with their indexes and foreign keys, two CHECK constraints, a partial unique
+index, and `ENABLE ROW LEVEL SECURITY` with no policies on both new tables. No column is dropped, no column is
+retyped, and no existing row is rewritten.
+
+**Ordering matters.** The running code reads `User.accountType` in the session query, so apply the migration
+*before* the deployment that carries this change. Applying it early is safe on the current code, which never
+mentions the column.
+
+Procedure, following §3:
+
+1. Apply the exact repo SQL through the Supabase MCP, then insert the `_prisma_migrations` row with the file's
+   sha256, then confirm RLS on the two new tables with zero policies.
+2. Convert the existing administrator, as its own reviewed step:
+   ```
+   npx tsx scripts/convert-admin-to-staff.ts            # report only, changes nothing
+   npx tsx scripts/convert-admin-to-staff.ts --apply    # perform it
+   ```
+   The script resolves the administrator from the database (no address is in source), prints what will be
+   preserved, deleted, detached and anonymised, refuses if the account still has likes, matches, chats, reports or
+   payments, and re-checks every post-condition afterwards. It emails a set-password link; the owner then signs in
+   at `https://www.mellocrush.com/admin`.
+3. Deploy. `/admin` now shows the Admin Portal sign-in to anyone signed out.
+
+**Rollback.** The data migration is not reversible by re-running SQL: conversion deletes the administrator's
+profile, photos and settings rows, and soft-deletes their Community posts. Take a point-in-time snapshot before
+step 2. The *schema* rolls back cleanly (drop the two tables, the column and the two enums) and the code rolls back
+cleanly, but an account already converted stays converted; restoring its dating profile means restoring from the
+snapshot. Step 1 alone is fully reversible.
 
 ## 3b. Receipt OCR migration (applied 2026-09-18)
 

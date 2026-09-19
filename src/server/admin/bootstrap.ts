@@ -1,49 +1,47 @@
 /**
- * Admin role changes and first-admin bootstrap (docs/ARCHITECTURE.md §21.2).
+ * First-admin bootstrap (docs/ARCHITECTURE.md §21.2).
  *
- * Bootstrap: the owner sets ADMIN_BOOTSTRAP_TOKEN (32+ random characters) in the server environment, signs in with
- * Google as usual, opens /admin-setup and enters the token. The claim succeeds only while NO admin exists, so
- * the mechanism switches itself off after first use; the owner then removes the variable. No email address is in
- * source, nobody becomes admin automatically, and the page 404s whenever bootstrap is not available.
+ * The owner sets ADMIN_BOOTSTRAP_TOKEN (32+ random characters) in the server environment, signs in as usual, opens
+ * /admin-setup and enters the token. The claim succeeds only while NO administrator exists, so the mechanism
+ * switches itself off after first use; the owner then removes the variable. No email address is in source, nobody
+ * becomes admin automatically, and the page 404s whenever bootstrap is not available.
+ *
+ * Since the staff split (§22.1) a successful claim does not set a role — it runs the full MEMBER → STAFF
+ * conversion and issues a set-password link, exactly like any other promotion. A claimant who still has dating
+ * history the conversion refuses to destroy is told so and nothing changes.
  */
 import { timingSafeEqual } from "node:crypto";
 import { getDb, type Db, type DbLike } from "@/lib/db";
+import type { EmailProvider } from "@/lib/email";
+import { sendStaffInviteEmail } from "@/server/staff/auth";
+import { promoteAccountToStaff } from "@/server/staff/promote";
 import { getEnv } from "@/lib/env";
-import { InvalidStateError, NotFoundError, ValidationError } from "@/lib/errors";
+import { InvalidStateError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { AUDIT_ACTIONS, writeAudit } from "./audit";
-import { assertPermission, type AdminActor } from "./authz";
 
 export type Role = "USER" | "MODERATOR" | "ADMIN";
 export const ROLES: readonly Role[] = ["USER", "MODERATOR", "ADMIN"];
 
+/**
+ * How many administrators exist. Counts live STAFF accounts holding an ACTIVE ADMIN grant — the same definition
+ * `requireStaff()` uses — so a leftover MEMBER row whose role column says ADMIN neither counts as an administrator
+ * nor keeps bootstrap switched off.
+ */
 export async function countAdmins(db: DbLike): Promise<number> {
-  return db.user.count({ where: { role: "ADMIN", status: { not: "DELETED" } } });
+  return db.staffGrant.count({
+    where: { status: "ACTIVE", role: "ADMIN", claimedBy: { accountType: "STAFF", status: { notIn: ["DELETED", "BANNED"] } } },
+  });
 }
 
-/** ADMIN only. Never your own role; never leaves the project without an admin. */
-export async function changeUserRole(admin: AdminActor, targetUserId: string, input: { role: Role; reason: string }, deps: { db?: Db; now?: Date } = {}): Promise<{ userId: string; role: Role }> {
-  assertPermission(admin, "users.role");
-  const db = deps.db ?? getDb();
-  const now = deps.now ?? new Date();
-  if (!ROLES.includes(input?.role)) throw new ValidationError("Choose a role");
-  const reason = String(input?.reason ?? "").trim();
-  if (reason.length < 3 || reason.length > 300 || /[<>]/.test(reason)) throw new ValidationError("Give a short reason (3–300 characters)");
-  if (targetUserId === admin.userId) throw new InvalidStateError("You can't change your own role");
-  const target = await db.user.findUnique({ where: { id: targetUserId }, select: { id: true, role: true, status: true } });
-  if (!target) throw new NotFoundError("User");
-  if (target.status === "DELETED") throw new InvalidStateError("Deleted accounts can't hold a role");
-  if (target.role === input.role) return { userId: target.id, role: target.role };
-  const updated = await db.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('admin:roles'))`;
-    if (target.role === "ADMIN" && (await countAdmins(tx)) <= 1) throw new InvalidStateError("Mellocrush needs at least one administrator");
-    const row = await tx.user.update({ where: { id: target.id }, data: { role: input.role }, select: { id: true, role: true } });
-    await writeAudit(tx, { actorId: admin.userId, action: AUDIT_ACTIONS.adminRoleChanged, targetType: "User", targetId: target.id, data: { reason, before: { role: target.role }, after: { role: row.role } }, now });
-    return row;
-  });
-  return { userId: updated.id, role: updated.role };
-}
+/*
+ * `changeUserRole()` used to live here: it flipped User.role for any account from the user-detail screen. It is
+ * gone on purpose. Setting a role on a dating account would have produced exactly the arrangement the staff split
+ * removes — an operator with a profile, a place in discovery and a Community identity. Staff authority now comes
+ * from a StaffGrant, and the only ways to obtain one are an invitation (src/server/staff/grants.ts) or an explicit
+ * conversion (src/server/staff/promote.ts), both of which remove the dating account first.
+ */
 
 function configuredToken(): string | null {
   const token = getEnv().ADMIN_BOOTSTRAP_TOKEN;
@@ -56,9 +54,12 @@ export async function isBootstrapAvailable(db: DbLike): Promise<boolean> {
   return (await countAdmins(db)) === 0;
 }
 
-export type BootstrapResult = { ok: true } | { ok: false; code: "UNAVAILABLE" | "INVALID_TOKEN" | "RATE_LIMITED" | "NOT_ELIGIBLE" };
+export type BootstrapResult =
+  /** The address the set-password link was sent to, so the page can say where to look. */
+  | { ok: true; email: string }
+  | { ok: false; code: "UNAVAILABLE" | "INVALID_TOKEN" | "RATE_LIMITED" | "NOT_ELIGIBLE"; message?: string };
 
-export async function bootstrapFirstAdmin(actor: Actor, token: string, deps: { db?: Db; now?: Date; token?: string | null } = {}): Promise<BootstrapResult> {
+export async function bootstrapFirstAdmin(actor: Actor, token: string, deps: { db?: Db; now?: Date; token?: string | null; email?: EmailProvider } = {}): Promise<BootstrapResult> {
   const db = deps.db ?? getDb();
   const now = deps.now ?? new Date();
   const expected = deps.token === undefined ? configuredToken() : deps.token;
@@ -69,25 +70,41 @@ export async function bootstrapFirstAdmin(actor: Actor, token: string, deps: { d
   const want = Buffer.from(expected);
   if (given.length !== want.length || !timingSafeEqual(given, want)) return { ok: false, code: "INVALID_TOKEN" };
 
-  return db.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('admin:roles'))`;
-    if ((await countAdmins(tx)) > 0) return { ok: false, code: "UNAVAILABLE" } as const;
-    const user = await tx.user.findUnique({ where: { id: actor.userId }, select: { id: true, role: true, status: true, onboardingCompletedAt: true } });
-    if (!user || user.status !== "ACTIVE" || !user.onboardingCompletedAt) return { ok: false, code: "NOT_ELIGIBLE" } as const;
-    await tx.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
-    await writeAudit(tx, { actorId: user.id, action: AUDIT_ACTIONS.adminBootstrapped, targetType: "User", targetId: user.id, data: { via: "bootstrap-token", before: { role: user.role }, after: { role: "ADMIN" } }, now });
-    return { ok: true } as const;
-  });
+  if ((await countAdmins(db)) > 0) return { ok: false, code: "UNAVAILABLE" };
+  const user = await db.user.findUnique({ where: { id: actor.userId }, select: { id: true, accountType: true, role: true, status: true, onboardingCompletedAt: true } });
+  if (!user || user.status !== "ACTIVE" || user.accountType !== "MEMBER" || !user.onboardingCompletedAt) return { ok: false, code: "NOT_ELIGIBLE" };
+
+  // A successful claim is a full conversion, not a role flip: the claimant's dating profile goes, an ACTIVE grant
+  // is created and a set-password link is issued. `promoteAccountToStaff` re-checks "no administrator yet" under
+  // the same advisory lock it takes, so two simultaneous claims cannot both succeed.
+  try {
+    const promotion = await promoteAccountToStaff(db, user.id, {
+      role: "ADMIN",
+      reason: "First administrator claimed with the bootstrap token",
+      now,
+      via: "bootstrap",
+      actorId: user.id,
+      requireNoExistingAdmin: true,
+    });
+    await writeAudit(db, {
+      actorId: user.id,
+      action: AUDIT_ACTIONS.adminBootstrapped,
+      targetType: "User",
+      targetId: user.id,
+      data: { via: "bootstrap-token", before: { accountType: user.accountType, role: user.role }, after: { accountType: "STAFF", role: "ADMIN" } },
+      now,
+    });
+    await sendStaffInviteEmail(promotion.email, promotion.token, promotion.expiresAt, { setup: true, provider: deps.email, now });
+    return { ok: true, email: promotion.email };
+  } catch (e) {
+    if (e instanceof InvalidStateError) return { ok: false, code: "NOT_ELIGIBLE", message: e.message };
+    throw e;
+  }
 }
 
-/** Used by scripts/grant-admin.ts (an operator with database access). Audited with a null actor and the CLI marker. */
-export async function grantRoleFromCli(db: Db, targetUserId: string, role: Role, now: Date = new Date()): Promise<{ before: Role; after: Role }> {
-  const target = await db.user.findUnique({ where: { id: targetUserId }, select: { id: true, role: true, status: true } });
-  if (!target) throw new NotFoundError("User");
-  if (target.status === "DELETED") throw new InvalidStateError("Deleted accounts can't hold a role");
-  await db.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: target.id }, data: { role } });
-    await writeAudit(tx, { actorId: null, action: AUDIT_ACTIONS.adminRoleChanged, targetType: "User", targetId: target.id, data: { via: "cli", before: { role: target.role }, after: { role } }, now });
-  });
-  return { before: target.role, after: role };
-}
+/*
+ * `grantRoleFromCli()` used to live here and set User.role directly. It is gone for the same reason
+ * `changeUserRole()` is: a role on a dating account produces an operator with a profile and a place in discovery.
+ * The replacement is scripts/convert-admin-to-staff.ts, which converts the account first and then grants it, and
+ * scripts/grant-admin.ts now points at it.
+ */

@@ -1,15 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDb } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { isDomainError } from "@/lib/errors";
 import { AdminAccessError, requireAdmin } from "@/server/admin/authz";
-import { bootstrapFirstAdmin, changeUserRole, type Role } from "@/server/admin/bootstrap";
+import { bootstrapFirstAdmin } from "@/server/admin/bootstrap";
+import { sendStaffInviteEmail } from "@/server/staff/auth";
+import { promoteMemberToStaff } from "@/server/staff/promote";
+import type { StaffRole } from "@/server/staff/rules";
+import { deleteOrphanedStorage } from "@/server/staff/storage-cleanup";
 import { decideReport, type ReportDetailDto } from "@/server/admin/moderation";
 import { setAccountStatus, type AccountAction, type AccountStatus } from "@/server/admin/users";
 import { decidePhoto, type PhotoDecision } from "@/server/admin/photo-moderation";
 import { decideVerification } from "@/server/admin/verification";
-import { requireActor } from "@/server/auth/current-user";
+import { requireMember } from "@/server/auth/current-user";
 import { approveOrder, rejectOrder, type AdminOrderDto } from "@/server/billing/approval";
 import { reprocessReceipt } from "@/server/billing/receipts";
 import type { AdminReceiptVerificationDto } from "@/server/billing/receipt-dto";
@@ -44,12 +49,22 @@ export async function adminSetAccountStatus(userId: string, input: { action: Acc
   }
 }
 
-export async function adminChangeRole(userId: string, input: { role: Role; reason: string }): Promise<AdminResult<{ role: Role }>> {
+/**
+ * Converts a member account into a staff account (docs/ARCHITECTURE.md §22.3). This replaces the old "change
+ * role" control: the dating profile is removed, a live grant is created and the person is emailed a link to set
+ * an admin-portal password. It refuses while the account still has dating history that must be handled by hand.
+ */
+export async function adminConvertToStaff(userId: string, input: { role: StaffRole; reason: string }): Promise<AdminResult<{ email: string }>> {
   try {
     const admin = await requireAdmin("users.role");
-    const r = await changeUserRole(admin, String(userId), input);
+    const r = await promoteMemberToStaff(admin, String(userId), input, { db: getDb() });
+    await sendStaffInviteEmail(r.email, r.token, r.expiresAt, { setup: true });
+    // Photos and any verification selfie whose rows are gone. Failures are logged, never surfaced: the conversion
+    // itself has committed and must not appear to have failed because a bucket was slow.
+    await deleteOrphanedStorage(r.orphanedStorageKeys);
     revalidatePath(`/admin/users/${r.userId}`);
-    return { ok: true, data: { role: r.role } };
+    revalidatePath("/admin/staff");
+    return { ok: true, data: { email: r.email } };
   } catch (e) {
     return failure(e);
   }
@@ -167,7 +182,7 @@ export type BootstrapActionResult = { ok: true } | { ok: false; message: string 
 export async function claimAdminBootstrap(input: { token: string }): Promise<BootstrapActionResult> {
   let claimed = false;
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const r = await bootstrapFirstAdmin({ userId: actor.userId }, String(input?.token ?? ""));
     if (!r.ok) {
       const message = r.code === "INVALID_TOKEN" ? "That token isn't right." : r.code === "RATE_LIMITED" ? "Too many attempts. Try again in an hour." : r.code === "NOT_ELIGIBLE" ? "Finish onboarding first, then try again." : "Bootstrap isn't available.";

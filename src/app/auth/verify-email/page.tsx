@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
 export default async function VerifyEmailPage({ searchParams }: { searchParams: Promise<{ expired?: string }> }) {
   const state = await getAuthState();
   if (state.kind === "anonymous") redirect(ROUTES.welcome);
+  // A staff address is confirmed by the invitation it was sent to, so this screen never applies to one (§22.2).
+  if (state.kind === "staff") redirect(ROUTES.staffHome);
   if (state.kind === "active") redirect(ROUTES.home);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
   const verification = await getEmailVerificationState(getDb(), state.user.id);

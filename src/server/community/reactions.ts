@@ -10,6 +10,7 @@ import type { Actor } from "@/server/actor";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { notifyCommunity } from "./notify";
 import { canSeePost } from "./feed";
+import { assertMemberAccount } from "@/server/members/guard";
 
 export interface ReactionResult {
   liked: boolean;
@@ -19,6 +20,7 @@ export interface ReactionResult {
 export async function setReaction(actor: Actor, postId: string, liked: boolean, options: { db?: Db; now?: Date } = {}): Promise<ReactionResult> {
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
+  await assertMemberAccount(db, actor.userId);
   if (!(await canSeePost(db, actor, postId))) throw new NotFoundError("Post");
   const limit = await consumeRateLimit(db, `community:react:${actor.userId}`, COMMUNITY.reactionsPerMinute, 60_000, now);
   if (!limit.allowed) throw new ValidationError("Slow down a little.");

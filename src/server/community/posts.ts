@@ -40,8 +40,10 @@ export async function createPost(actor: Actor, input: CreatePostInput, deps: { d
   if (kind === "PHOTO" && !input.photo) throw new ValidationError("Add a photo to your photo post");
   if (kind !== "PHOTO" && input.photo) throw new ValidationError("Only photo posts can include a photo");
 
-  const user = await db.user.findUnique({ where: { id: actor.userId }, select: { status: true, privacy: { select: { invisibleMode: true } } } });
+  const user = await db.user.findUnique({ where: { id: actor.userId }, select: { accountType: true, status: true, privacy: { select: { invisibleMode: true } } } });
   if (!user || user.status !== "ACTIVE") throw new InvalidStateError("Your account can't post right now");
+  // Community is a member space. An operational account moderates it; it never takes part in it (§18).
+  if (user.accountType !== "MEMBER") throw new InvalidStateError("Staff accounts don't take part in Community");
   // The stored flag is the right test here, not the entitlement: a member is hidden from Discover whenever the flag
   // is on, with or without Plus (src/server/privacy/invisible-mode.ts), and this rule mirrors that hiding.
   if (COMMUNITY.invisibleModeParticipation === "READ_ONLY" && user.privacy?.invisibleMode) throw new InvalidStateError("Community posting is paused while Invisible Mode is on");

@@ -16,7 +16,15 @@ export type AuthState =
   /** An email account holding a session but no member functionality until its address is confirmed (§4.1b). */
   | { kind: "unverified"; user: SessionUser; sessionId: string }
   | { kind: "onboarding"; user: SessionUser; sessionId: string }
-  | { kind: "active"; user: SessionUser; sessionId: string };
+  | { kind: "active"; user: SessionUser; sessionId: string }
+  /**
+   * An operational account (docs/ARCHITECTURE.md §22.1). It is never "active": every member guard below refuses
+   * it, and every member route sends it to the admin portal instead of into the dating app.
+   */
+  | { kind: "staff"; user: SessionUser; sessionId: string };
+
+/** Where a staff account goes whenever it touches the member side of the app. */
+export const STAFF_HOME = "/admin";
 
 /** Memoised per request. Suspended/banned/deleted accounts behave as anonymous (the session is dropped). */
 export const getAuthState = cache(async (): Promise<AuthState> => {
@@ -39,49 +47,90 @@ export function authKind(state: AuthState): AuthKind {
   return state.kind;
 }
 
-/** For app routes: anonymous → welcome, unverified → the verification screen, incomplete → onboarding. */
+/** For app routes: anonymous → welcome, staff → the admin portal, unverified → the verification screen, incomplete → onboarding. */
 export async function requireActiveUser(): Promise<Actor & { user: SessionUser }> {
   const state = await getAuthState();
   if (state.kind === "anonymous") redirect(ROUTES.welcome);
+  if (state.kind === "staff") redirect(STAFF_HOME);
   if (state.kind === "unverified") redirect(ROUTES.verifyEmail);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
   return { userId: state.user.id, user: state.user };
 }
 
-/** For onboarding routes: anonymous → welcome; unverified → verify first; completed → Discover. */
+/**
+ * For onboarding routes: anonymous → welcome; staff → the admin portal; unverified → verify first; completed →
+ * Discover. A staff account must never start dating onboarding, which is why it is turned away here rather than
+ * allowed to fall through to the "incomplete" case (§13).
+ */
 export async function requireOnboardingUser(): Promise<Actor & { user: SessionUser }> {
   const state = await getAuthState();
   if (state.kind === "anonymous") redirect(ROUTES.welcome);
+  if (state.kind === "staff") redirect(STAFF_HOME);
   if (state.kind === "unverified") redirect(ROUTES.verifyEmail);
   if (state.kind === "active") redirect(ROUTES.home);
   return { userId: state.user.id, user: state.user };
 }
 
-/** For auth routes: an authenticated user never sees the login again. */
+/** For auth routes: an authenticated user never sees the login again. Staff land in the portal, not the app. */
 export async function redirectIfAuthenticated(): Promise<void> {
   const state = await getAuthState();
+  if (state.kind === "staff") redirect(STAFF_HOME);
   if (state.kind === "active") redirect(ROUTES.home);
   if (state.kind === "unverified") redirect(ROUTES.verifyEmail);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
 }
 
 /**
- * For server actions: any signed-in user whose account is usable. This is the single choke point every member
- * action goes through, so refusing "unverified" here is what actually keeps an unconfirmed email account out of
- * discovery, likes, matches, messages, Likes You, Boost, Community and Plus — not the hidden UI (§4.1b).
+ * The guard every member server action goes through (docs/ARCHITECTURE.md §4.1b, §22.4). It is the single choke
+ * point that keeps two different kinds of account out of the dating domain:
+ *
+ *  - an email account that has not confirmed its address (`unverified`), and
+ *  - an operational account (`staff`), which has no dating identity at all.
+ *
+ * Because it refuses here rather than in the UI, hiding a button is never what protects anything: discovery,
+ * likes, matches, messages, Likes You, Boost, Community, Plus and profile editing are all closed to staff by this
+ * one check, even if a request is crafted by hand.
  */
-export async function requireActor(): Promise<Actor & { user: SessionUser }> {
+export async function requireMember(): Promise<Actor & { user: SessionUser }> {
   const state = await getAuthState();
   if (state.kind === "anonymous") throw new Error("Not authenticated");
+  if (state.kind === "staff") throw new StaffCannotUseMemberFeaturesError();
   if (state.kind === "unverified") throw new EmailVerificationRequiredError();
   return { userId: state.user.id, user: state.user };
 }
 
-/** Thrown by `requireActor` for an email account that has not confirmed its address. */
+/**
+ * The staff counterpart, for operational server actions. It establishes only that the caller is a live staff
+ * account; which staff account may do what is decided by the permission check in src/server/admin/authz.ts, which
+ * calls this first.
+ */
+export async function requireStaffActor(): Promise<Actor & { user: SessionUser; sessionId: string }> {
+  const state = await getAuthState();
+  if (state.kind !== "staff") throw new StaffAccessRequiredError();
+  return { userId: state.user.id, user: state.user, sessionId: state.sessionId };
+}
+
+/** Thrown by `requireMember` for an email account that has not confirmed its address. */
 export class EmailVerificationRequiredError extends Error {
   constructor() {
     super("Confirm your email address to use Mellocrush.");
     this.name = "EmailVerificationRequiredError";
+  }
+}
+
+/** Thrown by `requireMember` when an operational account reaches a dating action (§16). */
+export class StaffCannotUseMemberFeaturesError extends Error {
+  constructor() {
+    super("Staff accounts don't use Mellocrush as members.");
+    this.name = "StaffCannotUseMemberFeaturesError";
+  }
+}
+
+/** Thrown by `requireStaffActor` for anything that is not a live staff account. */
+export class StaffAccessRequiredError extends Error {
+  constructor() {
+    super("Not authorized");
+    this.name = "StaffAccessRequiredError";
   }
 }
 

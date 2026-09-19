@@ -45,12 +45,26 @@ export function displayableModerationSql(): Prisma.Sql {
 }
 
 /**
+ * An operational account is never a dating candidate (docs/ARCHITECTURE.md §22.5).
+ *
+ * A STAFF account has no Profile, so the INNER JOIN in every candidate query already excludes it and this clause
+ * should never be the thing that does the work. It is here precisely because "should never" is not a guarantee:
+ * a stale row, a half-run migration, a future code path that creates a Profile by accident, or a malformed record
+ * restored from a backup would each be enough. Stating the rule in the canonical predicate means a staff account
+ * cannot surface even when something upstream is wrong.
+ */
+export function memberOnlySql(): Prisma.Sql {
+  return Prisma.sql`u."accountType" = 'MEMBER'`;
+}
+
+/**
  * Base visibility: may viewer V see candidate U at all? Independent of V's filters.
  * Used by discovery, Likes You, like(), profile views.
  */
 export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array | null, now: Date): Prisma.Sql {
   return Prisma.sql`
     u.id <> ${viewerId}
+    AND ${memberOnlySql()}
     AND u.status = 'ACTIVE'
     AND u."deletedAt" IS NULL
     AND u."onboardingCompletedAt" IS NOT NULL
@@ -82,7 +96,8 @@ export function baseVisibleSql(viewerId: string, viewerPhoneHash: Uint8Array | n
  */
 export function noBlockOrContactSql(viewerId: string, viewerPhoneHash: Uint8Array | null): Prisma.Sql {
   return Prisma.sql`
-    NOT EXISTS (
+    ${memberOnlySql()}
+    AND NOT EXISTS (
       SELECT 1 FROM "Block" b
       WHERE (b."blockerId" = ${viewerId} AND b."blockedId" = u.id)
          OR (b."blockerId" = u.id AND b."blockedId" = ${viewerId})

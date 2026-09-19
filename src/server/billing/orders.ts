@@ -23,6 +23,7 @@ import { toCustomerCheckDto, type ReceiptCheckDto } from "./receipt-dto";
 import { attachReceipt, submitOrder, type ReceiptUpload } from "./receipts";
 import { generateReference } from "./reference";
 import { assertTransition, OPEN_ORDER_STATUSES, type OrderStatus } from "./state";
+import { assertMemberAccount } from "@/server/members/guard";
 
 export type { ReceiptUpload } from "./receipts";
 
@@ -116,6 +117,8 @@ export async function createOrder(actor: Actor, input: { planId: string }, deps:
   const now = deps.now ?? new Date();
   const planId = typeof input?.planId === "string" ? input.planId : "";
   if (!planId || planId.length > 64) throw new ValidationError("Choose a plan");
+  // Plus is a member entitlement; a staff account has nothing to spend it on (§16).
+  await assertMemberAccount(db, actor.userId);
 
   await assertCanBuy(db, actor.userId);
   const plan = await db.subscriptionPlan.findUnique({ where: { id: planId } });

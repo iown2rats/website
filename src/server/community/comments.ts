@@ -16,6 +16,7 @@ import { noBlockOrContactSql } from "@/server/discovery/predicate";
 import { loadAuthors, type CommunityCommentDto } from "./dto";
 import { canSeePost } from "./feed";
 import { notifyCommunity } from "./notify";
+import { assertMemberAccount } from "@/server/members/guard";
 
 export const commentBodySchema = z
   .string()
@@ -72,6 +73,7 @@ export async function addComment(actor: Actor, postId: string, rawBody: string, 
   const db = deps.db ?? getDb();
   const storage = deps.storage ?? getStorageProvider();
   const now = deps.now ?? new Date();
+  await assertMemberAccount(db, actor.userId);
   const parsed = commentBodySchema.safeParse(rawBody ?? "");
   if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? "That comment isn't valid");
   if (!(await canSeePost(db, actor, postId))) throw new NotFoundError("Post");

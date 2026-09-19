@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { isDomainError } from "@/lib/errors";
-import { requireActor } from "@/server/auth/current-user";
+import { requireMember } from "@/server/auth/current-user";
 import { cancelOrder, createOrder, submitOrderForActor, type OrderDto } from "@/server/billing/orders";
 
 /*
@@ -25,7 +25,7 @@ function failure(e: unknown): BillingFailure {
 export async function startPlusOrder(input: { planId: string }): Promise<BillingFailure | { ok: true; order: OrderDto }> {
   let order: OrderDto;
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     order = await createOrder({ userId: actor.userId }, { planId: String(input?.planId ?? "") });
   } catch (e) {
     return failure(e);
@@ -35,7 +35,7 @@ export async function startPlusOrder(input: { planId: string }): Promise<Billing
 
 export async function cancelPlusOrder(input: { orderId: string }): Promise<BillingFailure | { ok: true; order: OrderDto }> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const order = await cancelOrder({ userId: actor.userId }, String(input?.orderId ?? ""));
     return { ok: true, order };
   } catch (e) {
@@ -45,7 +45,7 @@ export async function cancelPlusOrder(input: { orderId: string }): Promise<Billi
 
 export async function submitPlusOrder(input: { orderId: string }): Promise<BillingFailure | { ok: true; order: OrderDto }> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const order = await submitOrderForActor({ userId: actor.userId }, String(input?.orderId ?? ""));
     return { ok: true, order };
   } catch (e) {

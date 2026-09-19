@@ -52,14 +52,26 @@ describe("admin permissions", () => {
     expect(ROLE_PERMISSIONS.MODERATOR.length).toBeLessThan(ROLE_PERMISSIONS.ADMIN.length);
   });
   it("derives the admin actor from the database row only", () => {
-    const base = { id: "u1", status: "ACTIVE", onboardingCompletedAt: new Date() };
+    const base = { id: "u1", accountType: "STAFF", status: "ACTIVE" };
     expect(adminActorFrom({ ...base, role: "ADMIN" })).toEqual({ userId: "u1", role: "ADMIN" });
     expect(adminActorFrom({ ...base, role: "MODERATOR" })).toEqual({ userId: "u1", role: "MODERATOR" });
     expect(adminActorFrom({ ...base, role: "USER" })).toBeNull();
     expect(adminActorFrom({ ...base, role: "admin" })).toBeNull();
     expect(adminActorFrom({ ...base, role: "ADMIN", status: "SUSPENDED" })).toBeNull();
-    expect(adminActorFrom({ ...base, role: "ADMIN", onboardingCompletedAt: null })).toBeNull();
     expect(adminActorFrom(null)).toBeNull();
+  });
+
+  it("refuses a dating member however its role column reads", () => {
+    // The account-type test is what keeps authority from leaking back into the member domain: a stale row, a bad
+    // migration or a direct database edit that sets role=ADMIN on a MEMBER must still get nothing.
+    expect(adminActorFrom({ id: "u1", accountType: "MEMBER", status: "ACTIVE", role: "ADMIN" })).toBeNull();
+    expect(adminActorFrom({ id: "u1", accountType: "MEMBER", status: "ACTIVE", role: "MODERATOR" })).toBeNull();
+    // A missing account type is treated as "not staff" rather than defaulting open.
+    expect(adminActorFrom({ id: "u1", status: "ACTIVE", role: "ADMIN" })).toBeNull();
+  });
+
+  it("does not require onboarding, because staff never do it", () => {
+    expect(adminActorFrom({ id: "u1", accountType: "STAFF", status: "ACTIVE", role: "ADMIN" })).toEqual({ userId: "u1", role: "ADMIN" });
   });
 });
 

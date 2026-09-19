@@ -713,6 +713,164 @@ there was no code path in the product that set `APPROVED`, which made every prod
 
 `src/server/admin/audit.ts` is the single writer. Actions: `admin.role.changed`, `admin.bootstrapped`, `user.suspended`, `user.unsuspended`, `user.banned`, `report.decided`, `verification.decided`, `photo.moderated`, `payment.approved`, `payment.rejected`, `subscription.adjusted`, `payment_method.created/updated`, `plan.created/updated` (plus the existing user-initiated `account.deleted` / `account.recreated`). Payloads are sanitised: keys that look like secrets (token, hash, secret, providerSubject, …) are dropped before writing; account numbers are logged as last four digits. `/admin/audit` is read-only and no admin surface can edit or delete rows.
 
+## 22. Staff accounts and the admin portal (member/staff separation)
+
+Mellocrush has two kinds of account and they are mutually exclusive. A **MEMBER** account is a dating account: a
+profile, photos, a place in discovery, a Community identity. A **STAFF** account is operational: an address, a
+password, a role and an audit trail. One person must never function as both, and the separation is enforced on the
+server at every layer rather than by hiding UI.
+
+Before this split, "admin" was a column on a dating account, so an administrator necessarily had a profile that
+appeared in Discover like anyone else's. §21 describes the system as it was; this section replaces §21.1 and §21.2.
+
+### 22.1 Account types and routing
+
+`User.accountType` (`MEMBER | STAFF`, default MEMBER) is the domain; `User.role` is the authority layered on a
+staff account. The session carries the account type, and `authKindForUser` classifies a staff session as its own
+kind, ordered immediately after "blocked" so a staff account can never read as `active`, `onboarding` or
+`unverified` anywhere in the app.
+
+That single classification does most of the work:
+
+- `requireActiveUser()` and `requireOnboardingUser()` send a staff session to `/admin`, so no operator ever enters
+  dating onboarding and no profile is created for one (§13 of the brief).
+- `requireMember()` throws `StaffCannotUseMemberFeaturesError` for a staff session. Every member server action
+  goes through it.
+- `requireStaff()` / `requireAdmin()` require `accountType = STAFF` **and** an ACTIVE `StaffGrant`. A MEMBER row
+  whose `role` column says ADMIN — a stale row, a bad migration, a direct database edit — gets nothing.
+
+Routing: `/admin*` is its own route group in `classifyRoute`, allowed for every auth state because the portal's own
+pages decide who may see them. Anonymous visitors reach `/admin/login`; a signed-in member gets the same 404 a
+missing page gives, so the portal never confirms it exists; a live staff account gets the dashboard. The signed-in
+pages live under `src/app/admin/(dashboard)/`, the sign-in, invitation and password screens outside it.
+
+Onboarding is deliberately **not** required of staff, which is what makes a staff account genuinely profile-less
+rather than "a dating profile that is hidden".
+
+### 22.2 Staff authorisation, invitations and the portal
+
+`StaffGrant` (PENDING → ACTIVE → REVOKED) is the single source of truth for portal access, read on every request so
+revocation takes effect immediately rather than at the next sign-in. A partial unique index
+(`StaffGrant_email_open_key ... WHERE status <> 'REVOKED'`) keeps at most one live grant per normalised address, so
+two admins racing on the same address cannot both win; a revoked row is history and frees the address again.
+
+`/admin/staff` (ADMIN only to change anything, visible to any staff account) lists Active and Pending grants and
+offers Add staff, Change role, Revoke, Resend invite and Cancel invite. Adding somebody needs only an address, a
+role and a reason — they need no Mellocrush account, and none is created until they use the link.
+
+Invitations are `StaffInvite` rows: 32 random bytes, SHA-256 at rest, single-use via a conditional update,
+three-day expiry, and issuing one consumes the grant's outstanding invitations so only the newest link works. The
+raw token exists in the email and nowhere else — never in the database, the audit log, the admin UI or a log line.
+
+Claiming a link establishes a password and activates the grant. `createStaffAccount` writes a `User` row and
+nothing else: no Profile, no PrivacySettings, no DiscoveryPreferences, no Verification. Compare
+`src/server/users/account.ts`, which creates all four for a member.
+
+Email ownership (§11 of the brief): the token went to the authorised address, so presenting it is the proof of
+control. Nothing links an identity by matching email text. A Google or Telegram identity carrying the same address
+is never adopted, and an address that already belongs to a dating MEMBER is refused outright — converting a member
+is an administrator's explicit decision, not a side effect of somebody clicking a link.
+
+Portal authentication reuses the member system's primitives rather than inventing a second one: the same scrypt
+verifier, the same hashed single-use `AuthToken` rows for resets, the same Postgres rate limiter, the same opaque
+database-backed session. What differs is the lifecycle — a staff sign-in additionally requires STAFF plus an ACTIVE
+grant, and the member flows additionally refuse a staff identity. Every failure is one sentence, so neither portal
+sign-in nor "forgot password" can be used to discover who is staff. Rate limits are tighter than the member ones
+(5 sign-in attempts per address per 15 minutes against 10).
+
+A password reset changes a password and nothing else: it never touches `accountType`, `role` or a grant, so a reset
+link can never confer staff access.
+
+### 22.3 MEMBER → STAFF conversion
+
+Promotion is never a role change. `src/server/staff/conversion.ts` is an explicit, transactional, audited operation
+with three properties:
+
+1. **It reports before it acts.** `inventoryMemberData` counts every member-domain row on an account and
+   `planConversion` classifies each as preserved, deleted, detached or anonymised. `scripts/convert-admin-to-staff.ts`
+   prints that plan and changes nothing without `--apply`.
+2. **It refuses to destroy evidence or relationships.** Likes, matches, conversations, messages, intros, member
+   reports, orders, subscriptions, boosts and entitlement overrides are *entanglements*: they involve another
+   person, money or a safety record. If an account has any, conversion stops and names them.
+3. **It is all-or-nothing**, inside one transaction under the `admin:roles` advisory lock.
+
+Removed: Profile (cascading to photos, interests and prompts), discovery preferences, privacy settings, the
+account's own verification record, its passes, its Community reactions, contact hashes, push subscriptions, usage
+counters, its notification feed, and its dating attributes on `User` (date of birth, gender, phone, onboarding
+completion). Preserved: the `User` row and its id, every sign-in identity, every audit entry, and every
+administrative decision the account made. Community posts and comments it wrote are **soft-deleted** rather than
+removed, because other people's replies and reactions hang off them.
+
+Stored objects (photos, any verification selfie) are deleted after the transaction commits, never inside it, and a
+failure there is logged rather than surfaced: the conversion really did happen, and unreferenced bytes are the
+lesser problem.
+
+STAFF → MEMBER is not built. The schema does not prevent it, and the design assumes it would be explicit and would
+put the person through fresh onboarding rather than resurrecting old dating state.
+
+### 22.4 The member-domain guard
+
+`requireMember()` in `src/server/auth/current-user.ts` is the choke point every member server action goes through,
+and the five route handlers that read the session directly were tightened to match (`/api/photos` accepts active
+and onboarding members, `/api/payments/[orderId]/receipt`, `/api/community/posts` and `/api/verification/selfie`
+require an active member, and none accepts a staff session).
+
+`src/server/members/guard.ts` adds a second line at the domain layer: `assertMemberAccount` on the write paths that
+create dating state — like, pass, send message, add comment, react, boost, start a Plus order, delete account. A
+future action, script or job that forgets the request-level guard still cannot make a staff account act as a member.
+
+Staff authority itself is unchanged: ADMIN has every permission, MODERATOR keeps `dashboard.view`, `users.view`,
+`users.moderate`, `reports.act`, `verification.act` and `photos.moderate`.
+
+### 22.5 Discovery defence in depth
+
+A staff account has no Profile, so the INNER JOIN in every candidate query already excludes it. That is not treated
+as sufficient. `memberOnlySql()` (`u."accountType" = 'MEMBER'`) is part of both canonical visibility fragments —
+`baseVisibleSql` (deck, counts, `canView`, likes-you, undo) and `noBlockOrContactSql` (Community feed, comments,
+profile-by-handle) — and the two hydrators that turn an id into something a member sees (`buildVisibleProfiles`,
+`loadAuthors`) filter on it too. The non-predicate lists that name another person do the same: matches on the Likes
+tab, the Discover aside and its activity actors, the chats list and chat header.
+
+A regression test seeds a malformed account that keeps every member row and only flips `accountType`, and asserts it
+is still absent from the deck, from `canView` and from the profile hydrator.
+
+### 22.6 Community isolation
+
+Staff cannot create posts, comments or reactions: refused at the action layer by `requireMember()`, at the HTTP
+layer by the route's `active` requirement, and in `createPost`/`addComment`/`setReaction` themselves. They are not
+rendered as Community authors. Moderation is unaffected and continues to run on staff permissions.
+
+### 22.7 Messaging isolation
+
+Staff cannot create matches, enter conversations, send messages or appear in anyone's Matches or Chats. Conversion
+refuses to run while an account has any of those, so the situation should not arise; the chats list and header
+filter on account type anyway. Operational communication with a member is not built and would be a separate
+mechanism — dating conversations are not to be used for it.
+
+### 22.8 Administrator safety and audit
+
+The project always keeps an administrator. Revoking or demoting takes the `admin:roles` advisory lock and re-counts
+live admins inside the transaction, so two concurrent revocations cannot both pass. Nobody may revoke or demote
+their own grant. A live administrator is a STAFF account, not deleted or banned, holding an ACTIVE ADMIN grant — the
+same definition `requireStaff()` uses, so a leftover MEMBER row with an ADMIN column neither counts nor keeps
+bootstrap switched off.
+
+Audited: `staff.invited`, `staff.invite.resent`, `staff.invite.cancelled`, `staff.invite.rejected`,
+`staff.claimed`, `staff.activated`, `staff.role.changed`, `staff.revoked`, `staff.password.set`,
+`staff.password.reset`, `staff.converted` and `staff.change.rejected`. Refusals are audited *outside* the
+transaction that refused: a row written inside an aborted transaction rolls back with it, which is precisely the
+case where the record matters most.
+
+No password, verifier, raw invitation token or raw reset token ever reaches the audit log; `sanitizeAuditData`
+drops such keys and a test asserts the whole trail contains none of them.
+
+### 22.9 First administrator
+
+`/admin-setup` is unchanged in shape — `ADMIN_BOOTSTRAP_TOKEN`, only while no administrator exists, rate-limited,
+constant-time compare — but a successful claim now runs the full conversion and emails a set-password link instead
+of setting a role. `scripts/grant-admin.ts` is retired and points at `/admin/staff` and
+`scripts/convert-admin-to-staff.ts`.
+
 ## 15. Security controls summary
 
 | Threat | Control |

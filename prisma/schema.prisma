@@ -34,10 +34,32 @@ enum RelationshipIntent {
   FIGURING_OUT
 }
 
+/// Which domain an account belongs to (docs/ARCHITECTURE.md §22.1). This is the account's *domain*, not its
+/// authorisation: MEMBER accounts are dating accounts, STAFF accounts are operational. The two are mutually
+/// exclusive and a person must never function as both. `UserRole` layers authority on top of a STAFF account.
+///
+/// Invariants, enforced server-side and asserted by tests:
+///  - a STAFF account has no Profile, no ProfilePhoto, no DiscoveryPreferences, no PrivacySettings and no
+///    Verification row, never appears in discovery or Community, and cannot reach any member server action;
+///  - a MEMBER account can never satisfy `requireStaff()`, whatever its role column says.
+enum AccountType {
+  MEMBER
+  STAFF
+}
+
 enum UserRole {
   USER
   MODERATOR
   ADMIN
+}
+
+/// Lifecycle of one staff authorisation (docs/ARCHITECTURE.md §22.2). PENDING is an invitation that nobody has
+/// claimed yet; ACTIVE is a live staff authorisation bound to a User; REVOKED is permanently spent. A revoked row
+/// is never reused — re-authorising the same address creates a new grant, so the history stays readable.
+enum StaffGrantStatus {
+  PENDING
+  ACTIVE
+  REVOKED
 }
 
 enum UserStatus {
@@ -228,6 +250,9 @@ model User {
   phoneHashVersion      Int             @default(1)
   dateOfBirth           DateTime?       @db.Date
   gender                Gender?
+  /// MEMBER (a dating account) or STAFF (an operational account). Set once at creation and changed only by the
+  /// explicit, audited conversion in src/server/staff/conversion.ts — never by an ordinary role change.
+  accountType           AccountType     @default(MEMBER)
   role                  UserRole        @default(USER)
   status                UserStatus      @default(ONBOARDING)
   /// Furthest onboarding stage reached. Lets a user resume exactly where they left off.
@@ -281,8 +306,75 @@ model User {
   contactHashes         ContactHash[]
   auditLogs             AuditLog[]
 
+  staffGrant            StaffGrant?               @relation("StaffGrantHolder")
+  staffGrantsCreated    StaffGrant[]              @relation("StaffGrantCreator")
+  staffGrantsRevoked    StaffGrant[]              @relation("StaffGrantRevoker")
+  staffInvitesCreated   StaffInvite[]             @relation("StaffInviteCreator")
+
   @@index([status, onboardingCompletedAt])
   @@index([lastActiveAt])
+  @@index([accountType])
+}
+
+/// One staff authorisation, keyed on a normalised email address (docs/ARCHITECTURE.md §22.2).
+///
+/// A grant may exist before its holder does: an ADMIN authorises an address from /admin/staff, the address receives
+/// a single-use invitation link, and claiming it creates or converts the account and flips the grant to ACTIVE. A
+/// grant is what `requireStaff()` checks on every request, so revoking one closes the door immediately.
+///
+/// `email` is stored already normalised (trimmed, lowercased). A partial unique index created in the migration
+/// keeps at most one non-REVOKED grant per address, so two admins racing to authorise the same person cannot both
+/// win. Nothing here ever stores a password, a hash or a raw token: the invitation token lives in StaffInvite as a
+/// SHA-256 digest, and the password verifier lives on the EMAIL AuthIdentity like every other password.
+model StaffGrant {
+  id              String           @id @default(cuid(2))
+  /// Normalised (trimmed, lowercased) address this grant authorises.
+  email           String
+  /// The staff authority this grant confers. Only ADMIN or MODERATOR; validated in code, never USER.
+  role            UserRole
+  /// Why the grant was created, for the audit trail. Free text, 3–300 characters.
+  reason          String
+  status          StaffGrantStatus @default(PENDING)
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  /// The account that claimed this grant. Unique: one account never holds two grants.
+  claimedByUserId String?          @unique
+  claimedAt       DateTime?
+  revokedById     String?
+  revokedAt       DateTime?
+  /// Why the grant was revoked, when a reason was given.
+  revokedReason   String?
+  updatedAt       DateTime         @updatedAt
+
+  createdBy User?         @relation("StaffGrantCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  claimedBy User?         @relation("StaffGrantHolder", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+  revokedBy User?         @relation("StaffGrantRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+  invites   StaffInvite[]
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+/// A hashed, single-use, expiring invitation link for one StaffGrant (docs/ARCHITECTURE.md §22.2).
+///
+/// Mirrors AuthToken exactly, but hangs off the grant rather than an AuthIdentity, because a pending grant has no
+/// identity yet. The raw token is 32 random bytes and exists only in the email that was sent; the row stores its
+/// SHA-256. Issuing a new invite consumes the grant's outstanding ones, so only the newest link works.
+model StaffInvite {
+  id          String    @id @default(cuid(2))
+  grantId     String
+  /// SHA-256 of the raw token. The raw value is never stored, logged or audited.
+  tokenHash   Bytes     @unique
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  createdById String?
+
+  grant     StaffGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  createdBy User?      @relation("StaffInviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([grantId, consumedAt])
+  @@index([expiresAt])
 }
 
 /// Public-facing profile. Anything selectable here may be shown to other users subject to PrivacySettings.

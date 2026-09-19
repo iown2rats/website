@@ -9,7 +9,7 @@ import { getAuthState, requireUnverifiedActor } from "@/server/auth/current-user
 import { emailAuthAvailable } from "@/server/auth/email-availability";
 import { changeUnverifiedEmail, reauthenticateWithPassword, registerWithEmail, requestPasswordReset, resendVerification, resetPassword, signInWithEmail } from "@/server/auth/email-identity";
 import { ROUTES } from "@/server/auth/route-access";
-import { createSession, ipPrefix, revokeAllSessions, revokeSession } from "@/server/auth/session";
+import { createSession, ipPrefix, revokeSession } from "@/server/auth/session";
 
 /*
  * Email + password server actions (docs/ARCHITECTURE.md §4.1b). Every one of them re-checks the feature gate, so a
@@ -71,7 +71,15 @@ export async function signInWithEmailAction(raw: { email: string; password: stri
   if (!result.ok) return { ok: false, message: result.message, field: result.code === "INVALID_CREDENTIALS" ? "password" : undefined };
   const session = await createSession(db, result.value.userId, await currentSessionMeta());
   await setSessionCookie(session.token, session.expiresAt);
-  redirect(result.value.destination === "verify-email" ? ROUTES.verifyEmail : result.value.destination === "app" ? ROUTES.home : ROUTES.onboarding);
+  redirect(
+    result.value.destination === "admin"
+      ? ROUTES.staffHome
+      : result.value.destination === "verify-email"
+        ? ROUTES.verifyEmail
+        : result.value.destination === "app"
+          ? ROUTES.home
+          : ROUTES.onboarding,
+  );
 }
 
 export async function resendVerificationAction(): Promise<AuthFormResult> {
@@ -137,7 +145,9 @@ export async function signOutAction(): Promise<void> {
   redirect(ROUTES.welcome);
 }
 
-/** Used by tests and by the reset flow: end every session for a user. */
-export async function revokeEverySession(userId: string): Promise<number> {
-  return revokeAllSessions(getDb(), userId);
-}
+/*
+ * `revokeEverySession(userId)` used to live here. Every exported async function in a "use server" module is a
+ * callable endpoint, so it was an unauthenticated mass sign-out for any account id, and nothing in the app called
+ * it — the reset flow calls revokeAllSessions() directly in src/server/auth/email-identity.ts. Removed rather than
+ * guarded: the safe version is the domain function, which is not reachable from a client.
+ */

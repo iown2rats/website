@@ -18,8 +18,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ or
   const site = request.headers.get("sec-fetch-site");
   if (site && site !== "same-origin" && site !== "none") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Plus is a member entitlement: only a fully active member may submit a receipt, never an operational
+  // account and never an unconfirmed one (§16).
   const state = await getAuthState();
-  if (state.kind === "anonymous") return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (state.kind !== "active") {
+    return NextResponse.json({ error: state.kind === "staff" ? "Staff accounts don't buy Plus." : "Not signed in" }, { status: 401 });
+  }
 
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
   if (declaredLength > RECEIPT_RULES.maxBytes + 64 * 1024) return NextResponse.json({ error: "That receipt is too large. Choose an image under 8 MB." }, { status: 413 });

@@ -14,6 +14,7 @@ import { InvalidStateError, MessageRateLimitError, NotFoundError, ValidationErro
 import type { Actor } from "@/server/actor";
 import { lockPair } from "@/server/locks";
 import { isBlockedEitherWay } from "@/server/safety/block";
+import { assertMemberAccount } from "@/server/members/guard";
 
 export interface MessageOptions {
   now?: Date;
@@ -62,6 +63,7 @@ export async function sendMessage(actor: Actor, conversationId: string, rawBody:
   const body = normalizeMessageBody(rawBody);
   if (body.length < MESSAGE_LIMITS.minLength) throw new ValidationError("Message is empty");
   if (body.length > MESSAGE_LIMITS.maxLength) throw new ValidationError(`Messages can be up to ${MESSAGE_LIMITS.maxLength} characters`);
+  await assertMemberAccount(db, actor.userId);
 
   return db.$transaction(async (tx) => {
     // Serialise all sends by this user for the duration of the transaction.

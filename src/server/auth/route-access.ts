@@ -2,9 +2,9 @@
  * Route access rules (docs/ARCHITECTURE.md §4.2; Phase 5 §21). Pure and unit-tested; used by proxy.ts
  * (cookie presence only) and by the server layouts (full session state).
  */
-export type AuthKind = "anonymous" | "onboarding" | "active" | "unverified";
+export type AuthKind = "anonymous" | "onboarding" | "active" | "unverified" | "staff";
 
-export type RouteGroup = "public" | "auth" | "onboarding" | "app" | "system";
+export type RouteGroup = "public" | "auth" | "onboarding" | "app" | "system" | "staff";
 
 export const ROUTES = {
   welcome: "/",
@@ -25,12 +25,18 @@ export const ROUTES = {
   logout: "/auth/logout",
   onboarding: "/onboarding",
   home: "/discover",
+  /** The admin portal (docs/ARCHITECTURE.md §22.1). Staff land here; members never do. */
+  staffHome: "/admin",
+  staffSignIn: "/admin/login",
 } as const;
 
 export function classifyRoute(pathname: string): RouteGroup {
   if (pathname === "/" || pathname.startsWith("/legal")) return "public";
   if (pathname.startsWith("/auth")) return "auth";
   if (pathname.startsWith("/onboarding")) return "onboarding";
+  // The admin portal is its own group with its own sign-in. It must be reachable while signed out, or the portal
+  // login could never be shown; the pages themselves establish who is really staff.
+  if (pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/admin-setup")) return "staff";
   if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname.startsWith("/dev") || /\.[a-z0-9]+$/i.test(pathname)) return "system";
   return "app";
 }
@@ -64,19 +70,29 @@ function isAuthFlowEndpoint(pathname: string): boolean {
  *   anonymous  → app/onboarding blocked → / (welcome, "Continue with Google")
  *   onboarding → app/auth/public blocked → /onboarding
  *   active     → auth/onboarding/public blocked → /discover
- * The sign-in start/callback, logout and error endpoints are allowed for every state.
+ *   staff      → everything outside the portal blocked → /admin
+ * The sign-in start/callback, logout and error endpoints are allowed for every state, and the whole `staff` group
+ * is allowed for every state because the portal's own pages decide who may see them (§22.1).
  */
 export function resolveAccess(kind: AuthKind, pathname: string): AccessDecision {
   const group = classifyRoute(pathname);
   if (group === "system") return { allow: true };
   if (isAuthFlowEndpoint(pathname)) return { allow: true };
+  // Checked before the portal allowance below, because it is the strictest rule in the app: an email account that
+  // has not confirmed its address reaches exactly one screen. Member routes, onboarding, the admin portal and
+  // every server action are refused regardless of what any UI offers.
+  if (kind === "unverified") {
+    return pathname === ROUTES.verifyEmail ? { allow: true } : { allow: false, redirectTo: ROUTES.verifyEmail };
+  }
+  // The portal decides for itself who may see what: anonymous visitors need the sign-in screen, a member needs the
+  // same 404 a missing page gives, and a staff account needs the dashboard. None of that is expressible as one
+  // redirect, and guessing here would either hide the login or leak that the portal exists.
+  if (group === "staff") return { allow: true };
+  // An operational account has no member app to be sent to. Everything outside the portal goes to the portal.
+  if (kind === "staff") return { allow: false, redirectTo: ROUTES.staffHome };
   switch (kind) {
     case "anonymous":
       return group === "public" || group === "auth" ? { allow: true } : { allow: false, redirectTo: ROUTES.welcome };
-    case "unverified":
-      // An email account that has not confirmed its address reaches exactly one screen. Member routes, onboarding,
-      // the admin area and every server action are refused regardless of what the UI offers.
-      return pathname === ROUTES.verifyEmail ? { allow: true } : { allow: false, redirectTo: ROUTES.verifyEmail };
     case "onboarding":
       return group === "onboarding" ? { allow: true } : { allow: false, redirectTo: ROUTES.onboarding };
     case "active":

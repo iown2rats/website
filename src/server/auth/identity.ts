@@ -17,7 +17,7 @@ import { PROVIDER_ENUM, type SignInProvider } from "./oidc";
 import { createAccount } from "@/server/users/account";
 
 export type SignInOutcome =
-  | { kind: "signed-in"; userId: string; destination: "onboarding" | "app"; isNewAccount: boolean }
+  | { kind: "signed-in"; userId: string; destination: "onboarding" | "app" | "admin"; isNewAccount: boolean }
   | { kind: "deleted"; subject: string }
   | { kind: "unavailable" };
 
@@ -27,7 +27,7 @@ export async function signInWithIdentity(db: Db, provider: SignInProvider, claim
   const key = { provider_providerSubject: { provider: PROVIDER_ENUM[provider], providerSubject: claims.subject } };
   const identity = await db.authIdentity.findUnique({
     where: key,
-    select: { id: true, user: { select: { id: true, status: true, onboardingCompletedAt: true } } },
+    select: { id: true, user: { select: { id: true, accountType: true, status: true, onboardingCompletedAt: true } } },
   });
   if (!identity) {
     try {
@@ -41,7 +41,7 @@ export async function signInWithIdentity(db: Db, provider: SignInProvider, claim
       return { kind: "signed-in", userId: outcome.id, destination: "onboarding", isNewAccount: true };
     } catch (e) {
       // Lost a race with a concurrent first sign-in for the same subject: use the winner's account.
-      const winner = await db.authIdentity.findUnique({ where: key, select: { id: true, user: { select: { id: true, status: true, onboardingCompletedAt: true } } } });
+      const winner = await db.authIdentity.findUnique({ where: key, select: { id: true, user: { select: { id: true, accountType: true, status: true, onboardingCompletedAt: true } } } });
       if (!winner) throw e;
       return finishSignIn(db, winner, claims, now);
     }
@@ -49,7 +49,7 @@ export async function signInWithIdentity(db: Db, provider: SignInProvider, claim
   return finishSignIn(db, identity, claims, now);
 }
 
-async function finishSignIn(db: DbLike, identity: { id: string; user: { id: string; status: string; onboardingCompletedAt: Date | null } }, claims: VerifiedClaims, now: Date): Promise<SignInOutcome> {
+async function finishSignIn(db: DbLike, identity: { id: string; user: { id: string; accountType?: string; status: string; onboardingCompletedAt: Date | null } }, claims: VerifiedClaims, now: Date): Promise<SignInOutcome> {
   const { user } = identity;
   if (user.status === "DELETED") return { kind: "deleted", subject: claims.subject };
   if (user.status === "SUSPENDED" || user.status === "BANNED") return { kind: "unavailable" };
@@ -57,7 +57,10 @@ async function finishSignIn(db: DbLike, identity: { id: string; user: { id: stri
     db.authIdentity.update({ where: { id: identity.id }, data: { lastLoginAt: now, ...identityData(claims) } }),
     db.user.update({ where: { id: user.id }, data: { lastActiveAt: now } }),
   ]);
-  return { kind: "signed-in", userId: user.id, destination: user.onboardingCompletedAt ? "app" : "onboarding", isNewAccount: false };
+  // An operational account that signs in with its original provider lands in the portal, never in onboarding and
+  // never in the dating app, and nothing creates a profile for it on the way (§13).
+  const destination = user.accountType === "STAFF" ? "admin" : user.onboardingCompletedAt ? "app" : "onboarding";
+  return { kind: "signed-in", userId: user.id, destination, isNewAccount: false };
 }
 
 /**

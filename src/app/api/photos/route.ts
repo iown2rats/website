@@ -13,8 +13,13 @@ export async function POST(request: NextRequest) {
   const site = request.headers.get("sec-fetch-site");
   if (site && site !== "same-origin" && site !== "none") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Uploading happens during onboarding as well as afterwards, so both member states are allowed — but an
+  // operational account has no profile to add a photo to, and an unconfirmed email account has no member
+  // functionality at all (§16). Checking the kind here is what makes that true for a hand-made request.
   const state = await getAuthState();
-  if (state.kind === "anonymous") return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (state.kind !== "active" && state.kind !== "onboarding") {
+    return NextResponse.json({ error: state.kind === "staff" ? "Staff accounts don't have profile photos." : "Not signed in" }, { status: 401 });
+  }
 
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
   if (declaredLength > PHOTO_RULES.maxBytes + 64 * 1024) return NextResponse.json({ error: "That photo is too large. Choose one under 8 MB." }, { status: 413 });

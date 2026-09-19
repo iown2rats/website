@@ -3,7 +3,6 @@ import { BootstrapForm } from "@/components/features/admin/bootstrap-form";
 import { Callout } from "@/components/ui/alert";
 import { PageOverlay } from "@/components/layout/page-overlay";
 import { getDb } from "@/lib/db";
-import { isAdminRole } from "@/server/admin/authz";
 import { isBootstrapAvailable } from "@/server/admin/bootstrap";
 import { getAuthState } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
@@ -18,8 +17,10 @@ export const dynamic = "force-dynamic";
 export default async function AdminBootstrapPage() {
   const state = await getAuthState();
   if (state.kind === "anonymous") redirect(ROUTES.welcome);
+  // Already operational: there is nothing to claim.
+  if (state.kind === "staff") redirect(ROUTES.staffHome);
+  if (state.kind === "unverified") redirect(ROUTES.verifyEmail);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
-  if (isAdminRole(state.user.role)) redirect("/admin");
   if (!(await isBootstrapAvailable(getDb()))) notFound();
   return (
     <PageOverlay title="Admin setup" backHref="/settings">

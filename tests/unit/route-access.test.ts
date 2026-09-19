@@ -73,3 +73,42 @@ describe("route access rules", () => {
     expect(authKindForUser({ status: "BANNED", onboardingCompletedAt: new Date() })).toBe("blocked");
   });
 });
+
+describe("staff accounts and the admin portal", () => {
+  // Browser verification found the welcome page letting a staff session through, because "/" is the one member
+  // route with no shared layout guard above it. These assertions pin the rule for every state.
+  it("sends a staff account to the portal from every member route, including the welcome page", () => {
+    for (const path of ["/", "/discover", "/likes", "/chats", "/community", "/profile", "/settings", "/onboarding", "/legal/terms", "/auth/register"]) {
+      expect(resolveAccess("staff", path), path).toEqual({ allow: false, redirectTo: "/admin" });
+    }
+  });
+
+  it("lets every state reach the portal, because the portal decides for itself", () => {
+    for (const path of ["/admin", "/admin/login", "/admin/staff", "/admin/set-password", "/admin/reset-password"]) {
+      for (const kind of ["anonymous", "onboarding", "active", "staff"] as const) {
+        expect(resolveAccess(kind, path), `${kind} ${path}`).toEqual({ allow: true });
+      }
+    }
+  });
+
+  it("still refuses an unconfirmed email account everywhere, portal included", () => {
+    expect(resolveAccess("unverified", "/admin")).toEqual({ allow: false, redirectTo: "/auth/verify-email" });
+    expect(resolveAccess("unverified", "/admin/login")).toEqual({ allow: false, redirectTo: "/auth/verify-email" });
+    expect(resolveAccess("unverified", "/auth/verify-email")).toEqual({ allow: true });
+  });
+
+  it("classifies the portal as its own group", () => {
+    expect(classifyRoute("/admin")).toBe("staff");
+    expect(classifyRoute("/admin/staff")).toBe("staff");
+    expect(classifyRoute("/admin-setup")).toBe("staff");
+    expect(classifyRoute("/discover")).toBe("app");
+  });
+
+  it("an anonymous visitor is not bounced away from the portal by the proxy", () => {
+    // The proxy only sees cookie presence. Before the staff group existed it sent /admin to the dating welcome
+    // page, which would have made the portal login unreachable while signed out.
+    expect(resolveProxyAccess(false, "/admin")).toEqual({ allow: true });
+    expect(resolveProxyAccess(false, "/admin/login")).toEqual({ allow: true });
+    expect(resolveProxyAccess(false, "/discover")).toEqual({ allow: false, redirectTo: "/" });
+  });
+});

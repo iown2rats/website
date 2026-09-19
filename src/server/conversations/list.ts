@@ -64,6 +64,9 @@ export async function listConversations(actor: Actor, deps: { db?: Db; storage?:
     where: {
       status: "ACTIVE",
       participants: { some: { userId: actor.userId } },
+      // A dating conversation has two dating members on it (§22.7).
+      userA: { accountType: "MEMBER" },
+      userB: { accountType: "MEMBER" },
       // Either direction of block hides the conversation from lists (history is preserved).
       NOT: {
         OR: [
@@ -148,7 +151,7 @@ export async function getConversationHeader(actor: Actor, conversationId: string
   const conversation = await getConversationForActor(db, actor, conversationId);
   const [other, match] = await Promise.all([
     db.user.findUnique({
-      where: { id: conversation.otherUserId },
+      where: { id: conversation.otherUserId, accountType: "MEMBER" },
       select: {
         privacy: { select: { hideLocation: true } },
         verification: { select: { status: true } },

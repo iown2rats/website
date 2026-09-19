@@ -25,7 +25,7 @@ export interface AdminNavBadges {
 }
 
 interface NavItem {
-  key: keyof AdminNavBadges | "dashboard" | "users" | "plans" | "methods" | "subscriptions" | "audit";
+  key: keyof AdminNavBadges | "dashboard" | "users" | "plans" | "methods" | "subscriptions" | "audit" | "staff" | "settings";
   label: string;
   href: string;
   Icon: ComponentType<IconProps>;
@@ -53,12 +53,20 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { key: "methods", label: "Payment methods", href: "/admin/payments/methods", Icon: LockIcon, permission: "payment-methods.manage" },
     ],
   },
-  { title: "System", items: [{ key: "audit", label: "Audit log", href: "/admin/audit", Icon: PinIcon, permission: "audit.view" }] },
+  {
+    title: "System",
+    items: [
+      { key: "staff", label: "Staff", href: "/admin/staff", Icon: LockIcon, permission: "dashboard.view" },
+      { key: "audit", label: "Audit log", href: "/admin/audit", Icon: PinIcon, permission: "audit.view" },
+      { key: "settings", label: "Settings", href: "/admin/settings", Icon: InfoIcon, permission: "dashboard.view" },
+    ],
+  },
 ];
 
 function isActive(item: NavItem, pathname: string): boolean {
   if (item.exact) return pathname === item.href;
   if (item.href === "/admin/payments") return pathname.startsWith("/admin/payments") && !pathname.startsWith("/admin/payments/methods");
+  if (item.href === "/admin/users") return pathname.startsWith("/admin/users");
   return pathname === item.href || pathname.startsWith(item.href + "/");
 }
 

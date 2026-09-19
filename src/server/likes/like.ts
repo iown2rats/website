@@ -11,6 +11,7 @@ import { lockPair } from "@/server/locks";
 import { createMatchIfMutual, type MatchOutcome } from "@/server/matching/match";
 import { isBlockedEitherWay } from "@/server/safety/block";
 import { consumeLocked, lockUsage } from "@/server/usage/usage-window";
+import { assertMemberAccount } from "@/server/members/guard";
 
 export interface LikeResult extends MatchOutcome {
   /** True when this call created the like; false when it already existed (idempotent). */
@@ -34,6 +35,7 @@ export async function likeUser(actor: Actor, targetUserId: string, options: Like
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
   if (targetUserId === actor.userId) throw new ValidationError("You cannot like yourself");
+  await assertMemberAccount(db, actor.userId);
   // Pause Dating (Phase 9 §24): a paused user is hidden from Discover and may not start new dating interactions,
   // otherwise pausing would grant Invisible Mode for free. Matches and chats are unaffected.
   const privacy = await db.privacySettings.findUnique({ where: { userId: actor.userId }, select: { visibility: true, pausedAt: true } });
@@ -100,6 +102,7 @@ export async function passUser(actor: Actor, targetUserId: string, options: Like
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
   if (targetUserId === actor.userId) throw new ValidationError("You cannot pass yourself");
+  await assertMemberAccount(db, actor.userId);
   const target = await db.user.findUnique({ where: { id: targetUserId }, select: { id: true } });
   if (!target) throw new NotFoundError("Profile");
 

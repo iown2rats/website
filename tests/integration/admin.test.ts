@@ -2,27 +2,28 @@
  * Admin authorization, user operations, bootstrap, moderation, verification and audit (docs/ARCHITECTURE.md §21).
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { ConsoleEmailProvider } from "@/lib/email/console";
 import { InvalidStateError, NotFoundError, ValidationError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/server/admin/audit";
 import { listAuditLog } from "@/server/admin/audit-list";
 import { AdminAccessError, assertPermission, type AdminActor } from "@/server/admin/authz";
-import { bootstrapFirstAdmin, changeUserRole, countAdmins, isBootstrapAvailable } from "@/server/admin/bootstrap";
+import { bootstrapFirstAdmin, countAdmins, isBootstrapAvailable } from "@/server/admin/bootstrap";
 import { getDashboardMetrics } from "@/server/admin/metrics";
 import { decideReport, getReportDetail, listReports } from "@/server/admin/moderation";
 import { getUserDetail, searchUsers, setAccountStatus } from "@/server/admin/users";
 import { decideVerification, listVerificationQueue } from "@/server/admin/verification";
 import { createSession, resolveSession } from "@/server/auth/session";
 import { disconnectDb, resetDb, testDb } from "../helpers/db";
-import { at, createIdentity, createUser, grantPlus, hours } from "../helpers/factory";
+import { at, createIdentity, createStaff, createUser, grantPlus, hours } from "../helpers/factory";
 
 const db = testDb();
 const T0 = new Date("2026-09-18T00:00:00Z");
 const TOKEN = "bootstrap-token-0123456789abcdef0123456789abcdef";
 
+/** A live staff account. Since the staff split this is an operational account, never a converted member. */
 async function makeAdmin(role: "ADMIN" | "MODERATOR" = "ADMIN"): Promise<AdminActor> {
-  const u = await createUser(db, { now: T0 });
-  await db.user.update({ where: { id: u.userId }, data: { role } });
-  return { userId: u.userId, role };
+  const staff = await createStaff(db, { role, now: T0 });
+  return { userId: staff.userId, role };
 }
 
 beforeEach(() => resetDb(db));
@@ -36,14 +37,17 @@ describe("admin authorization", () => {
     expect(() => assertPermission(mod, "users.role")).toThrow(AdminAccessError);
     expect(() => assertPermission(mod, "reports.act")).not.toThrow();
   });
-  it("a plain user's session never yields an admin actor, whatever the client claims", async () => {
+  it("a plain member's session never yields an admin actor, whatever the client claims", async () => {
     const { adminActorFrom } = await import("@/server/admin/authz");
     const u = await createUser(db, { now: T0 });
     const row = await db.user.findUniqueOrThrow({ where: { id: u.userId } });
     expect(adminActorFrom(row)).toBeNull();
-    // A forged role in a payload is irrelevant: only the row matters.
-    expect(adminActorFrom({ ...row, role: "ADMIN" })).toEqual({ userId: u.userId, role: "ADMIN" });
+    // Even a forged ADMIN role gets nothing, because the account is a dating MEMBER. Authority belongs to the
+    // staff domain, so a role column on a member row is never enough on its own.
+    expect(adminActorFrom({ ...row, role: "ADMIN" })).toBeNull();
     expect((await db.user.findUniqueOrThrow({ where: { id: u.userId } })).role).toBe("USER");
+    // The same row as a STAFF account does yield an actor: it is the account type plus the role, never one alone.
+    expect(adminActorFrom({ ...row, accountType: "STAFF", role: "ADMIN" })).toEqual({ userId: u.userId, role: "ADMIN" });
   });
   it("domain functions refuse a non-admin actor object outright", async () => {
     const u = await createUser(db, { now: T0 });
@@ -55,16 +59,30 @@ describe("admin authorization", () => {
 describe("bootstrap", () => {
   it("only while no admin exists, only with the exact token, audited, then self-disables", async () => {
     const owner = await createUser(db, { now: T0 });
+    await createIdentity(db, owner.userId, { email: "owner@example.com" });
+    const mailbox = new ConsoleEmailProvider();
     expect(await isBootstrapAvailable(db)).toBe(false); // token not configured in tests
     expect(await bootstrapFirstAdmin(owner, TOKEN, { db, now: T0, token: null })).toEqual({ ok: false, code: "UNAVAILABLE" });
     expect(await bootstrapFirstAdmin(owner, "wrong-token-0123456789abcdef0123456789abcdef", { db, now: T0, token: TOKEN })).toEqual({ ok: false, code: "INVALID_TOKEN" });
-    expect(await bootstrapFirstAdmin(owner, TOKEN, { db, now: T0, token: TOKEN })).toEqual({ ok: true });
-    expect((await db.user.findUniqueOrThrow({ where: { id: owner.userId } })).role).toBe("ADMIN");
+
+    const claimed = await bootstrapFirstAdmin(owner, TOKEN, { db, now: T0, token: TOKEN, email: mailbox });
+    expect(claimed).toEqual({ ok: true, email: "owner@example.com" });
+
+    // A claim is a conversion, not a role flip: the claimant is now STAFF with no dating profile.
+    const after = await db.user.findUniqueOrThrow({ where: { id: owner.userId } });
+    expect(after.role).toBe("ADMIN");
+    expect(after.accountType).toBe("STAFF");
+    expect(await db.profile.count({ where: { userId: owner.userId } })).toBe(0);
     expect(await db.auditLog.count({ where: { action: AUDIT_ACTIONS.adminBootstrapped, targetId: owner.userId } })).toBe(1);
+    // The set-password link is emailed, never returned.
+    expect(mailbox.sent.at(-1)?.text).toMatch(/\/admin\/set-password\?token=/);
+
     const second = await createUser(db, { now: T0 });
-    expect(await bootstrapFirstAdmin(second, TOKEN, { db, now: T0, token: TOKEN })).toEqual({ ok: false, code: "UNAVAILABLE" });
+    await createIdentity(db, second.userId, { email: "second@example.com" });
+    expect((await bootstrapFirstAdmin(second, TOKEN, { db, now: T0, token: TOKEN })).ok).toBe(false);
     expect(await countAdmins(db)).toBe(1);
   });
+
   it("rate-limits guesses and refuses accounts that have not finished onboarding", async () => {
     const guesser = await createUser(db, { now: T0 });
     for (let i = 0; i < 5; i += 1) expect((await bootstrapFirstAdmin(guesser, "x".repeat(40), { db, now: T0, token: TOKEN })).ok).toBe(false);
@@ -72,28 +90,21 @@ describe("bootstrap", () => {
     const onboarding = await createUser(db, { now: T0, status: "ONBOARDING" });
     expect(await bootstrapFirstAdmin(onboarding, TOKEN, { db, now: T0, token: TOKEN })).toEqual({ ok: false, code: "NOT_ELIGIBLE" });
   });
-});
 
-describe("roles", () => {
-  it("ADMIN changes roles with a reason and audit; never own role; never the last admin", async () => {
-    const admin = await makeAdmin();
-    const u = await createUser(db, { now: T0 });
-    await expect(changeUserRole(admin, u.userId, { role: "MODERATOR", reason: "" }, { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);
-    expect(await changeUserRole(admin, u.userId, { role: "MODERATOR", reason: "Trusted volunteer" }, { db, now: T0 })).toEqual({ userId: u.userId, role: "MODERATOR" });
-    const audit = await db.auditLog.findFirstOrThrow({ where: { action: AUDIT_ACTIONS.adminRoleChanged, targetId: u.userId } });
-    expect(audit.actorId).toBe(admin.userId);
-    expect(audit.data).toMatchObject({ reason: "Trusted volunteer", before: { role: "USER" }, after: { role: "MODERATOR" } });
-    await expect(changeUserRole(admin, admin.userId, { role: "USER", reason: "demote self" }, { db, now: T0 })).rejects.toBeInstanceOf(InvalidStateError);
-    const other = await makeAdmin();
-    await changeUserRole(admin, other.userId, { role: "USER", reason: "leaving" }, { db, now: T0 });
-    // The demoted account no longer yields an admin actor from its row, so requireAdmin() would refuse it.
-    const { adminActorFrom } = await import("@/server/admin/authz");
-    expect(adminActorFrom(await db.user.findUniqueOrThrow({ where: { id: other.userId } }))).toBeNull();
-    await expect(changeUserRole(admin, admin.userId, { role: "USER", reason: "last admin" }, { db, now: T0 })).rejects.toBeInstanceOf(InvalidStateError);
-    const mod = await makeAdmin("MODERATOR");
-    await expect(changeUserRole(mod, u.userId, { role: "ADMIN", reason: "escalate" }, { db, now: T0 })).rejects.toBeInstanceOf(AdminAccessError);
+  it("refuses a claimant with no verified email address", async () => {
+    const owner = await createUser(db, { now: T0 });
+    const result = await bootstrapFirstAdmin(owner, TOKEN, { db, now: T0, token: TOKEN });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("NOT_ELIGIBLE");
+    expect(await countAdmins(db)).toBe(0);
   });
 });
+
+/*
+ * The old "roles" block tested changeUserRole(), which no longer exists: staff authority comes from a StaffGrant
+ * and is covered end to end in tests/integration/staff.test.ts (creation, invitation, claim, role change,
+ * revocation, last-admin protection and audit).
+ */
 
 describe("account status", () => {
   it("suspend signs the person out, unsuspend restores, ban is recorded; every step audited with a reason", async () => {
@@ -206,11 +217,13 @@ describe("metrics and audit log", () => {
     await db.user.updateMany({ where: { id: { in: [admin.userId, onboarding.userId, paused.userId, plus.userId] } }, data: { createdAt: T0 } });
     await db.user.update({ where: { id: old.userId }, data: { createdAt: at(T0, -hours(48)) } });
     const m = await getDashboardMetrics({ db, now: at(T0, hours(6)) }); // 06:00 UTC = 11:00 Maldives; day started 19:00 UTC yesterday
-    expect(m.users.total).toBe(5);
+    // Four dating members exist. The staff account is operational and is deliberately not counted here, so
+    // "accounts" and "completed profiles" cannot drift apart as operators are added (§22.2).
+    expect(m.users.total).toBe(4);
     expect(m.users.onboarding).toBe(1);
-    expect(m.users.completedProfiles).toBe(4);
-    expect(m.users.newToday).toBe(4); // everyone created at T0; the 48h-old one is excluded
-    expect(m.users.new7d).toBe(5);
+    expect(m.users.completedProfiles).toBe(3);
+    expect(m.users.newToday).toBe(3); // the members created at T0; the 48h-old one is excluded
+    expect(m.users.new7d).toBe(4);
     expect(m.users.paused).toBe(1);
     expect(m.membership.plusNow).toBe(1);
     expect(m.safety.openReports).toBe(0);

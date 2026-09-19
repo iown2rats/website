@@ -23,12 +23,28 @@ export async function setInvisibleMode(actor: Actor, enabled: boolean, options: 
   return updated;
 }
 
+/**
+ * Three fields, and the middle one is easy to misread: `effective` does NOT mean "hidden".
+ *
+ *  - `enabled`   — the stored wish. Hidden from Discover at large whenever this is true, with or without Plus.
+ *  - `effective` — the *premium* behaviour is operating: hidden from strangers but visible to people this member
+ *                  has liked. Needs the entitlement.
+ *  - `suspended` — the wish is on but Plus has lapsed, so the member is hidden from everyone, including the people
+ *                  they liked. Still hidden; the exception is what they lost, not the hiding.
+ *
+ * So both `effective` and `suspended` keep a member out of other people's decks. The discovery predicate is
+ * therefore keyed on `enabled`, and the entitlement only decides whether the liked-people exception applies
+ * (src/server/discovery/predicate.ts). This is deliberate: a lapse must never push somebody who asked to be hidden
+ * back in front of strangers, which is exactly what the privacy screen promises them
+ * ("You are never shown to new people without your say"). Regression tests:
+ * tests/integration/invisible-mode.test.ts.
+ */
 export interface InvisibleModeState {
-  /** The stored wish. */
+  /** The stored wish. Hidden from Discover whenever true, entitlement or not. */
   enabled: boolean;
-  /** Whether it is currently in effect (wish AND entitlement). */
+  /** The premium behaviour is operating: hidden from strangers, visible to people this member liked. */
   effective: boolean;
-  /** True when enabled but the entitlement lapsed: the user is paused from Discover, not exposed. */
+  /** True when enabled but the entitlement lapsed: hidden from everyone, not exposed. */
   suspended: boolean;
 }
 

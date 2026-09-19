@@ -42,6 +42,8 @@ export async function createPost(actor: Actor, input: CreatePostInput, deps: { d
 
   const user = await db.user.findUnique({ where: { id: actor.userId }, select: { status: true, privacy: { select: { invisibleMode: true } } } });
   if (!user || user.status !== "ACTIVE") throw new InvalidStateError("Your account can't post right now");
+  // The stored flag is the right test here, not the entitlement: a member is hidden from Discover whenever the flag
+  // is on, with or without Plus (src/server/privacy/invisible-mode.ts), and this rule mirrors that hiding.
   if (COMMUNITY.invisibleModeParticipation === "READ_ONLY" && user.privacy?.invisibleMode) throw new InvalidStateError("Community posting is paused while Invisible Mode is on");
 
   const limit = await consumeRateLimit(db, `community:post:${actor.userId}`, COMMUNITY.postsPerHour, 3_600_000, now);

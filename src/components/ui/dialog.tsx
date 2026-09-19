@@ -81,26 +81,37 @@ export function BottomSheet({ open, onClose, label, labelledBy, children, classN
       onCancel={onCancel}
       onClick={onBackdropClick}
       className={cn(
-        "m-0 mt-auto mx-auto w-full max-w-[var(--sheet-max)] max-h-[88svh] open:flex flex-col glass-card text-text border-0 p-0",
+        "m-0 mt-auto mx-auto w-full max-w-[var(--sheet-max)] max-h-[88svh] glass-card text-text border-0 p-0",
         "rounded-t-card rounded-b-none open:animate-sheet-in overflow-hidden",
         className,
       )}
     >
       {/*
-        * min-h-0 lets this column shrink inside the flex parent, so it scrolls rather than pushing the footer away.
-        * [&>*]:shrink-0 is what makes it actually scroll: without it the sections are flex items that compress to
-        * fit, and a section with its own overflow-hidden (the Advanced filters card) silently clips its contents
-        * instead — content disappears and scrollHeight never exceeds clientHeight.
+        * The flex column lives on this wrapper, never on the <dialog> itself, and that is deliberate on both sides.
+        * An unguarded display utility on the element would beat the user-agent rule that hides a closed dialog and
+        * leave every sheet in the page laid out and swallowing taps. Guarding it with the open variant instead
+        * makes the sheet's own layout depend on a selector list carrying two pseudo-classes Safari gained only
+        * recently. Leaving display to the user agent avoids both: none when closed, block when open, everywhere
+        * that has a dialog element at all, and nothing here depends on which it is.
+        * (Tailwind scans comments for class names, so that variant is described rather than spelled out.)
         */}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pt-2.5 pb-4 [&>*]:shrink-0">
-        <span aria-hidden="true" className="mx-auto h-1 w-10 rounded-[2px] bg-border shrink-0" />
-        {children}
-      </div>
-      {footer ? (
-        <div className="shrink-0 border-t border-border bg-surface/80 px-4 pt-3 backdrop-blur-sm" style={{ paddingBottom: "calc(12px + var(--safe-bottom))" }}>
-          {footer}
+      <div className="flex max-h-[88svh] flex-col">
+        {/*
+          * min-h-0 lets this column shrink inside the wrapper, so it scrolls rather than pushing the footer away.
+          * [&>*]:shrink-0 is what makes it actually scroll: without it the sections are flex items that compress
+          * to fit, and a section with its own overflow-hidden (the Advanced filters card) silently clips its
+          * contents instead — content disappears and scrollHeight never exceeds clientHeight.
+          */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pt-2.5 pb-4 [&>*]:shrink-0">
+          <span aria-hidden="true" className="mx-auto h-1 w-10 rounded-[2px] bg-border shrink-0" />
+          {children}
         </div>
-      ) : null}
+        {footer ? (
+          <div className="shrink-0 border-t border-border bg-surface/80 px-4 pt-3 backdrop-blur-sm" style={{ paddingBottom: "calc(12px + var(--safe-bottom))" }}>
+            {footer}
+          </div>
+        ) : null}
+      </div>
     </dialog>
   );
 }
@@ -115,10 +126,13 @@ export function Modal({ open, onClose, label, labelledBy, children, className, d
       aria-labelledby={labelledBy}
       onCancel={onCancel}
       onClick={onBackdropClick}
-      className={cn("m-auto max-h-[85svh] w-[calc(100%-32px)] max-w-105 open:flex flex-col glass-card text-text border-0 p-0 rounded-card overflow-hidden open:animate-fade-in", className)}
+      className={cn("m-auto max-h-[85svh] w-[calc(100%-32px)] max-w-105 glass-card text-text border-0 p-0 rounded-card overflow-hidden open:animate-fade-in", className)}
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-5 [&>*]:shrink-0">{children}</div>
-      {footer ? <div className="shrink-0 border-t border-border bg-surface/80 p-5 backdrop-blur-sm">{footer}</div> : null}
+      {/* Same reason as BottomSheet: the column is a wrapper, so `display` stays the user agent's business. */}
+      <div className="flex max-h-[85svh] flex-col">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-5 [&>*]:shrink-0">{children}</div>
+        {footer ? <div className="shrink-0 border-t border-border bg-surface/80 p-5 backdrop-blur-sm">{footer}</div> : null}
+      </div>
     </dialog>
   );
 }

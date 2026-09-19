@@ -464,8 +464,7 @@ Two related corrections in the same file:
   In the Filters sheet that was "Reset", which appeared boxed and pressed before anyone had touched it. The dialog
   element takes `tabIndex={-1}` and focus itself on open: the accessible name is still announced, focus is still
   trapped, and no control looks activated.
-- The `display` utility on a `<dialog>` must be `open:flex`, never `flex`. An author `display` declaration beats the
-  user-agent rule that hides a closed dialog, which leaves every sheet in the page laid out and swallowing taps.
+- Never put a `display` utility on a `<dialog>` at all — see §30, which corrects the first version of this line.
 
 ## 29. The desktop tier (2026-09-19)
 
@@ -499,3 +498,22 @@ wide tier the row is left-aligned, the sidebar is 248, and main plus any panel f
 Measured after, at 1920: sidebar at x = 0, content group 1280 wide with 196 px margins either side; at 1440 the group
 fills the remaining width with its 40 px gutters. No horizontal overflow and no page errors at 1920, 1440, 1280, 1024
 or 390; the 1024 and 390 measurements are identical to before.
+
+## 30. Dialogs leave `display` to the user agent (2026-09-19)
+
+§28 said a `<dialog>` needs its display utility guarded by the open variant. That was half right and it is the wrong
+advice. The guard is real — an unguarded `flex` beats the user-agent rule that hides a closed dialog, which leaves
+every sheet in the page laid out and swallowing taps — but the guarded form has its own cost: Tailwind compiles that
+variant to `:is([open], …)` with two further pseudo-classes that Safari gained only recently, so the *layout of an
+open sheet* ends up depending on how well the browser parses that selector list. The Filters sheet and the admin menu
+are both this component, and both were reported broken on an iPhone.
+
+The fix is to want neither. The flex column moves to a wrapper `<div>` inside the dialog, which is unconditionally
+`display: flex`, and the dialog element carries no display utility — so the user agent does what it has always done:
+`none` when closed, `block` when open, in every browser that has `<dialog>` at all. The sheet's maximum height moves
+to the wrapper with it. Everything §28 added is unaffected: the pinned footer, the small-viewport unit, the
+`[&>*]:shrink-0` that makes the body scroll rather than squash, and the dialog taking focus itself on open.
+
+One incidental trap worth knowing: **Tailwind scans prose for class names**, including code comments and these docs.
+The first version of this section made Tailwind emit the very rule it was warning about, from the sentence describing
+it. Where a utility has to be named in prose, describe it rather than spelling it.

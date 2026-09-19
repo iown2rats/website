@@ -93,28 +93,10 @@ const PASSES: [number, number][] = [[1, 6], [3, 2], [16, 6]];
 /** One blocked pair. They would otherwise be reciprocal, so the block is visible in the matrix. */
 const BLOCK: [number, number] = [11, 14];
 
-const pad = (n: number) => String(n).padStart(2, "0");
-const handleOf = (p: Person) => `${HANDLE_PREFIX}${pad(p.n)}`;
-const emailOf = (p: Person) => `qa${pad(p.n)}@${EMAIL_DOMAIN}`;
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
 const qn = (v: string | null | undefined) => (v == null ? "NULL" : q(v));
 
-/** 24-character lowercase id in the same shape as the cuid(2) values Prisma generates. */
-function makeId(): string {
-  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
-  const bytes = randomBytes(24);
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
-}
-
-/** Birth date that yields exactly `age` today, well away from a birthday boundary. */
-function dobFor(age: number, now: Date): string {
-  const d = new Date(Date.UTC(now.getUTCFullYear() - age, now.getUTCMonth(), now.getUTCDate()));
-  d.setUTCDate(d.getUTCDate() - 60);
-  return d.toISOString().slice(0, 10);
-}
-
 async function create(): Promise<string> {
-  const now = new Date();
   const password = process.env.QA_COHORT_PASSWORD ?? randomBytes(12).toString("base64url");
   const hash = await hashPassword(password);
 

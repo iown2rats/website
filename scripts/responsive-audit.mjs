@@ -369,27 +369,6 @@ async function main() {
       }
     }
 
-    // Flows, each in a context of its own so the throwaway account never leaks into another check.
-    for (const flow of FLOWS) {
-      if (routeFilter && !flow.path.includes(routeFilter)) continue;
-      if (!LOCAL) {
-        redirected.push({ width, route: flow.name, wanted: flow.path, landed: "(skipped: flows only run against localhost)", auth: true });
-        continue;
-      }
-      const fctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
-      const fp = await fctx.newPage();
-      const reached = await flow.reach(fp).then(() => true).catch(() => false);
-      if (reached) {
-        await fp.waitForTimeout(600);
-        const r = await fp.evaluate(PROBE);
-        checked.push({ width, route: flow.name, path: flow.path });
-        if (violates(r)) failures.push({ width, route: flow.name, path: flow.path, ...r });
-      } else {
-        redirected.push({ width, route: flow.name, wanted: flow.path, landed: `(could not reach: ${new URL(fp.url()).pathname})`, auth: true });
-      }
-      await fctx.close();
-    }
-
     // Overlays, on the routes that own them.
     for (const ov of OVERLAYS) {
       if (routeFilter && !ov.route.includes(routeFilter)) continue;
@@ -422,12 +401,51 @@ async function main() {
     await anon.close();
     await ctx.close();
   }
+
+  /*
+   * Flows run once, not once per width.
+   *
+   * Registering is rate limited — correctly, it is an anti-abuse guard on a real signup form — so reaching this
+   * state eleven times gets refused after the second and reports nine widths as unreachable. Reaching it once and
+   * resizing covers every width off one throwaway account, which is also simply the right amount of signup
+   * traffic for a layout check to generate.
+   */
+  if (FLOWS.length) {
+    const routeFilter = arg("routes", "");
+    for (const flow of FLOWS) {
+      if (routeFilter && !flow.path.includes(routeFilter)) continue;
+      if (!LOCAL) {
+        redirected.push({ width: 0, route: flow.name, wanted: flow.path, landed: "(skipped: flows only run against localhost)", auth: true });
+        continue;
+      }
+      const fctx = await browser.newContext({ viewport: { width: WIDTHS[0], height: HEIGHT_FOR(WIDTHS[0]) }, deviceScaleFactor: 1 });
+      const fp = await fctx.newPage();
+      const reached = await flow.reach(fp).then(() => true).catch(() => false);
+      if (!reached) {
+        // Say what actually stopped it. "Could not reach" on its own sent me looking for a layout bug.
+        const alerts = await fp.locator('[role="alert"]').allInnerTexts().catch(() => []);
+        const why = alerts.filter(Boolean).join(" / ") || new URL(fp.url()).pathname;
+        redirected.push({ width: 0, route: flow.name, wanted: flow.path, landed: `(could not reach: ${why})`, auth: true });
+        await fctx.close();
+        continue;
+      }
+      for (const width of WIDTHS) {
+        await fp.setViewportSize({ width, height: HEIGHT_FOR(width) });
+        await fp.waitForTimeout(400);
+        const r = await fp.evaluate(PROBE);
+        checked.push({ width, route: flow.name, path: flow.path });
+        if (violates(r)) failures.push({ width, route: flow.name, path: flow.path, ...r });
+      }
+      await fctx.close();
+    }
+  }
+
   await browser.close();
 
   console.log(`\nResponsive contract: ${checked.length} route×viewport checks across ${WIDTHS.length} widths\n`);
   if (redirected.length) {
     console.log(`NOT CHECKED — ${redirected.length} route×viewport pair(s) redirected away and were not measured:\n`);
-    for (const r of redirected) console.log(`  ${String(r.width).padStart(4)}px  ${r.route}: ${r.wanted} → ${r.landed}`);
+    for (const r of redirected) console.log(`  ${r.width ? String(r.width).padStart(4) + "px" : "  all "}  ${r.route}: ${r.wanted} → ${r.landed}`);
     console.log("");
   }
   if (!failures.length) {

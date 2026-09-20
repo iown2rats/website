@@ -69,7 +69,7 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
     else if (visibility === "hidden") toast.show("Dating resumed");
   };
 
-  const toggle = (key: "hideLocation" | "hideAge" | "hideActiveStatus" | "blockContacts", value: boolean) => {
+  const toggle = (key: "hideLocation" | "hideAge" | "hideActiveStatus" | "readReceipts" | "blockContacts", value: boolean) => {
     const before = privacy;
     setPrivacy({ ...privacy, [key]: value });
     void apply(key, () => savePrivacyToggles({ [key]: value })).then((ok) => { if (!ok) setPrivacy(before); });
@@ -80,10 +80,12 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
     { value: "invisible", label: "Only people I like", sub: "Invisible Mode: you're hidden in Discover until you like someone first", plus: true },
     { value: "hidden", label: "Hidden", sub: "Paused from Discover, chats still work" },
   ];
-  const toggles: { key: "hideLocation" | "hideAge" | "hideActiveStatus"; label: string; sub: string }[] = [
+  const toggles: { key: "hideLocation" | "hideAge" | "hideActiveStatus" | "readReceipts"; label: string; sub: string }[] = [
     { key: "hideLocation", label: "Hide my location", sub: "Show nothing instead of your island" },
     { key: "hideAge", label: "Hide age", sub: "Others see only your name" },
     { key: "hideActiveStatus", label: "Hide active status", sub: "No “active now” indicator" },
+    // Stating the reciprocity here is the point: it is the difference between a privacy setting and an advantage.
+    { key: "readReceipts", label: "Read receipts", sub: "Matches see when you’ve read theirs. Turn this off and you won’t see theirs either" },
   ];
 
   return (

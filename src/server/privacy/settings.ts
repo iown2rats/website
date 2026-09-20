@@ -18,6 +18,12 @@ export interface PrivacySettingsDto {
   hideLocation: boolean;
   hideAge: boolean;
   hideActiveStatus: boolean;
+  /**
+   * Read receipts, and deliberately reciprocal: turning this off also stops YOU seeing when others read yours
+   * (see conversationReadState). A one-directional version would let someone watch without being watched, which
+   * is not a privacy setting so much as an advantage.
+   */
+  readReceipts: boolean;
   blockContacts: boolean;
   /** Number of hashed numbers the user added (their own list, never a match count). */
   contactHashCount: number;
@@ -41,6 +47,7 @@ export async function getPrivacySettings(actor: Actor, deps: { db?: Db; now?: Da
     hideLocation: privacy?.hideLocation ?? false,
     hideAge: privacy?.hideAge ?? false,
     hideActiveStatus: privacy?.hideActiveStatus ?? false,
+    readReceipts: privacy?.readReceipts ?? true,
     blockContacts: privacy?.blockContacts ?? false,
     contactHashCount,
     invisibleMode: { ...invisible, available: entitlements.rules.canUseInvisibleMode },

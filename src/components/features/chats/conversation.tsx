@@ -51,6 +51,8 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
   // Oldest → newest for rendering.
   const [messages, setMessages] = useState<MessageDto[]>(() => [...initialPage.messages].reverse());
   const [olderCursor, setOlderCursor] = useState<string | null>(initialPage.nextCursor);
+  // When the other person last read this chat, or null when either of you has receipts off (docs/ARCHITECTURE.md §12.12).
+  const [otherReadAt, setOtherReadAt] = useState<string | null>(initialPage.readState?.otherReadAt ?? null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [pending, setPending] = useState<Pending[]>([]);
   const [draft, setDraft] = useState("");
@@ -69,6 +71,22 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
   const reportTitleId = useId();
 
   const closed = header.status !== "ACTIVE";
+
+  /*
+   * The last of my messages they have read. Receipts are per-conversation, not per-message: the server reports one
+   * timestamp, so a message counts as read when it was sent before it. Labelling only the newest such message keeps
+   * the column quiet — the ones above it are implied, exactly as they are in every chat app.
+   */
+  const lastSeenOutgoingId = (() => {
+    if (!otherReadAt) return null;
+    const readAt = Date.parse(otherReadAt);
+    if (Number.isNaN(readAt)) return null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]!;
+      if (m.fromMe && m.kind !== "SYSTEM" && Date.parse(m.at) <= readAt) return m.id;
+    }
+    return null;
+  })();
   const newestId = messages.length ? messages[messages.length - 1]!.id : null;
 
   // Mark read when the conversation is on screen (initially and whenever new incoming messages arrive while visible).
@@ -89,6 +107,7 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
         if (cancelled) return;
         if (result && result.ok) {
           sync(result.serverNow);
+          setOtherReadAt(result.readState?.otherReadAt ?? null);
           if (result.status !== header.status) setHeader((h) => ({ ...h, status: result.status, canUnmatch: false }));
           if (result.messages.length) {
             latest = result.messages[result.messages.length - 1]!.id;
@@ -239,7 +258,7 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
         ) : (
           <div className="mb-3 self-center rounded-full bg-surface-muted px-3.5 py-1.5 text-center text-micro text-text-secondary">You matched with {header.other.name}. Say hello.</div>
         )}
-        {messages.map((m) => <Bubble key={m.id} message={m} now={serverTime} />)}
+        {messages.map((m) => <Bubble key={m.id} message={m} now={serverTime} seen={m.id === lastSeenOutgoingId} />)}
         {pending.map((p) => (
           <div key={p.clientId} className="flex max-w-[78%] flex-col items-end self-end">
             <div className={cn("whitespace-pre-wrap break-words rounded-[20px] rounded-br-[6px] bg-primary px-3.75 py-2.75 text-body leading-[1.45] text-on-primary", p.state === "sending" && "opacity-60")}>{p.body}</div>
@@ -352,7 +371,7 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
   );
 }
 
-function Bubble({ message, now }: { message: MessageDto; now: () => number }) {
+function Bubble({ message, now, seen = false }: { message: MessageDto; now: () => number; seen?: boolean }) {
   if (message.kind === "SYSTEM") {
     return <div className="my-1 self-center rounded-full bg-surface-muted px-3.5 py-1.5 text-center text-micro text-text-secondary">{message.body}</div>;
   }
@@ -361,7 +380,10 @@ function Bubble({ message, now }: { message: MessageDto; now: () => number }) {
     <div className={cn("flex max-w-[78%] flex-col", me ? "items-end self-end" : "items-start self-start")}>
       {/* User text is rendered as text: React escapes it and white-space keeps the author's line breaks. */}
       <div className={cn("whitespace-pre-wrap break-words rounded-[20px] px-3.75 py-2.75 text-body leading-[1.45]", me ? "rounded-br-[6px] bg-primary text-on-primary" : "rounded-bl-[6px] bg-aqua-soft text-text")}>{message.body}</div>
-      <div className="mx-1.5 mt-1 mb-1.5 text-tiny text-text-secondary">{bubbleTime(message.at, new Date(now()))}</div>
+      <div className="mx-1.5 mt-1 mb-1.5 text-tiny text-text-secondary">
+        {bubbleTime(message.at, new Date(now()))}
+        {seen ? <span className="ml-1.5 font-medium text-primary-ink">Seen</span> : null}
+      </div>
     </div>
   );
 }

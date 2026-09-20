@@ -9,6 +9,7 @@ import { listConversations, type ChatsListDto } from "@/server/conversations/lis
 import { getConversationForActor, listMessages, markConversationRead, pollConversation, sendMessage, type MessageDto, type MessagePageDto, type PollDto } from "@/server/conversations/messages";
 import { getMatchProfile } from "@/server/conversations/profile";
 import { unmatchConversation } from "@/server/conversations/unmatch";
+import { kickMessageEmailSweep } from "@/server/notifications/message-email";
 import type { DiscoveryCardDto } from "@/server/discovery/dto";
 import { blockUser } from "@/server/safety/block";
 import { reportConversationPartner } from "@/server/safety/report";
@@ -57,6 +58,13 @@ export async function sendChatMessage(input: unknown): Promise<{ ok: true; messa
     const actor = await requireMember();
     const parsed = sendSchema.parse(input);
     const sent = await sendMessage(actor, parsed.conversationId, parsed.body);
+    /*
+     * Ordinary traffic is the scheduler. Messaging is the busiest authenticated path in the app, so hanging the
+     * sweep off it keeps unread-message mail moving without a cron — and its own global one-per-minute gate means
+     * a busy hour costs one sweep per minute, not one per message. It is never awaited: the mailer must not be
+     * able to slow down or fail a send. /api/cron/message-emails exists for when a real scheduler is attached.
+     */
+    kickMessageEmailSweep();
     return { ok: true, message: { id: sent.id, fromMe: true, kind: "TEXT", body: sent.body, at: sent.createdAt.toISOString() }, serverNow: new Date().toISOString() };
   } catch (e) {
     return failure(e);

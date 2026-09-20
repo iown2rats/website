@@ -155,6 +155,27 @@ export const PLACEHOLDER_PRICING = true;
  * dedicated page pages through the rest. Lives here rather than in the server module so the client can read it
  * without pulling the database layer into its bundle.
  */
+/**
+ * "Someone messaged you while you were away" email (docs/ARCHITECTURE.md §12.13).
+ *
+ * The trigger is "still unread after a while", not "user looks offline". The only activity signals available are
+ * User.lastActiveAt, which is written at sign-in, and Session.lastSeenAt, which is refreshed at most hourly on
+ * purpose so a browsing session is not a write per request. Neither can answer "is she looking at the app right
+ * now", and guessing wrong means emailing somebody who is mid-conversation. Unread-after-a-delay needs no guess.
+ */
+export const MESSAGE_EMAIL = {
+  /** Long enough that someone who picks the phone up is never emailed about a message they then read. */
+  unreadForMs: 10 * 60_000,
+  /** At most one per conversation per window, so a burst of twenty messages is still one email. */
+  perConversationCooldownMs: 6 * 3_600_000,
+  /** The sweep is cheap but not free, and it is driven by ordinary traffic; once a minute is plenty. */
+  sweepEveryMs: 60_000,
+  /** Cap on one sweep, so a backlog drains over several runs rather than one long request. */
+  batchSize: 25,
+  /** Older than this and an email is worse than silence — the moment has passed. */
+  giveUpAfterMs: 7 * 24 * 3_600_000,
+} as const;
+
 export const NOTIFICATION_FEED = {
   dropdownSize: 5,
   pageSize: 20,

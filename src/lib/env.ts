@@ -36,6 +36,12 @@ const schema = z
     /** RFC 5322 From address on a domain verified with the provider, e.g. `Mellocrush <hello@mellocrush.com>`. */
     EMAIL_FROM: z.string().min(3).optional(),
     EMAIL_AUTH: z.enum(["on", "off"]).default("on"),
+    /**
+     * Shared secret for /api/cron/*. Vercel Cron sends it as `Authorization: Bearer <CRON_SECRET>`, and any other
+     * scheduler can do the same. Unset means the endpoints refuse every request rather than standing open — the
+     * sweep still runs off ordinary traffic, so an unscheduled deployment loses timeliness, never the feature.
+     */
+    CRON_SECRET: z.string().min(16).optional(),
     STORAGE_PROVIDER: z.enum(["local", "supabase"]).default("local"),
     LOCAL_STORAGE_DIR: z.string().default(".storage"),
     APP_URL: z.string().url().default("http://localhost:3000"),
@@ -106,6 +112,18 @@ export function getEnv(): Env {
  */
 export function emailAuthConfigured(env: Env = getEnv()): boolean {
   if (env.EMAIL_AUTH === "off") return false;
+  if (env.EMAIL_PROVIDER === "resend") return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
+  return env.EMAIL_PROVIDER === "console" && env.NODE_ENV !== "production";
+}
+
+/**
+ * Whether the app can deliver mail at all.
+ *
+ * Deliberately NOT emailAuthConfigured: that one asks whether email+password SIGN-IN is offered, and EMAIL_AUTH=off
+ * turns the method off without saying anything about the mailer. A notification still needs sending when sign-in
+ * happens to be Google-only, so the two questions get two functions.
+ */
+export function emailDeliveryConfigured(env: Env = getEnv()): boolean {
   if (env.EMAIL_PROVIDER === "resend") return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
   return env.EMAIL_PROVIDER === "console" && env.NODE_ENV !== "production";
 }

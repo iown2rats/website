@@ -1,6 +1,6 @@
 /**
- * The two transactional emails, in Mellocrush's voice: short, one action, no marketing. Both are sent as plain text
- * with a simple HTML version on the warm-white brand surface; no images, no tracking pixels, no external stylesheet.
+ * Mellocrush's transactional emails, in its voice: short, one action, no marketing. All are sent as plain text with
+ * a simple HTML version on the warm-white brand surface; no images, no tracking pixels, no external stylesheet.
  */
 import type { EmailMessage } from "./provider";
 
@@ -69,5 +69,24 @@ export function staffPasswordResetEmail(url: string, expiresInMinutes: number): 
     subject: `Reset your admin password · ${BRAND}`,
     text: `${heading}\n\n${body}\n\n${url}\n\n${footer}`,
     html: shell(heading, body, { label: "Reset password", url }, footer),
+  };
+}
+
+/**
+ * "You have a message waiting." Sent only when a message is still unread a while after it arrived
+ * (docs/ARCHITECTURE.md §12.13).
+ *
+ * It deliberately does NOT carry the message. An inbox is read over shoulders, synced to laptops and screenshotted
+ * by people other than its owner, and what two matches say to each other is theirs. The email carries who wrote and
+ * a way back, which is all it needs to do its job.
+ */
+export function newMessageEmail(fromName: string, url: string, more: number): Omit<EmailMessage, "to"> {
+  const heading = more > 0 ? `${fromName} and ${more} other${more === 1 ? "" : "s"} messaged you` : `${fromName} sent you a message`;
+  const body = `You have unread messages on ${BRAND}. Open the app to read and reply.`;
+  const footer = `You're getting this because message notifications are on. You can turn them off in Settings → Notifications.`;
+  return {
+    subject: more > 0 ? `You have unread messages · ${BRAND}` : `${fromName} sent you a message · ${BRAND}`,
+    text: `${heading}\n\n${body}\n\n${url}\n\n${footer}`,
+    html: shell(heading, body, { label: "Open Mellocrush", url }, footer),
   };
 }

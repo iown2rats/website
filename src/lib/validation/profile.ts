@@ -29,6 +29,7 @@ export const privacyTogglesSchema = z.object({
   hideLocation: z.boolean().optional(),
   hideAge: z.boolean().optional(),
   hideActiveStatus: z.boolean().optional(),
+  readReceipts: z.boolean().optional(),
   blockContacts: z.boolean().optional(),
 });
 export type PrivacyTogglesInput = z.infer<typeof privacyTogglesSchema>;

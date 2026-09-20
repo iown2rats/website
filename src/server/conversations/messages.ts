@@ -113,6 +113,43 @@ export async function sendMessage(actor: Actor, conversationId: string, rawBody:
 }
 
 // ───────────────────────────── DTOs ─────────────────────────────
+/**
+ * When the other participant last read this conversation, or null when it must not be shown.
+ *
+ * Two people have to agree before a receipt is shown, and the rule is symmetric:
+ *
+ *   - the reader must allow receipts, because it is their behaviour being reported;
+ *   - the viewer must allow them too, because otherwise turning the setting off would buy you the ability to
+ *     watch without being watched. A receipt you receive but never give is not privacy, it is an advantage.
+ *
+ * Null is returned for every "no" — a blocked pair, a setting off, a conversation never opened — so the client
+ * has one shape to render and can never distinguish "not read" from "not telling".
+ */
+export interface ConversationReadStateDto {
+  /** ISO time the other participant last read this conversation, or null. */
+  otherReadAt: string | null;
+}
+
+export async function getConversationReadState(
+  db: DbLike,
+  actorId: string,
+  conversationId: string,
+  otherUserId: string,
+): Promise<ConversationReadStateDto> {
+  const [mine, theirs, participant] = await Promise.all([
+    db.privacySettings.findUnique({ where: { userId: actorId }, select: { readReceipts: true } }),
+    db.privacySettings.findUnique({ where: { userId: otherUserId }, select: { readReceipts: true } }),
+    db.conversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId, userId: otherUserId } },
+      select: { lastReadAt: true },
+    }),
+  ]);
+  // The column defaults to true, so a row that does not exist yet means "on".
+  if ((mine?.readReceipts ?? true) === false) return { otherReadAt: null };
+  if ((theirs?.readReceipts ?? true) === false) return { otherReadAt: null };
+  return { otherReadAt: participant?.lastReadAt?.toISOString() ?? null };
+}
+
 
 export interface MessageDto {
   id: string;
@@ -128,6 +165,8 @@ export interface MessagePageDto {
   /** Cursor for the next OLDER page, or null. */
   nextCursor: string | null;
   serverNow: string;
+  /** Only on the first page; older pages cannot change it. */
+  readState?: ConversationReadStateDto;
 }
 
 function toMessageDto(actorId: string, m: { id: string; senderId: string; kind: string; body: string; createdAt: Date }): MessageDto {
@@ -139,7 +178,7 @@ export async function listMessages(actor: Actor, conversationId: string, options
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
   const limit = Math.min(Math.max(options.limit ?? 40, 1), 100);
-  await getConversationForActor(db, actor, conversationId);
+  const conversation = await getConversationForActor(db, actor, conversationId);
   const rows = await db.message.findMany({
     where: { conversationId, deletedAt: null },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -149,7 +188,14 @@ export async function listMessages(actor: Actor, conversationId: string, options
   });
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
-  return { messages: page.map((m) => toMessageDto(actor.userId, m)), nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, serverNow: now.toISOString() };
+  // Paging backwards through history cannot change who has read what, so only the first page pays for it.
+  const readState = options.cursor ? undefined : await getConversationReadState(db, actor.userId, conversationId, conversation.otherUserId);
+  return {
+    messages: page.map((m) => toMessageDto(actor.userId, m)),
+    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+    serverNow: now.toISOString(),
+    ...(readState ? { readState } : {}),
+  };
 }
 
 export interface PollDto {
@@ -157,6 +203,8 @@ export interface PollDto {
   messages: MessageDto[];
   status: "ACTIVE" | "PENDING" | "LOCKED";
   serverNow: string;
+  /** Carried on every poll: reading is a change the sender should see, even when nothing new was said. */
+  readState: ConversationReadStateDto;
 }
 
 /** Incremental poll: only messages after the newest one the client holds. Realtime can replace this without touching the UI. */
@@ -179,7 +227,8 @@ export async function pollConversation(actor: Actor, conversationId: string, opt
     take: limit,
     select: { id: true, senderId: true, kind: true, body: true, createdAt: true },
   });
-  return { messages: rows.map((m) => toMessageDto(actor.userId, m)), status: conversation.status, serverNow: now.toISOString() };
+  const readState = await getConversationReadState(db, actor.userId, conversationId, conversation.otherUserId);
+  return { messages: rows.map((m) => toMessageDto(actor.userId, m)), status: conversation.status, serverNow: now.toISOString(), readState };
 }
 
 /**

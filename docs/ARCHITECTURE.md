@@ -584,6 +584,55 @@ OCR is an assistant to payment verification, never the source of truth. Nothing 
 - **Admin view** (`/admin/payments/<id>`): receipt image and the check panel side by side; every check with state, detected/expected and note; detected fields; duplicate warning; attempt history; **Re-run OCR** (`reprocessReceipt`: `payments.review`, 10 per admin per hour, audited `receipt.reprocessed`, appends a row, changes no state, grants nothing). Approve/Reject remain human. When the latest reading is a `MISMATCH` or a duplicate, approval **requires a reason** (server-enforced, 3–300 chars) and the `payment.approved` audit row carries `receiptOutcome` and `overrideReason`; a MATCH never auto-approves.
 - Tests: `tests/unit/ocr-parsers.test.ts`, `tests/unit/ocr-verify.test.ts`, `tests/integration/receipt-ocr.test.ts` (one case runs the real engine on a rendered fixture); fixtures in `tests/fixtures/receipts.ts` are sanitised layouts, not real receipts.
 
+### 12.15 Read receipts ("Seen")
+
+Both halves existed from the start and were connected to nothing: `ConversationParticipant.lastReadAt` was written
+by `markConversationRead` and used only for unread badges, and `PrivacySettings.readReceipts` appeared in no file
+outside the generated Prisma client. The sender was never told. This wires them together.
+
+`getConversationReadState(db, actorId, conversationId, otherUserId)` returns one timestamp — when the other person
+last read the conversation — or null. It is carried on the first message page and on **every poll**, because being
+read is a change the sender should see even when nothing new was said.
+
+**Two people must agree, and the rule is symmetric.** The reader must allow receipts, since it is their behaviour
+being reported; and the viewer must allow them too, since otherwise turning the setting off would buy the ability
+to watch without being watched. A receipt you take but never give is not a privacy setting, it is an advantage.
+Every "no" returns null — blocked pair, setting off, chat never opened — so the client cannot tell "not read" from
+"not telling".
+
+Receipts are per conversation, not per message: the server reports one timestamp and a message counts as read if
+it was sent before it. The UI labels only the newest such message; the ones above it are implied.
+
+A missing `PrivacySettings` row reads as **on**, matching the column default, so an account that predates the row
+is not silently opted out.
+
+### 12.16 "Someone messaged you while you were away"
+
+An email goes when a message is **still unread after a delay** — never on a guess about whether somebody is online.
+Mellocrush has no reliable liveness signal: `User.lastActiveAt` is written at sign-in, and `Session.lastSeenAt` is
+refreshed at most hourly on purpose so that browsing is not a database write per request. Neither can answer "is
+she looking at the app right now", and guessing wrong means emailing a person mid-conversation. Unread-after-a-delay
+needs no guess and is self-correcting: open the chat, the notification is marked read, the email never goes.
+
+**There is no queue table and no migration.** The unread `MESSAGE` notification *is* the queue — one per
+conversation, already cleared when the chat is opened, already suppressed when the recipient has message
+notifications off. Throttling rides on `RateLimitBucket`, the same durable fixed-window counter used elsewhere,
+keyed per recipient and conversation, so a burst of twenty messages is one email.
+
+**The email never carries the message.** An inbox is read over shoulders, synced to laptops and screenshotted by
+people other than its owner; what two matches say to each other is theirs. It carries who wrote and a way back.
+
+**What drives it.** Ordinary traffic: `sendChatMessage` kicks the sweep fire-and-forget, and the sweep's own
+global one-per-minute gate means a busy hour costs one sweep per minute rather than one per message. It is never
+awaited, so the mailer cannot slow down or fail a send. `/api/cron/message-emails` exists for a real scheduler and
+is authorised by `CRON_SECRET` as an `Authorization: Bearer` header — the shape Vercel Cron sends. With the secret
+unset the route refuses everything: an endpoint that triggers outbound email must never stand open, and failing
+closed costs only punctuality, since traffic still drives the sweep.
+
+`emailDeliveryConfigured()` is deliberately distinct from `emailAuthConfigured()`: the latter asks whether email
+sign-in is offered, and `EMAIL_AUTH=off` says nothing about whether the mailer works. A notification still needs
+sending when sign-in happens to be Google-only.
+
 ## 13. Notifications
 
 Types: `NEW_MATCH`, `MESSAGE`, `LIKE_RECEIVED` (Plus users see who; free users get a count-only notification), `INTRO_RECEIVED`, `COMMUNITY_LIKE`, `COMMUNITY_COMMENT`, `VERIFICATION_UPDATE`, `SAFETY_NOTICE`, `ACCOUNT_NOTICE`, and the billing types `PAYMENT_APPROVED`, `PAYMENT_REJECTED`, `SUBSCRIPTION_EXPIRING`, `SUBSCRIPTION_EXPIRED` (§12.12; transactional, not gated by preferences). Notifications never control authorization: the entitlement service and the database are canonical. Created inside the same transaction as the triggering write. Read model returns unread counts per tab for badges; `markRead(actor, ids | all)`. `NotificationSettings` (matches, likes, messages, community, marketing) gate creation of the non-safety types. A `PushSubscription` table is included in the schema so Web Push can be added without migration; no push is sent in this phase.

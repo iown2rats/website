@@ -36,7 +36,9 @@ export function toDeckCard(dto: DiscoveryCardDto): DeckCard {
     occupation: dto.occupation,
     intent: dto.intent,
     interests: dto.interests,
-    photos: dto.photos.map((p, i) => ({ url: p.url, thumbUrl: p.thumbUrl, key: p.demoKey, blurhash: p.blurhash, alt: `${dto.name}, photo ${i + 1}` })),
+    // `locked` has to survive this mapping: it is the only thing telling the UI that a photo it has no URL for
+    // is protected rather than missing, and dropping it silently renders an empty tile (ARCHITECTURE §12.18).
+    photos: dto.photos.map((p, i) => ({ url: p.url, thumbUrl: p.thumbUrl, key: p.demoKey, blurhash: p.blurhash, locked: p.locked, alt: `${dto.name}, photo ${i + 1}` })),
     bio: dto.bio,
     education: dto.education,
     languages: dto.languages,

@@ -731,7 +731,7 @@ before: `brand-source/mellocrush-wordmark.png` (lowercase `mellocrush`, white le
 interlocking "oo" with the heart, on white). §24's cocoa lettering, pale coral and four-point star are gone, and so
 is the star everywhere it was described — the heart replaces it.
 
-Everything in `public/brand/` and the two icon files in `src/app/` are now **derived** from those two images by
+Everything in `src/assets/brand/` and the two icon files in `src/app/` are now **derived** from those two images by
 `scripts/build-brand-assets.py`, never hand-edited, so a size can never drift from the artwork. Regenerate with
 `pip install Pillow numpy && python3 scripts/build-brand-assets.py`.
 
@@ -761,6 +761,17 @@ every wordmark slot renders 21–38 px tall, so 480 px covers 3× DPR — and a 
 mark is a 512 px transparent square. App icons (`mellocrush-app-icon-{192,512}.png`, `src/app/icon.png`,
 `src/app/apple-icon.png`) are the mark flattened onto the warm page colour `#FFFBF1`, opaque rather than transparent
 because iOS composites a transparent icon onto black.
+
+**Why `src/assets/brand/` and not `public/brand/`.** The artwork shipped once from `public/`, at fixed URLs, and the
+old mark stayed on screen — noticed on the admin portal, where the signed-out card is the only place the mark appears
+alone at 40 px, but true anywhere a browser already held a copy. Files under `public/` are served
+`cache-control: public, max-age=0, must-revalidate`, which iOS Safari treats as a suggestion, and replacing the bytes
+under the same path gives it no reason to think otherwise. Importing them instead makes the bundler hash the contents
+into the filename, so `logo.tsx` and `manifest.ts` reference `/_next/static/media/mellocrush-mark.<hash>.png`, served
+immutable: new artwork, new URL, no stale copy anywhere and nothing for anyone to clear. `src/app/icon.png` and
+`src/app/apple-icon.png` need no help — Next's file-based metadata convention already fingerprints them. Guarded by
+`tests/unit/brand-assets.test.ts`, because putting a logo back at a fixed path looks like nothing in a diff and only
+shows up on somebody else's phone.
 
 Verified in the browser at 390 px light, 390 px dark and 1440 px: the welcome card, the Discover header, the desktop
 sidebar and the app icon, with the navy lettering on sand, the white lettering on black, and no halo on either.

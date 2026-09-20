@@ -1,10 +1,19 @@
 import Image from "next/image";
+import wordmarkInk from "@/assets/brand/mellocrush-logo-480.png";
+import wordmarkWhite from "@/assets/brand/mellocrush-logo-white-480.png";
+import mark from "@/assets/brand/mellocrush-mark.png";
 import { cn } from "@/lib/cn";
 
 /*
- * Mellocrush brand assets (public/brand, derived from brand-source by scripts/build-brand-assets.py). The wordmark is
- * the supplied artwork — lowercase "mellocrush" with the interlocking coral "oo" #EE5358 and the gold heart #FDA748 —
- * used exactly as delivered: it is an image, never recreated with text, and its proportions are never altered.
+ * Mellocrush brand assets (src/assets/brand, derived from brand-source by scripts/build-brand-assets.py). The
+ * wordmark is the supplied artwork — lowercase "mellocrush" with the interlocking coral "oo" #EE5358 and the gold
+ * heart #FDA748 — used exactly as delivered: it is an image, never recreated with text, and its proportions are
+ * never altered.
+ *
+ * Imported rather than referenced at a `/brand/...` URL so the bundler fingerprints each file and serves it
+ * immutable. A logo at a fixed public path is a logo a browser can keep showing after the artwork changes, and
+ * `public/` files ship as `max-age=0, must-revalidate`, which iOS Safari treats as a suggestion. The first upload of
+ * this artwork left the old mark on screen for exactly that reason.
  *
  * The lettering ships in two colours because the artwork is a raster and cannot follow `--text` the way everything
  * else does: navy #0B1A2B (the artwork's own dark) for the sand page colour, white for black and for dark
@@ -17,11 +26,11 @@ import { cn } from "@/lib/cn";
  */
 export const BRAND_NAME = "Mellocrush";
 /** Navy lettering, for the sand page colour. */
-export const WORDMARK_INK_SRC = "/brand/mellocrush-logo-480.png";
+export const WORDMARK_INK = wordmarkInk;
 /** White lettering, for black and for dark photographs; the coral "oo" and gold heart are unchanged. */
-export const WORDMARK_WHITE_SRC = "/brand/mellocrush-logo-white-480.png";
+export const WORDMARK_WHITE = wordmarkWhite;
 export const WORDMARK_ASPECT = 1492 / 284;
-export const MARK_SRC = "/brand/mellocrush-mark.png";
+export const MARK = mark;
 
 /** Which lettering colour to draw: `auto` follows the appearance setting, the others are fixed. */
 export type WordmarkTone = "auto" | "ink" | "white";
@@ -31,20 +40,20 @@ export function Wordmark({ height = 24, className, priority = false, tone = "aut
   const width = Math.round(height * WORDMARK_ASPECT);
   const common = { width, height, priority, unoptimized: true, style: { width, height } };
   if (tone !== "auto") {
-    return <Image {...common} alt={BRAND_NAME} src={tone === "white" ? WORDMARK_WHITE_SRC : WORDMARK_INK_SRC} className={cn("block shrink-0 select-none", className)} />;
+    return <Image {...common} alt={BRAND_NAME} src={tone === "white" ? WORDMARK_WHITE : WORDMARK_INK} className={cn("block shrink-0 select-none", className)} />;
   }
   // Both carry the name rather than one of them: `display: none` takes the other out of the accessibility tree, so
   // exactly one is announced in either appearance. Marking one aria-hidden would leave the logo unnamed in the
   // appearance where that is the visible file.
   return (
     <>
-      <Image {...common} alt={BRAND_NAME} src={WORDMARK_INK_SRC} className={cn("wordmark-ink shrink-0 select-none", className)} />
-      <Image {...common} alt={BRAND_NAME} src={WORDMARK_WHITE_SRC} className={cn("wordmark-white shrink-0 select-none", className)} />
+      <Image {...common} alt={BRAND_NAME} src={WORDMARK_INK} className={cn("wordmark-ink shrink-0 select-none", className)} />
+      <Image {...common} alt={BRAND_NAME} src={WORDMARK_WHITE} className={cn("wordmark-white shrink-0 select-none", className)} />
     </>
   );
 }
 
 /** The interlocking coral "oo" with the gold heart, for icon-only places (compact headers, favicon-sized slots). */
 export function BrandMark({ size = 24, className, label = BRAND_NAME }: { size?: number; className?: string; label?: string }) {
-  return <Image src={MARK_SRC} alt={label} width={size} height={size} unoptimized className={cn("block shrink-0 select-none", className)} style={{ width: size, height: size }} />;
+  return <Image src={MARK} alt={label} width={size} height={size} unoptimized className={cn("block shrink-0 select-none", className)} style={{ width: size, height: size }} />;
 }

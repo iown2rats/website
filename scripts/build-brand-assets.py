@@ -27,7 +27,9 @@ from PIL import Image
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "brand-source"
-BRAND = ROOT / "public" / "brand"
+# NOT public/: these are imported, so Next fingerprints them and serves them immutable. A logo that lives at a fixed
+# public URL is a logo a browser can keep showing after it changes — which is exactly what happened the first time.
+BRAND = ROOT / "src" / "assets" / "brand"
 APP = ROOT / "src" / "app"
 
 # The artwork's own colours, measured from the supplied files rather than guessed.
@@ -129,6 +131,7 @@ def main() -> None:
     print("app icons (opaque: a transparent icon is composited onto black by iOS)")
     save(mark, BRAND / "mellocrush-app-icon-192.png", width=192, flatten=PAGE)
     save(mark, BRAND / "mellocrush-app-icon-512.png", width=512, flatten=PAGE)
+    # src/app/icon.png and apple-icon.png are Next's file-based metadata convention; it fingerprints these itself.
     save(mark, APP / "icon.png", width=512, flatten=PAGE)
     save(mark, APP / "apple-icon.png", width=180, flatten=PAGE)
 

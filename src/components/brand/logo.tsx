@@ -57,3 +57,55 @@ export function Wordmark({ height = 24, className, priority = false, tone = "aut
 export function BrandMark({ size = 24, className, label = BRAND_NAME }: { size?: number; className?: string; label?: string }) {
   return <Image src={MARK} alt={label} width={size} height={size} unoptimized className={cn("block shrink-0 select-none", className)} style={{ width: size, height: size }} />;
 }
+
+/**
+ * The mark as a single-colour glyph, painted with a CSS token rather than baked into a file.
+ *
+ * The comparison table needs the mark in the Plus gold, and `--sand` is #c6a962 on the page and #e0c27a on black —
+ * one colour cannot be both. Masking the real artwork and filling it with the token means the glyph follows the
+ * theme exactly, at any size, from the same file the coral mark already uses. A second gold PNG would have had to
+ * be generated per theme and would drift the moment the artwork changed.
+ *
+ * The mask flattens the heart and the rings into one silhouette, which is what the design calls for at this size.
+ */
+export function PlusMark({ size = 22, className, title }: { size?: number; className?: string; title?: string }) {
+  return (
+    <span
+      role={title ? "img" : "presentation"}
+      aria-label={title}
+      aria-hidden={title ? undefined : true}
+      className={cn("inline-block shrink-0 bg-sand", className)}
+      style={{
+        width: size,
+        height: size,
+        maskImage: `url(${mark.src})`,
+        WebkitMaskImage: `url(${mark.src})`,
+        maskSize: "contain",
+        WebkitMaskSize: "contain",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+        maskPosition: "center",
+        WebkitMaskPosition: "center",
+      }}
+    />
+  );
+}
+
+/**
+ * The "mellocrush plus" lockup for the membership hero: the wordmark's own colours in type, over the coral mark
+ * with a warm glow behind it. Composed here rather than shipped as one flattened image so the text stays real text
+ * — selectable, translatable, and sharp at any density — and so the glow can follow the theme.
+ */
+export function PlusLockup({ className }: { className?: string }) {
+  return (
+    <div className={cn("pointer-events-none relative select-none", className)} aria-hidden="true">
+      <span className="absolute -inset-6 rounded-full bg-primary/20 blur-2xl" />
+      <span className="absolute -inset-2 rounded-full bg-sand/10 blur-xl" />
+      <div className="relative flex flex-col items-center gap-0.5">
+        <span className="text-tiny font-semibold leading-none tracking-[-.02em] text-primary">mellocrush</span>
+        <span className="text-micro font-semibold leading-none tracking-[-.02em] text-sand">plus</span>
+        <Image src={MARK} alt="" width={60} height={60} unoptimized className="mt-1 block h-15 w-15 select-none" />
+      </div>
+    </div>
+  );
+}

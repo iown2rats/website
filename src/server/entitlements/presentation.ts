@@ -43,28 +43,52 @@ export interface MembershipDto {
   paymentsAvailable: boolean;
   currentOrder: OrderDto | null;
   /** Free vs Plus, row by row, from the approved product rules (§12.1). Display only. */
-  comparison: { capability: string; free: string; plus: string }[];
+  comparison: ComparisonRow[];
+  /** What everybody gets regardless of plan, so the table only has to carry the differences. */
+  alwaysIncluded: string;
 }
 
-function describeRules(): MembershipDto["comparison"] {
+/**
+ * A cell's meaning, not its rendering. "Included" is a state the page draws as the Plus mark and "—" is a state it
+ * draws as a dash; sending those glyphs as strings from here would put presentation in the read model and force the
+ * page to compare against them to lay anything out differently.
+ */
+export type ComparisonCell = { kind: "text"; text: string } | { kind: "included" } | { kind: "excluded" };
+
+export interface ComparisonRow {
+  /** Stable identity for the row, so the page can attach an icon without matching on the label. */
+  key: "likes" | "incoming-likes" | "invisible" | "boosts" | "filters" | "undo" | "intro";
+  capability: string;
+  free: ComparisonCell;
+  plus: ComparisonCell;
+}
+
+function describeRules(): ComparisonRow[] {
   const f = PRODUCT_RULES.FREE;
   const p = PRODUCT_RULES.PLUS;
-  const yesNo = (v: boolean) => (v ? "Included" : "—");
+  const text = (t: string): ComparisonCell => ({ kind: "text", text: t });
+  const flag = (v: boolean): ComparisonCell => (v ? { kind: "included" } : { kind: "excluded" });
+  const perWeek = (n: number | null): ComparisonCell => (n === null ? text("Unlimited") : text(`${n} per week`));
+
+  /*
+   * Only the DIFFERENCES between the tiers. What both tiers get — profiles, photos, Discover, matching, messaging
+   * your matches, blocking and reporting — is stated once in `alwaysIncluded` instead of as rows of "Included /
+   * Included", which read as filler and made the table three rows longer than the thing it was comparing.
+   */
   return [
-    { capability: "Profile, photos, Discover, matching and chat", free: "Included", plus: "Included" },
-    { capability: "Likes per day", free: String(f.dailyLikeLimit), plus: String(p.dailyLikeLimit) },
-    // Messaging a match is free and unlimited on both tiers and is never a Plus upsell; the row stays so the
-    // comparison answers the question rather than leaving a reader to wonder (§12.4).
-    { capability: "Messaging your matches", free: "Unlimited", plus: "Unlimited" },
-    { capability: "See who likes you", free: f.canSeeIncomingLikes ? "Included" : "Count only", plus: yesNo(p.canSeeIncomingLikes) },
-    { capability: "Invisible Mode", free: yesNo(f.canUseInvisibleMode), plus: yesNo(p.canUseInvisibleMode) },
-    { capability: "Profile Boosts", free: f.boostsPerWindow ? `${f.boostsPerWindow} a week` : "—", plus: p.boostsPerWindow ? `${p.boostsPerWindow} a week` : "—" },
-    { capability: "Advanced filters", free: yesNo(f.canUseAdvancedFilters), plus: yesNo(p.canUseAdvancedFilters) },
-    { capability: "Undo your last pass", free: yesNo(f.canUndoPass), plus: yesNo(p.canUndoPass) },
-    { capability: "Intro with a like", free: f.introsPerWeek === null ? "Unlimited" : `${f.introsPerWeek} a week`, plus: p.introsPerWeek === null ? "Unlimited" : `${p.introsPerWeek} a week` },
-    { capability: "Block, report and safety tools", free: "Always", plus: "Always" },
+    { key: "likes", capability: "Likes per day", free: text(String(f.dailyLikeLimit)), plus: text(String(p.dailyLikeLimit)) },
+    { key: "incoming-likes", capability: "See who likes you", free: f.canSeeIncomingLikes ? text("Full profiles") : text("Count only"), plus: p.canSeeIncomingLikes ? text("Full profiles") : text("Count only") },
+    { key: "invisible", capability: "Invisible Mode", free: flag(f.canUseInvisibleMode), plus: flag(p.canUseInvisibleMode) },
+    { key: "boosts", capability: "Profile Boosts", free: f.boostsPerWindow ? perWeek(f.boostsPerWindow) : { kind: "excluded" }, plus: p.boostsPerWindow ? perWeek(p.boostsPerWindow) : { kind: "excluded" } },
+    { key: "filters", capability: "Advanced filters", free: flag(f.canUseAdvancedFilters), plus: flag(p.canUseAdvancedFilters) },
+    { key: "undo", capability: "Undo your last pass", free: flag(f.canUndoPass), plus: flag(p.canUndoPass) },
+    { key: "intro", capability: "Intro with a like", free: perWeek(f.introsPerWeek), plus: perWeek(p.introsPerWeek) },
   ];
 }
+
+/** Stated once, next to the table, rather than as rows that say the same thing in both columns. */
+const ALWAYS_INCLUDED =
+  "Profiles, photos, Discover, matching, messaging your matches, blocking and reporting are available without Plus.";
 
 export async function getMembership(actor: Actor, deps: { db?: Db; now?: Date } = {}): Promise<MembershipDto> {
   const db = deps.db ?? getDb();
@@ -95,5 +119,6 @@ export async function getMembership(actor: Actor, deps: { db?: Db; now?: Date } 
     paymentsAvailable: Boolean(method) && planDtos.some((p) => p.forSale),
     currentOrder,
     comparison: describeRules(),
+    alwaysIncluded: ALWAYS_INCLUDED,
   };
 }

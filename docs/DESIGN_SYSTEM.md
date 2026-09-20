@@ -775,3 +775,40 @@ shows up on somebody else's phone.
 
 Verified in the browser at 390 px light, 390 px dark and 1440 px: the welcome card, the Discover header, the desktop
 sidebar and the app icon, with the navy lettering on sand, the white lettering on black, and no halo on either.
+
+## 35. Membership, rebuilt to the owner's design (2026-09-20)
+
+The screen already had the right numbers; what it did not have was a shape. Three changes carry it.
+
+**The table states only the difference.** It used to carry ten rows, three of which said the same thing in both
+columns — *Profile, photos, Discover, matching and chat*, *Messaging your matches*, *Block, report and safety
+tools*. Rows that agree with themselves make a comparison a third longer while answering nothing, so they moved
+into one **"Always included for everyone"** card beside it and the table is seven rows of actual difference.
+
+**Cells carry meaning, not glyphs.** `ComparisonCell` is `{kind:"text"} | {kind:"included"} | {kind:"excluded"}`,
+so the read model says *what is true* and the page decides that "included" draws as the Plus mark and "excluded"
+draws as an em dash. Sending "Included" as a string would have put presentation in the read model and forced the
+page to compare against that string to lay anything out differently. Each row also carries a stable `key`, which
+is what the icon map is keyed on — matching an icon to a display label would break silently the first time
+somebody rewords the copy.
+
+**The Plus column is one panel, not seven tints.** A rounded, gold-edged block spans header to last row behind the
+cells, so the column reads as a single run of gold rather than a stack of separately tinted cells with seams
+between them.
+
+**The Plus glyph is masked, not baked.** `--sand` is `#c6a962` on the page and `#e0c27a` on black; no single PNG
+is both. `PlusMark` masks the real mark artwork and fills it with the token, so the glyph is exactly the theme's
+gold at any size, from the file the coral mark already uses. A gold PNG would have needed one per theme and would
+drift the moment the artwork changed.
+
+**The hero lockup is composed, not a flattened image.** `PlusLockup` sets "mellocrush" in coral and "plus" in the
+Plus gold over the coral mark, with the glow as two blurred radial layers behind. Keeping the type as type means
+it stays sharp at any density and is not an image of words. It hides below 360 px, where the headline needs the
+width more than the lockup does.
+
+Prices, plan names and badges are unchanged and still come from the admin-managed rows — MVR 49 / 149 / 357 over
+7 / 30 / 90 days, "Most popular" and "Best value" — as does whether anything is for sale. Nothing on this screen
+can grant Plus; the CTA creates an order that an admin confirms.
+
+Verified at 320, 360, 390, 430 and 1280 px in both appearances: no horizontal page scroll at any width, every
+feature label on one line from 360 px up, and the gold panel legible on black and on the sand page colour.

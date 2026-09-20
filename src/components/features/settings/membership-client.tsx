@@ -38,7 +38,7 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
 
       {m.tier === "FREE" && !open ? (
         <>
-          <div className={cn("grid gap-2.5", m.plans.length >= 3 ? "grid-cols-3" : "grid-cols-2")} role="radiogroup" aria-label="Plus plans">
+          <div className={cn("grid gap-2.5 pt-3", m.plans.length >= 3 ? "grid-cols-3" : "grid-cols-2")} role="radiogroup" aria-label="Plus plans">
             {m.plans.map((p) => {
               const selected = chosen === p.id;
               return (
@@ -49,12 +49,16 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
                   aria-checked={selected}
                   disabled={!p.forSale || !m.paymentsAvailable}
                   onClick={() => setChosen(p.id)}
-                  className={cn("relative flex flex-col items-center gap-1 rounded-2xl px-3 py-3 text-center transition-colors disabled:opacity-60", selected ? "bg-primary-soft" : "bg-surface-muted")}
+                  className={cn(
+                    "relative flex flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-4.5 text-center transition-colors disabled:opacity-60",
+                    selected ? "bg-primary-soft ring-1 ring-primary/40" : "bg-surface-muted",
+                  )}
                 >
-                  {p.badge ? <span className="absolute -top-2.5 rounded-full bg-sand px-2 py-0.5 text-tag font-medium uppercase tracking-[.05em] text-on-sand">{p.badge}</span> : null}
-                  <span className="text-micro font-medium text-text-secondary">{p.name}</span>
-                  <span className="text-body font-medium tracking-[-.02em] text-text">{p.price ?? "Price TBA"}</span>
-                  <span className="text-tiny text-text-secondary">{p.intervalDays} days</span>
+                  {/* The badge straddles the card's top edge, so it reads as a label on the card rather than inside it. */}
+                  {p.badge ? <span className="absolute -top-2.5 whitespace-nowrap rounded-full bg-sand px-2.5 py-0.5 text-tag font-medium uppercase tracking-[.05em] text-on-sand">{p.badge}</span> : null}
+                  <span className="text-caption font-medium text-text-secondary">{p.name}</span>
+                  <span className="text-h3 font-semibold tracking-[-.02em] text-text">{p.price ?? "Price TBA"}</span>
+                  <span className="text-caption-sm text-text-secondary">{p.intervalDays} days</span>
                 </button>
               );
             })}

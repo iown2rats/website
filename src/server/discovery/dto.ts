@@ -9,7 +9,7 @@ import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provi
 import { buildVisibleProfiles, type VisibleProfile } from "@/server/profiles/visible-profile";
 
 export interface DiscoveryPhotoDto {
-  /** Signed, short-lived URL of the 1080-wide variant. Null only for development demo placeholders. */
+  /** Signed, short-lived URL of the 1080-wide variant. Null for demo placeholders and for locked photos. */
   url: string | null;
   /** Signed URL of the 400-wide variant, used for next-card previews and avatars. */
   thumbUrl: string | null;
@@ -18,6 +18,12 @@ export interface DiscoveryPhotoDto {
   blurhash: string;
   width: number;
   height: number;
+  /**
+   * Protected photo this viewer has not unlocked (docs/ARCHITECTURE.md §12.18). `url`, `thumbUrl` and `demoKey`
+   * are all null, and not because they were cleared here — the read model never handed over the storage key, so
+   * there was never a URL to sign. The blurhash is the whole payload.
+   */
+  locked: boolean;
 }
 
 export interface DiscoveryCardDto {
@@ -36,12 +42,14 @@ export interface DiscoveryCardDto {
   interests: string[];
   prompts: { prompt: string; answer: string }[];
   photos: DiscoveryPhotoDto[];
+  /** How many of `photos` are locked, so the UI can say "2 more photos" without a second pass. */
+  lockedPhotoCount: number;
   isActiveNow: boolean | null;
 }
 
 /** Exhaustive allow-list; the DTO audit test asserts a card has exactly these keys. */
 export const DISCOVERY_CARD_KEYS: readonly (keyof DiscoveryCardDto)[] = [
-  "handle", "name", "age", "verified", "location", "occupation", "education", "languages", "heightCm", "bio", "intent", "interests", "prompts", "photos", "isActiveNow",
+  "handle", "name", "age", "verified", "location", "occupation", "education", "languages", "heightCm", "bio", "intent", "interests", "prompts", "photos", "isActiveNow", "lockedPhotoCount",
 ];
 
 export const isDemoKey = (key: string) => key.startsWith("demo/");
@@ -49,9 +57,11 @@ export const isDemoKey = (key: string) => key.startsWith("demo/");
 export async function toDiscoveryCard(profile: VisibleProfile, storage: StorageProvider): Promise<DiscoveryCardDto> {
   const photos = await Promise.all(
     profile.photos.map(async (ph): Promise<DiscoveryPhotoDto> => {
-      if (isDemoKey(ph.storageKey)) return { url: null, thumbUrl: null, demoKey: ph.storageKey, blurhash: ph.blurhash, width: ph.width, height: ph.height };
+      // Locked photos carry no keys at all, so this branch has nothing it *could* sign even if it tried.
+      if (ph.locked) return { url: null, thumbUrl: null, demoKey: null, blurhash: ph.blurhash, width: ph.width, height: ph.height, locked: true };
+      if (isDemoKey(ph.storageKey)) return { url: null, thumbUrl: null, demoKey: ph.storageKey, blurhash: ph.blurhash, width: ph.width, height: ph.height, locked: false };
       const [url, thumbUrl] = await Promise.all([storage.getReadUrl(ph.storageKey, PHOTO_URL_TTL_SECONDS), storage.getReadUrl(ph.thumbKey, PHOTO_URL_TTL_SECONDS)]);
-      return { url, thumbUrl, demoKey: null, blurhash: ph.blurhash, width: ph.width, height: ph.height };
+      return { url, thumbUrl, demoKey: null, blurhash: ph.blurhash, width: ph.width, height: ph.height, locked: false };
     }),
   );
   return {
@@ -69,6 +79,7 @@ export async function toDiscoveryCard(profile: VisibleProfile, storage: StorageP
     interests: profile.interests,
     prompts: profile.prompts,
     photos,
+    lockedPhotoCount: profile.lockedPhotoCount,
     isActiveNow: profile.isActiveNow,
   };
 }

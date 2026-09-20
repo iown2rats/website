@@ -5,16 +5,13 @@
 import type { DbLike } from "@/lib/db";
 import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { ageFromDateOfBirth } from "@/lib/age";
+import { applyPhotoLock, resolvePhotoAccess, type VisiblePhoto } from "@/server/photos/visibility";
 
-export interface VisibleProfilePhoto {
-  id: string;
-  blurhash: string;
-  width: number;
-  height: number;
-  /** Storage key is resolved to a short-lived signed URL by the storage layer at render time. */
-  storageKey: string;
-  thumbKey: string;
-}
+/**
+ * A photo as this viewer is allowed to receive it (docs/ARCHITECTURE.md §12.18). An unlocked photo carries its
+ * storage keys; a locked one carries none, so nothing downstream can sign a URL for it.
+ */
+export type VisibleProfilePhoto = VisiblePhoto;
 
 export interface VisibleProfile {
   handle: string;
@@ -33,6 +30,8 @@ export interface VisibleProfile {
   interests: string[];
   prompts: { prompt: string; answer: string }[];
   photos: VisibleProfilePhoto[];
+  /** Photos this viewer cannot see yet. Lets a surface say "3 more photos" without shipping them. */
+  lockedPhotoCount: number;
   /** Null when the user hides active status. */
   isActiveNow: boolean | null;
   /** Internal id, kept server-side only for follow-up actions; actions accept handles from clients. */
@@ -49,8 +48,15 @@ const ACTIVE_NOW_MS = 15 * 60_000;
  * member actually sees. Filtering here means an operational account cannot be rendered as a dating profile even
  * if an id reaches this point some other way — the row is simply dropped from the result.
  */
-export async function buildVisibleProfiles(db: DbLike, _viewerId: string, userIds: string[], now: Date): Promise<VisibleProfile[]> {
+export async function buildVisibleProfiles(db: DbLike, viewerId: string, userIds: string[], now: Date): Promise<VisibleProfile[]> {
   if (userIds.length === 0) return [];
+  /*
+   * Whose photos this viewer may have in full. Two queries for the whole page — one entitlement lookup, one match
+   * lookup — so a deck of cards costs what a single card costs. The lock is applied HERE, at the one function
+   * that turns an id into something a member sees, which is why no surface downstream can leak a protected photo:
+   * it never receives the key.
+   */
+  const access = await resolvePhotoAccess(db, viewerId, userIds, now);
   const users = await db.user.findMany({
     where: { id: { in: userIds }, accountType: "MEMBER" },
     select: {
@@ -87,6 +93,7 @@ export async function buildVisibleProfiles(db: DbLike, _viewerId: string, userId
     const u = byId.get(id);
     if (!u?.profile) continue;
     const p = u.profile;
+    const photos = applyPhotoLock(p.photos, access.canSeeAll(u.id));
     out.push({
       handle: p.handle,
       name: p.displayName,
@@ -101,7 +108,8 @@ export async function buildVisibleProfiles(db: DbLike, _viewerId: string, userId
       intent: p.intent,
       interests: p.interests.map((i) => i.interest.label),
       prompts: p.prompts.map((pr) => ({ prompt: pr.prompt.text, answer: pr.answer })),
-      photos: p.photos,
+      photos,
+      lockedPhotoCount: photos.filter((ph) => ph.locked).length,
       isActiveNow: u.privacy?.hideActiveStatus
         ? null
         : Boolean(u.lastActiveAt && now.getTime() - u.lastActiveAt.getTime() < ACTIVE_NOW_MS),

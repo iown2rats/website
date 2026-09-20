@@ -13,6 +13,11 @@ export interface TierRules {
   readonly dailyLikeLimit: number;
   /** Full "Likes You" profiles (true) or count + anonymised placeholders (false). */
   readonly canSeeIncomingLikes: boolean;
+  /**
+   * Photos beyond someone's main one, before matching. A match unlocks them for everybody regardless of tier, so
+   * this rule only ever decides the UNMATCHED case (docs/ARCHITECTURE.md §12.18).
+   */
+  readonly canSeeProtectedPhotos: boolean;
   /** Invisible Mode: only people the user has liked can discover them. */
   readonly canUseInvisibleMode: boolean;
   /** Profile boosts allowed per rolling 7-day window. 0 = none. */
@@ -28,6 +33,7 @@ export const PRODUCT_RULES = {
   FREE: {
     dailyLikeLimit: 30,
     canSeeIncomingLikes: false,
+    canSeeProtectedPhotos: false,
     canUseInvisibleMode: false,
     boostsPerWindow: 0,
     canUseAdvancedFilters: false,
@@ -37,6 +43,7 @@ export const PRODUCT_RULES = {
   PLUS: {
     dailyLikeLimit: 90,
     canSeeIncomingLikes: true,
+    canSeeProtectedPhotos: true,
     canUseInvisibleMode: true,
     boostsPerWindow: 2,
     canUseAdvancedFilters: true,

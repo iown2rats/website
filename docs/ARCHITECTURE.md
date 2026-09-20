@@ -1071,3 +1071,59 @@ APP_URL=http://localhost:3000
 - Admin-side expiry job: `notifyExpiringSubscriptions` / `markExpiredSubscriptions` exist but nothing schedules them yet (a Vercel cron or similar needs owner approval).
 - **Verified badge after photo changes**: approve or amend the policy in §11 before it is implemented (needs a small schema change).
 - **Parser calibration**: the BML and MIB parsers follow layouts fixtured from real slips in the AVITO codebase. The first real Mellocrush receipts should be reviewed against the admin check panel; a layout change is a new parser version (`bml-v2`), never a silent edit, and "Re-run OCR" re-reads stored receipts with it.
+
+## 7.5 Dating and Friendship (2026-09-20)
+
+Mellocrush is two products sharing one app. `DiscoveryPreferences.connectionIntent` says which one a member is in,
+and the two pools never see each other.
+
+**This is not `RelationshipIntent`.** That enum — SERIOUS_RELATIONSHIP / MARRIAGE / DATING / FIGURING_OUT — is the
+romantic "how serious?" question, and `DATING` there means casual rather than "not friendship". Folding Friendship
+into it would have destroyed a shipped feature and the stated intent of most live members, so Dating vs Friendship
+is a separate field on a separate axis. It is single-select, matching the model that was already there; nothing in
+the schema ever allowed two intents at once.
+
+**Three concepts, deliberately distinct** (`src/server/preferences/intent-policy.ts`, the only module that decides
+any of this):
+
+| concept | where | how it is set |
+|---|---|---|
+| gender | `User.gender` | the member states it |
+| connection intent | `DiscoveryPreferences.connectionIntent` | the member chooses Dating or Friendship |
+| gender preference | `DiscoveryPreferences.interestedIn` | **derived** on Dating, **chosen** on Friendship |
+
+Dating is opposite-gender only, so its preference is not a question: a man is shown women, a woman men. Onboarding
+therefore does not ask — a step with one answer should not exist — and no write path reads a Dating preference from
+a request. `resolvePreferences` computes it from the gender, so `MAN + DATING + MEN` posted straight at the server
+stores WOMEN, and `UNSPECIFIED + DATING` is refused outright (it has no opposite, and the reciprocal rule would show
+that member to nobody and nobody to them — an empty deck with no explanation is worse than a clear refusal).
+
+`friendshipInterestedIn` holds the member's own Friendship answer even while they are on Dating. Without it,
+switching back and forth would either re-ask every time or, worse, silently adopt the derived Dating value as
+though they had chosen it.
+
+**Onboarding branches once**, after GENDER, and both branches are the same length, so the flow is still 11 steps
+and the progress treatment is untouched:
+
+    … GENDER → CONNECTION → INTENT → LOCATION …     Dating     (how serious?)
+    … GENDER → CONNECTION → MEET   → LOCATION …     Friendship (who would you like to meet?)
+
+`stagesFor()` builds the path and `stepNumber()` derives the "n / 11" from it, because a hard-coded step number
+would leave a hole where the other branch's question was. Opening the other branch's URL redirects to where the
+member actually is.
+
+**Discovery** gains one clause, in `compatibilitySql` rather than `viewerFilterSql`:
+
+    cp."connectionIntent" = <viewer's connectionIntent>
+
+It compares each side's own intent rather than a preference about the other's, so it is reciprocal by construction
+with nothing to keep in step. It sits with compatibility, not with the viewer's filters, because it is not a
+preference anyone may relax: a Plus member cannot widen their way across, and a future "show me everyone" filter
+cannot reach over it. The existing reciprocal gender clauses need no branch — `interestedIn` always holds the
+preference for the active intent, and both sides are already known to share one — so "Friendship → Everyone" works
+through exactly the rule dating uses.
+
+**Changing your mind later** goes through the same policy from Edit profile and the filters sheet. A gender change
+moves a Dating preference with it and leaves a Friendship one alone: who you want to be friends with does not
+change because you corrected your own gender. Friendship → Dating enforces the derived value; Dating → Friendship
+asks rather than inheriting.

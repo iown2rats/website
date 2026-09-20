@@ -9,9 +9,13 @@ import { getDb, type Db } from "@/lib/db";
 import { ValidationError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { getEntitlements } from "@/server/entitlements";
+import { datingInterestedIn, resolvePreferences, type ConnectionIntent } from "@/server/preferences/intent-policy";
 
 export const filtersSchema = z
   .object({
+    connectionIntent: z.enum(["DATING", "FRIENDSHIP"]),
+    // Friendship's answer. Ignored on Dating, where the preference is derived from gender and a submitted value
+    // is not trusted — that is the whole point of deriving it.
     interestedIn: z.enum(["WOMEN", "MEN", "EVERYONE"]),
     ageMin: z.number().int().min(DISCOVERY.filterAgeMin).max(DISCOVERY.filterAgeMax),
     ageMax: z.number().int().min(DISCOVERY.filterAgeMin).max(DISCOVERY.filterAgeMax),
@@ -29,7 +33,14 @@ export const filtersSchema = z
 export type FiltersInput = z.infer<typeof filtersSchema>;
 
 export interface DiscoveryFiltersDto {
+  connectionIntent: ConnectionIntent;
+  /** The preference in force. Read-only in the UI on Dating, because it is derived rather than chosen. */
   interestedIn: "WOMEN" | "MEN" | "EVERYONE";
+  /** Whether "Show me" is the member's to change here. False on Dating. */
+  interestedInEditable: boolean;
+  /** What "Show me" becomes if they switch to Dating; null when their gender cannot date. Lets the sheet show the
+   *  consequence of the switch immediately instead of leaving a stale answer until the save returns. */
+  datingInterestedIn: "WOMEN" | "MEN" | null;
   ageMin: number;
   ageMax: number;
   locationScope: "ANYWHERE" | "GREATER_MALE" | "MY_ATOLL" | "SPECIFIC";
@@ -44,7 +55,7 @@ export interface DiscoveryFiltersDto {
   hasOwnLocation: boolean;
 }
 
-export const DEFAULT_FILTERS: Omit<DiscoveryFiltersDto, "advancedEnabled" | "hasOwnLocation" | "interestedIn"> = {
+export const DEFAULT_FILTERS: Omit<DiscoveryFiltersDto, "advancedEnabled" | "hasOwnLocation" | "interestedIn" | "interestedInEditable" | "connectionIntent" | "datingInterestedIn"> = {
   ageMin: 22,
   ageMax: 34,
   locationScope: "ANYWHERE",
@@ -58,14 +69,19 @@ export const DEFAULT_FILTERS: Omit<DiscoveryFiltersDto, "advancedEnabled" | "has
 export async function getDiscoveryFilters(actor: Actor, options: { db?: Db; now?: Date } = {}): Promise<DiscoveryFiltersDto> {
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
-  const [prefs, entitlements, profile] = await Promise.all([
+  const [prefs, entitlements, profile, user] = await Promise.all([
     db.discoveryPreferences.findUnique({ where: { userId: actor.userId } }),
     getEntitlements(db, actor.userId, now),
     db.profile.findUnique({ where: { userId: actor.userId }, select: { locationId: true } }),
+    db.user.findUnique({ where: { id: actor.userId }, select: { gender: true } }),
   ]);
   const advancedEnabled = entitlements.rules.canUseAdvancedFilters;
+  const connectionIntent = prefs?.connectionIntent ?? "DATING";
   return {
+    connectionIntent,
     interestedIn: prefs?.interestedIn ?? "EVERYONE",
+    interestedInEditable: connectionIntent === "FRIENDSHIP",
+    datingInterestedIn: datingInterestedIn(user?.gender ?? null),
     ageMin: prefs?.ageMin ?? DEFAULT_FILTERS.ageMin,
     ageMax: prefs?.ageMax ?? DEFAULT_FILTERS.ageMax,
     locationScope: prefs?.locationScope ?? "ANYWHERE",
@@ -90,14 +106,32 @@ export async function saveDiscoveryFilters(actor: Actor, input: unknown, options
     const exists = await db.location.findUnique({ where: { id: f.locationId! }, select: { id: true } });
     if (!exists) throw new ValidationError("Choose an island or atoll from the list");
   }
-  const entitlements = await getEntitlements(db, actor.userId, now);
+  const [entitlements, user, existing] = await Promise.all([
+    getEntitlements(db, actor.userId, now),
+    db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { gender: true } }),
+    db.discoveryPreferences.findUnique({ where: { userId: actor.userId }, select: { friendshipInterestedIn: true } }),
+  ]);
   const advanced = entitlements.rules.canUseAdvancedFilters;
+
+  /*
+   * The intent and its preference are settled by the policy, not by the request.
+   *
+   * On Dating the submitted "Show me" is discarded and the value derived from gender, so a crafted request cannot
+   * put a man in the men's pool. On Friendship the submitted value IS the member's answer and is recorded as such,
+   * which is what makes a later switch back to Friendship remember it instead of re-asking. Switching Dating →
+   * Friendship with nothing remembered takes the value in front of them, because the sheet did ask.
+   */
+  const resolved = resolvePreferences({
+    gender: user.gender,
+    connectionIntent: f.connectionIntent,
+    friendshipInterestedIn: f.connectionIntent === "FRIENDSHIP" ? f.interestedIn : (existing?.friendshipInterestedIn ?? null),
+  });
 
   await db.discoveryPreferences.upsert({
     where: { userId: actor.userId },
     create: {
       userId: actor.userId,
-      interestedIn: f.interestedIn,
+      ...resolved,
       ageMin: f.ageMin,
       ageMax: f.ageMax,
       locationScope: f.locationScope,
@@ -108,7 +142,7 @@ export async function saveDiscoveryFilters(actor: Actor, input: unknown, options
       education: advanced ? (f.education || null) : null,
     },
     update: {
-      interestedIn: f.interestedIn,
+      ...resolved,
       ageMin: f.ageMin,
       ageMax: f.ageMax,
       locationScope: f.locationScope,

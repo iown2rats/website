@@ -163,7 +163,7 @@ describe("filters", () => {
     await db.profile.update({ where: { userId: tall.userId }, data: { heightCm: 180, education: "Villa College" } });
     await db.profile.update({ where: { userId: short.userId }, data: { heightCm: 155, education: "MNU" } });
 
-    const saved = await saveDiscoveryFilters(me, { interestedIn: "WOMEN", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", intent: null, heightMinCm: 175, education: "Villa" }, { db, now: T0 });
+    const saved = await saveDiscoveryFilters(me, { connectionIntent: "DATING", interestedIn: "WOMEN", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", intent: null, heightMinCm: 175, education: "Villa" }, { db, now: T0 });
     expect(saved).toMatchObject({ interestedIn: "WOMEN", ageMin: 22, ageMax: 34, heightMinCm: null, education: null, advancedEnabled: false });
     const row = await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } });
     expect(row.heightMinCm).toBeNull();
@@ -174,7 +174,7 @@ describe("filters", () => {
     expect((await getDeckCandidateIds(db, me, { now: T0 })).sort()).toEqual([tall.userId, short.userId].sort());
 
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
-    const plus = await saveDiscoveryFilters(me, { interestedIn: "WOMEN", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", heightMinCm: 175, education: "Villa" }, { db, now: T0 });
+    const plus = await saveDiscoveryFilters(me, { connectionIntent: "DATING", interestedIn: "WOMEN", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", heightMinCm: 175, education: "Villa" }, { db, now: T0 });
     expect(plus).toMatchObject({ heightMinCm: 175, education: "Villa", advancedEnabled: true });
     expect(await getDeckCandidateIds(db, me, { now: T0 })).toEqual([tall.userId]);
     expect(await getDiscoveryFilters(me, { db, now: T0 })).toMatchObject({ heightMinCm: 175 });
@@ -182,7 +182,7 @@ describe("filters", () => {
 
   it("validates ranges, location and markup", async () => {
     const me = await createUser(db, { now: T0 });
-    const base = { interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE" };
+    const base = { connectionIntent: "DATING", interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE" };
     await expect(saveDiscoveryFilters(me, { ...base, ageMin: 40 }, { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);
     await expect(saveDiscoveryFilters(me, { ...base, ageMin: 17 }, { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);
     await expect(saveDiscoveryFilters(me, { ...base, locationScope: "SPECIFIC" }, { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);

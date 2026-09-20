@@ -9,8 +9,7 @@ import { InvalidStateError, ValidationError } from "@/lib/errors";
 import { getStorageProvider } from "@/lib/storage";
 import { aboutEditSchema, infoSchema } from "@/lib/validation/profile";
 import type { Actor } from "@/server/actor";
-import { getOnboardingData } from "@/server/onboarding/onboarding";
-import { saveAbout, saveIntent } from "@/server/onboarding/onboarding";
+import { getOnboardingData, reconcilePreferencesForGender, saveAbout, saveIntent } from "@/server/onboarding/onboarding";
 import { listPhotos, type PhotoDto } from "@/server/photos/photos";
 import type { CompletionResult } from "./completion";
 
@@ -93,6 +92,9 @@ export async function updateInfo(actor: Actor, input: unknown, deps: { db?: Db }
       data: { locationId: info.locationId, homeLocationId: info.homeLocationId, occupation: info.occupation || null, education: info.education || null, heightCm: info.heightCm },
     }),
   ]);
+  // A Dating member's "Show me" is derived from their gender, so correcting the gender has to move it with them;
+  // a Friendship member's own answer is deliberately left alone. Both decisions live in the policy, not here.
+  await reconcilePreferencesForGender(db, actor.userId, info.gender);
 }
 
 /** Edit profile → About / Interests / Prompts and relationship intention, through the onboarding save functions. */

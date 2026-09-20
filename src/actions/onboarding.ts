@@ -1,13 +1,16 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getDb } from "@/lib/db";
 import { isDomainError } from "@/lib/errors";
+import type { Actor } from "@/server/actor";
 import { requireMember } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
 import {
   completeOnboarding,
   confirmPhotos,
   saveAbout,
+  saveConnectionIntent,
   saveDateOfBirth,
   saveGender,
   saveIntent,
@@ -31,8 +34,17 @@ function friendly(e: unknown): StageFormState {
   return { error: "Something went wrong. Please try again." };
 }
 
-function goNext(stage: OnboardingStageKey): never {
-  redirect(`${ROUTES.onboarding}/${slugForStage(nextStage(stage))}`);
+/**
+ * Where to go after `stage`. The next stage depends on the connection intent, because Dating and Friendship each
+ * skip the other's question, so it is read fresh rather than assumed — the CONNECTION step is precisely where it
+ * has just changed.
+ */
+async function goNext(actor: Actor, stage: OnboardingStageKey): Promise<never> {
+  const prefs = await getDb().discoveryPreferences.findUnique({
+    where: { userId: actor.userId },
+    select: { connectionIntent: true },
+  });
+  redirect(`${ROUTES.onboarding}/${slugForStage(nextStage(stage, prefs?.connectionIntent ?? null))}`);
 }
 
 export async function submitName(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -42,7 +54,7 @@ export async function submitName(_prev: StageFormState, formData: FormData): Pro
   } catch (e) {
     return friendly(e);
   }
-  goNext("NAME");
+  return goNext(actor, "NAME");
 }
 
 export async function submitDob(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -52,7 +64,7 @@ export async function submitDob(_prev: StageFormState, formData: FormData): Prom
   } catch (e) {
     return friendly(e);
   }
-  goNext("DOB");
+  return goNext(actor, "DOB");
 }
 
 export async function submitGender(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -62,7 +74,17 @@ export async function submitGender(_prev: StageFormState, formData: FormData): P
   } catch (e) {
     return friendly(e);
   }
-  goNext("GENDER");
+  return goNext(actor, "GENDER");
+}
+
+export async function submitConnectionIntent(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
+  const actor = await requireMember();
+  try {
+    await saveConnectionIntent(actor, { connectionIntent: formData.get("connectionIntent") });
+  } catch (e) {
+    return friendly(e);
+  }
+  return goNext(actor, "CONNECTION");
 }
 
 export async function submitMeet(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -72,7 +94,7 @@ export async function submitMeet(_prev: StageFormState, formData: FormData): Pro
   } catch (e) {
     return friendly(e);
   }
-  goNext("MEET");
+  return goNext(actor, "MEET");
 }
 
 export async function submitIntent(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -82,7 +104,7 @@ export async function submitIntent(_prev: StageFormState, formData: FormData): P
   } catch (e) {
     return friendly(e);
   }
-  goNext("INTENT");
+  return goNext(actor, "INTENT");
 }
 
 export async function submitLocation(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -92,7 +114,7 @@ export async function submitLocation(_prev: StageFormState, formData: FormData):
   } catch (e) {
     return friendly(e);
   }
-  goNext("LOCATION");
+  return goNext(actor, "LOCATION");
 }
 
 export async function submitPhotos(): Promise<StageFormState> {
@@ -102,7 +124,7 @@ export async function submitPhotos(): Promise<StageFormState> {
   } catch (e) {
     return friendly(e);
   }
-  goNext("PHOTOS");
+  return goNext(actor, "PHOTOS");
 }
 
 export async function submitAbout(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -118,7 +140,7 @@ export async function submitAbout(_prev: StageFormState, formData: FormData): Pr
   } catch (e) {
     return friendly(e);
   }
-  goNext("ABOUT");
+  return goNext(actor, "ABOUT");
 }
 
 export async function submitPrivacy(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
@@ -132,7 +154,7 @@ export async function submitPrivacy(_prev: StageFormState, formData: FormData): 
   } catch (e) {
     return friendly(e);
   }
-  goNext("PRIVACY");
+  return goNext(actor, "PRIVACY");
 }
 
 export async function submitComplete(): Promise<StageFormState> {

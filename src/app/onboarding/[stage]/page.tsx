@@ -8,16 +8,16 @@ import { NameForm } from "@/components/features/onboarding/name-form";
 import { PhotosForm } from "@/components/features/onboarding/photos-form";
 import { PrivacyForm } from "@/components/features/onboarding/privacy-form";
 import { StepFrame } from "@/components/features/onboarding/step-frame";
-import { submitGender, submitIntent, submitMeet } from "@/actions/onboarding";
+import { submitConnectionIntent, submitGender, submitIntent, submitMeet } from "@/actions/onboarding";
 import { getDb } from "@/lib/db";
 import { pendingPhotosAwaitReview } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { requireOnboardingUser } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
 import { getOnboardingData } from "@/server/onboarding/onboarding";
-import { DONE_META, STAGE_META, hasReached, previousStage, resumeSlug, slugForStage, stageFromSlug, type StageOrComplete } from "@/server/onboarding/stages";
+import { DONE_META, STAGE_META, hasReached, isOnPath, previousStage, resumeSlug, slugForStage, stageFromSlug, stepNumber, type StageOrComplete } from "@/server/onboarding/stages";
 import { listPhotos } from "@/server/photos/photos";
-import { GENDER_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
+import { CONNECTION_INTENT_LABELS, GENDER_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
 
 export default async function OnboardingStagePage({ params }: { params: Promise<{ stage: string }> }) {
   const { stage: slug } = await params;
@@ -32,6 +32,9 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
   // The done screen opens once the privacy stage has been reached; it re-validates everything on submit.
   const gate = stage === "DONE" ? "PRIVACY" : stage;
   if (!hasReached(pointer, gate)) redirect(`${ROUTES.onboarding}/${resumeSlug(pointer)}`);
+  // The other path's question is not theirs to answer: Dating has no "who would you like to meet", and Friendship
+  // is not asked how serious it is. Opening one by URL resumes where they actually are.
+  if (stage !== "DONE" && !isOnPath(stage, data.connectionIntent)) redirect(`${ROUTES.onboarding}/${resumeSlug(pointer)}`);
 
   if (stage === "DONE") {
     return (
@@ -42,9 +45,9 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
   }
 
   const meta = STAGE_META[stage];
-  const prev = previousStage(stage);
+  const prev = previousStage(stage, data.connectionIntent);
   const backHref = prev ? `${ROUTES.onboarding}/${slugForStage(prev)}` : null;
-  const frame = { step: meta.step, title: typeof meta.title === "function" ? meta.title(data.name ?? "") : meta.title, subtitle: meta.subtitle || undefined, backHref };
+  const frame = { step: stepNumber(stage, data.connectionIntent), title: typeof meta.title === "function" ? meta.title(data.name ?? "") : meta.title, subtitle: meta.subtitle || undefined, backHref };
 
   switch (stage) {
     case "NAME":
@@ -57,10 +60,17 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
           <ChoiceForm name="gender" label="Gender" action={submitGender} initial={data.gender} options={Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }))} />
         </StepFrame>
       );
-    case "MEET":
+    case "CONNECTION":
       return (
         <StepFrame {...frame}>
-          <ChoiceForm name="interestedIn" label="Who would you like to meet" action={submitMeet} initial={data.interestedIn} options={Object.entries(INTERESTED_IN_LABELS).map(([value, label]) => ({ value, label }))} />
+          <ChoiceForm name="connectionIntent" label="What brings you here" action={submitConnectionIntent} initial={data.connectionIntent} options={Object.entries(CONNECTION_INTENT_LABELS).map(([value, label]) => ({ value, label }))} />
+        </StepFrame>
+      );
+    case "MEET":
+      // Friendship only. The prefill is the member's own remembered answer, never the value Dating derived for them.
+      return (
+        <StepFrame {...frame}>
+          <ChoiceForm name="interestedIn" label="Who would you like to meet" action={submitMeet} initial={data.friendshipInterestedIn} options={Object.entries(INTERESTED_IN_LABELS).map(([value, label]) => ({ value, label }))} />
         </StepFrame>
       );
     case "INTENT":

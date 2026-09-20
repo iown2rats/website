@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { saveFilters } from "@/actions/discovery";
-import { INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
+import { CONNECTION_INTENT_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "@/components/features/discovery/filters-sheet";
 import { PlusTag } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ export function DiscoveryClient({ initial, locations }: { initial: DiscoveryFilt
     <PageOverlay title="Discovery preferences" backHref="/settings">
       <p className="text-body-sm text-text-secondary">Who you see in Discover. These are the same preferences as the Filters button on Discover.</p>
       <ListGroup>
+        <ListRow asDiv label="I’m here for" meta={CONNECTION_INTENT_LABELS[filters.connectionIntent]} />
         <ListRow asDiv label="Show me" meta={INTERESTED_IN_LABELS[filters.interestedIn]} />
         <ListRow asDiv label="Age range" meta={`${filters.ageMin}–${filters.ageMax}`} />
         <ListRow asDiv label="Location" meta={locationName} />

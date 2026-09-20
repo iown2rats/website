@@ -27,6 +27,13 @@ enum InterestedIn {
   EVERYONE
 }
 
+/// Dating or Friendship: what a member is here for. NOT `RelationshipIntent`, which is the romantic
+/// "how serious?" detail asked only of people who came here to date (src/server/preferences/intent-policy.ts).
+enum ConnectionIntent {
+  DATING
+  FRIENDSHIP
+}
+
 enum RelationshipIntent {
   SERIOUS_RELATIONSHIP
   DATING
@@ -76,6 +83,7 @@ enum OnboardingStage {
   NAME
   DOB
   GENDER
+  CONNECTION
   MEET
   INTENT
   LOCATION
@@ -306,10 +314,10 @@ model User {
   contactHashes         ContactHash[]
   auditLogs             AuditLog[]
 
-  staffGrant            StaffGrant?               @relation("StaffGrantHolder")
-  staffGrantsCreated    StaffGrant[]              @relation("StaffGrantCreator")
-  staffGrantsRevoked    StaffGrant[]              @relation("StaffGrantRevoker")
-  staffInvitesCreated   StaffInvite[]             @relation("StaffInviteCreator")
+  staffGrant          StaffGrant?   @relation("StaffGrantHolder")
+  staffGrantsCreated  StaffGrant[]  @relation("StaffGrantCreator")
+  staffGrantsRevoked  StaffGrant[]  @relation("StaffGrantRevoker")
+  staffInvitesCreated StaffInvite[] @relation("StaffInviteCreator")
 
   @@index([status, onboardingCompletedAt])
   @@index([lastActiveAt])
@@ -507,18 +515,26 @@ model PrivacySettings {
 }
 
 model DiscoveryPreferences {
-  userId        String              @id
-  interestedIn  InterestedIn        @default(EVERYONE)
-  ageMin        Int                 @default(22)
-  ageMax        Int                 @default(34)
-  locationScope LocationScope       @default(ANYWHERE)
-  locationId    String?
-  intent        RelationshipIntent?
+  userId                 String              @id
+  /// What this member is here for. Dating is opposite-gender only; Friendship is open.
+  connectionIntent       ConnectionIntent    @default(DATING)
+  /// The gender preference discovery matches on, for whichever intent is active. DERIVED for Dating (a man is
+  /// shown women, a woman men) and CHOSEN for Friendship. Only `resolvePreferences` writes it, so it cannot
+  /// drift from the rule; it stays a column because the predicate matches it reciprocally in SQL.
+  interestedIn           InterestedIn        @default(EVERYONE)
+  /// The member's own Friendship answer, kept while they are on Dating so switching back does not re-ask, and so
+  /// the derived Dating value is never mistaken for a choice they made.
+  friendshipInterestedIn InterestedIn?
+  ageMin                 Int                 @default(22)
+  ageMax                 Int                 @default(34)
+  locationScope          LocationScope       @default(ANYWHERE)
+  locationId             String?
+  intent                 RelationshipIntent?
   // Advanced (Plus) filters — ignored by the query unless the viewer holds the entitlement.
-  heightMinCm   Int?
-  heightMaxCm   Int?
-  education     String?
-  updatedAt     DateTime            @updatedAt
+  heightMinCm            Int?
+  heightMaxCm            Int?
+  education              String?
+  updatedAt              DateTime            @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)

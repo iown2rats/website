@@ -12,7 +12,9 @@ const MISSING_LINKS: Record<string, { label: string; slug: string }> = {
   name: { label: "your name", slug: STAGE_META.NAME.slug },
   dob: { label: "your birthday", slug: STAGE_META.DOB.slug },
   gender: { label: "how you identify", slug: STAGE_META.GENDER.slug },
-  interestedIn: { label: "who you'd like to meet", slug: STAGE_META.MEET.slug },
+  // Dating answers this on the connection step and never opens MEET, so the fix-up link points at the question
+  // that actually settles it for them.
+  interestedIn: { label: "who you'd like to meet", slug: STAGE_META.CONNECTION.slug },
   intent: { label: "what you're looking for", slug: STAGE_META.INTENT.slug },
   location: { label: "where you're based", slug: STAGE_META.LOCATION.slug },
   photos: { label: "at least 2 photos", slug: STAGE_META.PHOTOS.slug },

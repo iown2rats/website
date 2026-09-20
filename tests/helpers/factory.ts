@@ -11,6 +11,9 @@ let seq = 0;
 export interface UserOptions {
   gender?: "WOMAN" | "MAN" | "UNSPECIFIED";
   interestedIn?: "WOMEN" | "MEN" | "EVERYONE";
+  /** Dating (the default, matching the column) or Friendship. Separate pools in discovery. */
+  connectionIntent?: "DATING" | "FRIENDSHIP";
+  friendshipInterestedIn?: "WOMEN" | "MEN" | "EVERYONE" | null;
   age?: number;
   ageMin?: number;
   ageMax?: number;
@@ -77,7 +80,15 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
         },
       },
       privacy: { create: { invisibleMode: o.invisibleMode ?? false, visibility: o.visibility ?? "EVERYONE", hideLocation: o.hideLocation ?? false, hideAge: o.hideAge ?? false } },
-      discoveryPreferences: { create: { interestedIn: o.interestedIn ?? "EVERYONE", ageMin: o.ageMin ?? 18, ageMax: o.ageMax ?? 99 } },
+      discoveryPreferences: {
+        create: {
+          interestedIn: o.interestedIn ?? "EVERYONE",
+          connectionIntent: o.connectionIntent ?? "DATING",
+          friendshipInterestedIn: o.friendshipInterestedIn ?? (o.connectionIntent === "FRIENDSHIP" ? (o.interestedIn ?? "EVERYONE") : null),
+          ageMin: o.ageMin ?? 18,
+          ageMax: o.ageMax ?? 99,
+        },
+      },
       notificationSettings: { create: {} },
       verification: { create: { status: o.verified ? "VERIFIED" : "NONE" } },
     },

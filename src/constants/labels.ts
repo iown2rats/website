@@ -16,6 +16,9 @@ export function intentLower(intent: IntentKey | string | null | undefined): stri
   return label.toLowerCase();
 }
 
+/** Dating or Friendship. The subtitles are what make the two feel like different products, not a filter. */
+export const CONNECTION_INTENT_LABELS = { DATING: "Dating", FRIENDSHIP: "Friendship" } as const;
+
 export const GENDER_LABELS = { WOMAN: "Woman", MAN: "Man", UNSPECIFIED: "Prefer not to say" } as const;
 export const INTERESTED_IN_LABELS = { WOMEN: "Women", MEN: "Men", EVERYONE: "Everyone" } as const;
 

@@ -27,6 +27,8 @@ export interface ViewerContext {
   /** Viewer's own age, used for the candidate's age preference (mutual compatibility). */
   age: number | null;
   interestedIn: "WOMEN" | "MEN" | "EVERYONE";
+  /** Dating and Friendship are separate pools; see `intentCompatibilitySql`. */
+  connectionIntent: "DATING" | "FRIENDSHIP";
   ageMin: number;
   ageMax: number;
   intent: string | null;
@@ -145,14 +147,37 @@ export function discoverableSql(): Prisma.Sql {
 }
 
 /**
+ * Dating and Friendship are separate pools (docs/ARCHITECTURE.md §7.5). Somebody here to date is never shown
+ * somebody here for friends, in either direction.
+ *
+ * One equality does both directions at once, because the clause compares each side's own intent rather than a
+ * preference about the other's: if the viewer is DATING, only DATING candidates pass, and a DATING candidate
+ * running the same query sees only DATING viewers. There is nothing to keep in step.
+ *
+ * It sits in `compatibilitySql` rather than `viewerFilterSql` deliberately. The viewer's filters are preferences
+ * they may relax; this is not a preference. A Plus member cannot widen their way into the other pool, and a future
+ * "show me everyone" filter cannot accidentally reach across it.
+ */
+export function intentCompatibilitySql(v: ViewerContext): Prisma.Sql {
+  return Prisma.sql`cp."connectionIntent" = ${v.connectionIntent}::"ConnectionIntent"`;
+}
+
+/**
  * Mutual compatibility, independent of the viewer's optional filters (docs/ARCHITECTURE.md §7.1):
+ *  - the viewer and the candidate must be here for the same thing (Dating or Friendship);
  *  - the viewer's "Show me" must include the candidate's gender, AND the candidate's "Show me" must include the
  *    viewer's gender ("Prefer not to say" is only shown to people who chose Everyone, in both directions);
  *  - the candidate must have a date of birth, and the viewer's age must fall inside the candidate's age range.
+ *
+ * The gender clauses are unchanged and need no branch for Friendship: `interestedIn` always holds the preference
+ * for whichever intent is active, and the clause above has already guaranteed both sides are on the same one. So
+ * "Friendship → Everyone" works through exactly the same reciprocal rule that dating uses, and a man looking for
+ * male friends is matched against men whose own Friendship answer includes men.
  */
 export function compatibilitySql(v: ViewerContext): Prisma.Sql {
   const viewerGender = v.gender ?? "UNSPECIFIED";
   const parts: Prisma.Sql[] = [
+    intentCompatibilitySql(v),
     Prisma.sql`(
       ${v.interestedIn} = 'EVERYONE'
       OR (u.gender = 'WOMAN' AND ${v.interestedIn} = 'WOMEN')

@@ -162,8 +162,9 @@ describe("profile photos", () => {
 
 describe("discovery settings", () => {
   it("persists basic preferences for Free users and discards premium fields they submit", async () => {
-    const me = await createUser(db, { now: T0 });
-    const saved = await saveDiscoveryFilters(me, { interestedIn: "WOMEN", ageMin: 24, ageMax: 31, locationScope: "GREATER_MALE", intent: "DATING", heightMinCm: 170, heightMaxCm: 190, education: "Villa" }, { db, now: T0 });
+    // A man on Dating: "Show me" resolves to WOMEN from his gender, not from the submitted value.
+    const me = await createUser(db, { now: T0, gender: "MAN" });
+    const saved = await saveDiscoveryFilters(me, { connectionIntent: "DATING", interestedIn: "WOMEN", ageMin: 24, ageMax: 31, locationScope: "GREATER_MALE", intent: "DATING", heightMinCm: 170, heightMaxCm: 190, education: "Villa" }, { db, now: T0 });
     expect(saved).toMatchObject({ interestedIn: "WOMEN", ageMin: 24, ageMax: 31, locationScope: "GREATER_MALE", intent: "DATING", advancedEnabled: false });
     const row = await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } });
     expect(row.heightMinCm).toBeNull();
@@ -174,7 +175,7 @@ describe("discovery settings", () => {
   it("stores advanced filters for Plus users", async () => {
     const me = await createUser(db, { now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
-    const saved = await saveDiscoveryFilters(me, { interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", heightMinCm: 165, heightMaxCm: 185, education: "MNU" }, { db, now: T0 });
+    const saved = await saveDiscoveryFilters(me, { connectionIntent: "DATING", interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", heightMinCm: 165, heightMaxCm: 185, education: "MNU" }, { db, now: T0 });
     expect(saved).toMatchObject({ heightMinCm: 165, heightMaxCm: 185, education: "MNU", advancedEnabled: true });
   });
 });

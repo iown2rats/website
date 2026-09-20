@@ -42,7 +42,7 @@ describe("Plus-only capabilities are server-enforced", () => {
 
   it("9 · paid filter parameters sent by a Free client are discarded on save and ignored on read; Plus keeps them", async () => {
     const free = await createUser(db, { now: T0 });
-    const input = { interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: 170, heightMaxCm: 190, education: "MNU" };
+    const input = { connectionIntent: "DATING", interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: 170, heightMaxCm: 190, education: "MNU" };
     const saved = await saveDiscoveryFilters(free, input, { db, now: T0 });
     expect(saved).toMatchObject({ advancedEnabled: false, heightMinCm: null, heightMaxCm: null, education: null });
     const row = await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: free.userId } });

@@ -27,6 +27,9 @@ export async function loadViewerContext(db: DbLike, userId: string, now: Date): 
     gender: user.gender,
     age: user.dateOfBirth ? ageFromDateOfBirth(user.dateOfBirth, now) : null,
     interestedIn: prefs?.interestedIn ?? "EVERYONE",
+    // Matches the column default: a viewer with no preferences row yet is treated as here to date, never as
+    // belonging to both pools.
+    connectionIntent: prefs?.connectionIntent ?? "DATING",
     ageMin: prefs?.ageMin ?? 18,
     ageMax: prefs?.ageMax ?? 99,
     intent: prefs?.intent ?? null,

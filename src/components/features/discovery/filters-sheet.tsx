@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { INTENT_LABELS } from "@/constants/labels";
+import { CONNECTION_INTENT_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
 import { DISCOVERY } from "@/config/product";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input, Select } from "@/components/ui/field";
 import { LockIcon } from "@/components/ui/icons";
 import { PlusTag } from "@/components/ui/badge";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
+import type { ConnectionIntent } from "@/server/preferences/intent-policy";
 
 /*
  * Prototype "FILTERS SHEET": 22/800 title with a "Reset" text button; Age range with two sliders and "22–34";
@@ -42,7 +43,7 @@ const INTENTS = Object.entries(INTENT_LABELS) as [keyof typeof INTENT_LABELS, st
 const HEIGHTS = Array.from({ length: (210 - 140) / 5 + 1 }, (_, i) => 140 + i * 5);
 
 function toDraft(f: DiscoveryFiltersDto): FiltersDraft {
-  return { interestedIn: f.interestedIn, ageMin: f.ageMin, ageMax: f.ageMax, locationScope: f.locationScope, locationId: f.locationId, intent: f.intent, heightMinCm: f.heightMinCm, heightMaxCm: f.heightMaxCm, education: f.education };
+  return { connectionIntent: f.connectionIntent, interestedInEditable: f.interestedInEditable, datingInterestedIn: f.datingInterestedIn, interestedIn: f.interestedIn, ageMin: f.ageMin, ageMax: f.ageMax, locationScope: f.locationScope, locationId: f.locationId, intent: f.intent, heightMinCm: f.heightMinCm, heightMaxCm: f.heightMaxCm, education: f.education };
 }
 
 export function FiltersSheet({ open, onClose, filters, locations, saving, error, onApply, onLockedAdvanced }: FiltersSheetProps) {
@@ -62,7 +63,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
 
   const set = <K extends keyof FiltersDraft>(key: K, value: FiltersDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
   const reset = () => {
-    setDraft({ interestedIn: draft.interestedIn, ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: null, heightMaxCm: null, education: null });
+    setDraft({ connectionIntent: draft.connectionIntent, interestedInEditable: draft.interestedInEditable, datingInterestedIn: draft.datingInterestedIn, interestedIn: draft.interestedIn, ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: null, heightMaxCm: null, education: null });
     setShowPicker(false);
   };
   const segment = (on: boolean) => cn("h-11 flex-1 rounded-md text-body-sm font-medium text-text", on ? "bg-primary text-on-primary" : "bg-surface-muted");
@@ -105,12 +106,40 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         </section>
 
         <section className="flex flex-col gap-2.5">
-          <div className="text-body font-medium">Show me</div>
-          <div className="flex gap-2" role="radiogroup" aria-label="Show me">
-            {([["WOMEN", "Women"], ["MEN", "Men"], ["EVERYONE", "Everyone"]] as const).map(([v, label]) => (
-              <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => set("interestedIn", v)} className={segment(draft.interestedIn === v)}>{label}</button>
+          <div className="text-body font-medium">I&apos;m here for</div>
+          <div className="flex gap-2" role="radiogroup" aria-label="I'm here for">
+            {(Object.entries(CONNECTION_INTENT_LABELS) as [ConnectionIntent, string][]).map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={draft.connectionIntent === v}
+                /* Switching to Dating settles "Show me" as well, so the sheet shows the answer immediately rather
+                   than leaving a stale choice on screen until the save comes back. Friendship restores their own. */
+                onClick={() => setDraft((d) => ({
+                  ...d,
+                  connectionIntent: v,
+                  interestedInEditable: v === "FRIENDSHIP",
+                  interestedIn: v === "DATING" ? (d.datingInterestedIn ?? d.interestedIn) : (filters.connectionIntent === "FRIENDSHIP" ? filters.interestedIn : d.interestedIn),
+                }))}
+                className={segment(draft.connectionIntent === v)}
+              >{label}</button>
             ))}
           </div>
+        </section>
+
+        <section className="flex flex-col gap-2.5">
+          <div className="text-body font-medium">Show me</div>
+          {draft.interestedInEditable ? (
+            <div className="flex gap-2" role="radiogroup" aria-label="Show me">
+              {([["WOMEN", "Women"], ["MEN", "Men"], ["EVERYONE", "Everyone"]] as const).map(([v, label]) => (
+                <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => set("interestedIn", v)} className={segment(draft.interestedIn === v)}>{label}</button>
+              ))}
+            </div>
+          ) : (
+            /* Dating has one answer, so this states it instead of offering a choice that cannot be made. */
+            <p className="text-body-sm text-text-secondary">{INTERESTED_IN_LABELS[draft.interestedIn]} — Dating on Mellocrush is opposite gender only.</p>
+          )}
         </section>
       </div>
 

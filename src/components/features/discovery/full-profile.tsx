@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { intentLower, INTENT_LABELS } from "@/constants/labels";
 import { cn } from "@/lib/cn";
 import { photoBackground } from "@/lib/photos";
+import { LockedPhoto } from "@/components/ui/locked-photo";
 import { ChevronLeftIcon, CloseIcon, HeartIcon, VerifiedBadge } from "@/components/ui/icons";
 import type { DeckCard } from "./types";
 
@@ -22,10 +23,14 @@ export interface FullProfileProps {
   /** When provided the floating Pass/Like controls are shown (the card is the current deck head). */
   onPass?: () => void;
   onLike?: () => void;
+  /** Opens the existing Plus sheet. Tapping any locked photo leads here (docs/ARCHITECTURE.md §12.18). */
+  onUnlockPhotos?: () => void;
 }
 
-function Photo({ photo, alt, className, priority = false }: { photo: DeckCard["photos"][number] | undefined; alt: string; className?: string; priority?: boolean }) {
+function Photo({ photo, alt, className, priority = false, onUnlock }: { photo: DeckCard["photos"][number] | undefined; alt: string; className?: string; priority?: boolean; onUnlock?: () => void }) {
   if (!photo) return null;
+  // A locked photo has no url to render — the server never sent one — so this is the whole of it.
+  if (photo.locked) return <LockedPhoto blurhash={photo.blurhash ?? null} onUnlock={onUnlock} className={className} />;
   return (
     <div className={cn("relative overflow-hidden bg-aqua-soft", className)} style={photoBackground(photo)}>
       {photo.url ? <Image src={photo.url} alt={alt} fill unoptimized sizes="(min-width: 900px) 640px, 100vw" className="object-cover" priority={priority} loading={priority ? undefined : "lazy"} /> : null}
@@ -33,7 +38,7 @@ function Photo({ photo, alt, className, priority = false }: { photo: DeckCard["p
   );
 }
 
-export function FullProfile({ profile, onClose, onPass, onLike }: FullProfileProps) {
+export function FullProfile({ profile, onClose, onPass, onLike, onUnlockPhotos }: FullProfileProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -101,7 +106,7 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
                 <div className="text-prompt leading-[1.35] tracking-[-.015em] text-pretty">{firstPrompt.answer}</div>
               </div>
             ) : null}
-            <Photo photo={profile.photos[1]} alt={profile.photos[1]?.alt ?? ""} className="h-80 rounded-[22px]" />
+            <Photo photo={profile.photos[1]} alt={profile.photos[1]?.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} />
             {rows.length > 0 ? (
               <dl className="m-0 overflow-hidden rounded-3xl glass-card [&>div+div]:border-t [&>div+div]:border-border">
                 {rows.map(([k, v]) => (
@@ -128,8 +133,8 @@ export function FullProfile({ profile, onClose, onPass, onLike }: FullProfilePro
                 <div className="text-prompt leading-[1.35] tracking-[-.015em]">{secondPrompt.answer}</div>
               </div>
             ) : null}
-            <Photo photo={profile.photos[2]} alt={profile.photos[2]?.alt ?? ""} className="h-80 rounded-[22px]" />
-            {profile.photos.slice(3).map((p, i) => <Photo key={i} photo={p} alt={p.alt ?? ""} className="h-80 rounded-[22px]" />)}
+            <Photo photo={profile.photos[2]} alt={profile.photos[2]?.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} />
+            {profile.photos.slice(3).map((p, i) => <Photo key={i} photo={p} alt={p.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} />)}
           </div>
         </div>
 

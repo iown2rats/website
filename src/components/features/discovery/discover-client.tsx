@@ -273,6 +273,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
           onClose={() => setOpenProfile(null)}
           onPass={cards[0]?.handle === openProfile.handle ? () => void onPass(openProfile) : undefined}
           onLike={cards[0]?.handle === openProfile.handle ? () => void onLike(openProfile) : undefined}
+          onUnlockPhotos={() => setLock({ feature: "See all their photos", description: "Everyone shows one photo to everyone. Mellocrush Plus opens the rest before you match — and matching opens them anyway, for both of you." })}
         />
       ) : null}
 

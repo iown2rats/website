@@ -13,6 +13,12 @@ export interface PhotoRef {
   key?: string | null;
   blurhash?: string | null;
   alt?: string;
+  /**
+   * Protected photo this viewer has not unlocked (docs/ARCHITECTURE.md §12.18). When true there is no `url` and
+   * no `key`, because the server withheld the storage key rather than blanking a URL it had already made. The
+   * blurhash is the entire representation, so a component must render the lock rather than an empty tile.
+   */
+  locked?: boolean;
 }
 
 const DEMO_HUE = /hue-(\d{1,3})/;
@@ -29,6 +35,8 @@ export function demoHue(key: string | null | undefined): number | null {
 
 /** Background style for a photo surface: real image when a URL exists, demo gradient otherwise. */
 export function photoBackground(photo: PhotoRef | null, direction = 160, variant: "full" | "thumb" = "full"): CSSProperties {
+  // A locked photo must never fall through to a demo gradient or a stale URL; its surface is drawn by LockedPhoto.
+  if (photo?.locked) return {};
   const url = variant === "thumb" ? (photo?.thumbUrl ?? photo?.url) : photo?.url;
   if (url) {
     return { backgroundImage: `url(${url})`, backgroundSize: "cover", backgroundPosition: "center" };

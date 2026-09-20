@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { intentLower } from "@/constants/labels";
 import { isDemoPhoto, photoBackground } from "@/lib/photos";
+import { LockedPhoto } from "@/components/ui/locked-photo";
 import { PinIcon, VerifiedBadge } from "@/components/ui/icons";
 import type { CardProfile } from "./types";
 
@@ -48,7 +49,11 @@ export function ProfileCard({
       className={cn(fill ? "absolute inset-0" : "relative", "overflow-hidden bg-aqua-soft select-none", variant === "deck" ? "rounded-card shadow-lg" : "rounded-3xl", className)}
       style={{ ...photoBackground(photo, 160), ...style }}
     >
-      {photo?.url ? (
+      {photo?.locked ? (
+        // Stepping through the strip lands on protected photos too. No url exists for them — the server withheld
+        // the key — so the blurhash and the lock ARE the photo here (docs/ARCHITECTURE.md §12.18).
+        <LockedPhoto blurhash={photo.blurhash ?? null} className="absolute inset-0" compact />
+      ) : photo?.url ? (
         // Signed, short-lived URLs from the storage layer; optimisation happens at upload time (server-produced variants).
         <Image src={photo.url} alt={photo.alt ?? ""} fill unoptimized sizes="(min-width: 900px) 500px, 100vw" className="object-cover" draggable={false} />
       ) : null}

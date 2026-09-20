@@ -160,10 +160,16 @@ export function PhotoManager({ initialPhotos, reviewedBeforeVisible = false, lay
         <button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => remove(p.id)} disabled={busy} className="absolute right-1.5 top-1.5 grid size-8 place-items-center rounded-full border-0 bg-[rgba(6,20,26,.55)] text-white">
           <CloseIcon size={14} strokeWidth={2.6} />
         </button>
-        <div className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-between gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
+        {/*
+          Reveal-on-hover is a pointer idea, and this app is used on phones. Hidden until hover meant "Make main"
+          — the control that picks your public photo, which now decides what unmatched Free members can see at all
+          — was unreachable on touch. So the controls are visible by default and only fade out where a real hover
+          pointer exists to bring them back.
+        */}
+        <div className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-between gap-1 opacity-100 focus-within:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
           <button type="button" aria-label={`Move photo ${i + 1} earlier`} onClick={() => move(i, i - 1)} disabled={i === 0 || busy} className="grid size-8 place-items-center rounded-full border-0 bg-white/90 text-ocean disabled:opacity-30"><ChevronLeftIcon size={14} /></button>
           {i > 0 ? (
-            <button type="button" onClick={() => move(i, 0)} disabled={busy} className="h-8 rounded-full border-0 bg-white/90 px-2.5 text-tag font-medium text-ocean">Make main</button>
+            <button type="button" onClick={() => move(i, 0)} disabled={busy} aria-label={`Set photo ${i + 1} as your main photo`} className="h-8 rounded-full border-0 bg-white/90 px-2.5 text-tag font-medium text-ocean">Make main</button>
           ) : null}
           <button type="button" aria-label={`Move photo ${i + 1} later`} onClick={() => move(i, i + 1)} disabled={i === photos.length - 1 || busy} className="grid size-8 place-items-center rounded-full border-0 bg-white/90 text-ocean disabled:opacity-30"><ChevronRightIcon size={14} /></button>
         </div>

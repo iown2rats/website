@@ -17,7 +17,8 @@ export type Permission =
   | "payment-methods.manage"
   | "subscriptions.view"
   | "subscriptions.adjust"
-  | "audit.view";
+  | "audit.view"
+  | "welcome-cover.manage";
 
 const ALL_PERMISSIONS: readonly Permission[] = [
   "dashboard.view",
@@ -33,6 +34,7 @@ const ALL_PERMISSIONS: readonly Permission[] = [
   "subscriptions.view",
   "subscriptions.adjust",
   "audit.view",
+  "welcome-cover.manage",
 ];
 
 export const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {

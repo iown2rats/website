@@ -4,6 +4,7 @@ import { ResetPasswordForm } from "@/components/features/auth/reset-password-for
 import { getDb } from "@/lib/db";
 import { emailAuthAvailable } from "@/server/auth/email-availability";
 import { ROUTES } from "@/server/auth/route-access";
+import { currentWelcomeCover } from "@/server/welcome/active-cover";
 
 export const metadata = { title: "Set a new password" };
 export const dynamic = "force-dynamic";
@@ -14,16 +15,17 @@ export const dynamic = "force-dynamic";
  */
 export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   if (!(await emailAuthAvailable(getDb()))) redirect(ROUTES.welcome);
+  const cover = await currentWelcomeCover();
   const { token } = await searchParams;
   if (!token) {
     return (
-      <AuthShell labelledBy="reset-title" below={<AuthBackLink>Back to sign in</AuthBackLink>}>
+      <AuthShell cover={cover} labelledBy="reset-title" below={<AuthBackLink>Back to sign in</AuthBackLink>}>
         <AuthHeading id="reset-title" compact title="That link is incomplete" subtitle="Open the link from your email again, or ask for a new one." />
       </AuthShell>
     );
   }
   return (
-    <AuthShell labelledBy="reset-title" below={<AuthBackLink>Back to sign in</AuthBackLink>}>
+    <AuthShell cover={cover} labelledBy="reset-title" below={<AuthBackLink>Back to sign in</AuthBackLink>}>
       <AuthHeading id="reset-title" compact title="Set a new password" subtitle="Choose a password you don't use anywhere else." />
       <ResetPasswordForm token={token} />
     </AuthShell>

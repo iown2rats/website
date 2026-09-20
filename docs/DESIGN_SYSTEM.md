@@ -812,3 +812,24 @@ can grant Plus; the CTA creates an order that an admin confirms.
 
 Verified at 320, 360, 390, 430 and 1280 px in both appearances: no horizontal page scroll at any width, every
 feature label on one line from 360 px up, and the gold panel legible on black and on the sand page colour.
+
+
+## 36. The Welcome Screen cover is admin-managed (2026-09-20)
+
+The sign-in screen's background is now three art-directed images an admin uploads, not one file in `public/`
+(docs/ARCHITECTURE.md §26). Everything in front of it is untouched: logo, tagline, glass card, Google, Telegram,
+email and password, Continue, Forgot password, Create account, the legal line.
+
+- **Mobile** (under 768px) 1080 × 1920 · **Tablet** (768–1279px) 1536 × 2048 · **Desktop** (1280px and up) 2560 × 1440.
+  `<picture>` runs widest-first and takes the first matching `media`, so one file is downloaded, not three.
+- `object-fit: cover` everywhere: the image fills the viewport at every size and orientation, keeps its proportions
+  and is cropped rather than stretched. Intrinsic width/height on each candidate reserves the box, so the card never
+  moves when the photograph lands. A blur or flat average colour sits behind it, so the area is never blank.
+- A missing variant falls back to the built-in default **for that device**, never to another variant's artwork.
+- **Admin → Settings → Welcome Screen**: name a cover, upload up to three images (each slot shows a thumbnail in its
+  own aspect, the real dimensions and weight, and warnings rather than refusals for an odd shape or low resolution),
+  preview it, then publish. The preview is real iframes at 390 / 834 / 1180 / 1440px showing the actual Welcome
+  Screen, with an optional safe-area guide that exists only in admin.
+- Verified at 320, 360, 390, 430, 667×375 (landscape phone), 768, 820, 1024×768 and 1180×820 (landscape tablets),
+  1280, 1440 and 1920: each width loads its own variant, the image covers the viewport, and `scrollWidth <=
+  clientWidth` holds everywhere.

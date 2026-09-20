@@ -13,7 +13,11 @@ export function proxy(request: NextRequest) {
   const response = decision.allow ? NextResponse.next() : NextResponse.redirect(new URL(decision.redirectTo, request.url));
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("X-Frame-Options", "DENY");
+  // DENY everywhere, with one deliberate exception: the admin cover preview exists to be framed by the admin
+  // screen, and an iframe is what gives it a real viewport so the art-direction breakpoints resolve for the device
+  // being previewed rather than for the laptop looking at it. SAMEORIGIN still refuses every other site, and the
+  // page itself is admin-only and noindex (docs/ARCHITECTURE.md §26).
+  response.headers.set("X-Frame-Options", pathname.startsWith("/admin/welcome-preview/") ? "SAMEORIGIN" : "DENY");
   response.headers.set("Permissions-Policy", "camera=(self), geolocation=(), microphone=()");
   return response;
 }

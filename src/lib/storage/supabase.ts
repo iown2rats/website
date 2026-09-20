@@ -21,6 +21,7 @@ interface SignedUrlResult {
 export interface SupabaseBucketClient {
   upload(key: string, data: Uint8Array, options: { contentType: string; upsert: boolean; cacheControl: string }): Promise<{ error: { message: string } | null }>;
   remove(keys: string[]): Promise<{ error: { message: string } | null }>;
+  download(key: string): Promise<{ data: Blob | null; error: { message: string } | null }>;
   createSignedUrls(keys: string[], ttlSeconds: number): Promise<{ data: SignedUrlResult[] | null; error: { message: string } | null }>;
 }
 
@@ -63,6 +64,13 @@ export class SupabaseStorageProvider implements StorageProvider {
     for (const k of keys) this.memo.delete(`${k}`);
     const { error } = await this.bucketClient.remove(keys);
     if (error) throw new Error(`Storage delete failed: ${error.message}`);
+  }
+
+  async read(key: string): Promise<Uint8Array | null> {
+    assertSafeKey(key);
+    const { data, error } = await this.bucketClient.download(key);
+    if (error || !data) return null;
+    return new Uint8Array(await data.arrayBuffer());
   }
 
   getReadUrl(key: string, ttlSeconds: number): Promise<string> {

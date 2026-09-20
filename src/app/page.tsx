@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { AuthDivider, AuthHeading, AuthLegalLine, AuthShell, AuthTagline } from "@/components/features/auth/auth-shell";
-import { EmailAuthForm } from "@/components/features/auth/email-auth-form";
-import { ContinueWithGoogle, ContinueWithTelegram } from "@/components/features/auth/google-button";
+import { AuthShell } from "@/components/features/auth/auth-shell";
+import { WelcomeCard } from "@/components/features/auth/welcome-card";
 import { getDb } from "@/lib/db";
 import { getAuthState } from "@/server/auth/current-user";
 import { emailAuthAvailable } from "@/server/auth/email-availability";
 import { ROUTES } from "@/server/auth/route-access";
 import { telegramSignInAvailable } from "@/server/auth/telegram-availability";
+import { currentWelcomeCover } from "@/server/welcome/active-cover";
 
 /*
  * Mellocrush welcome screen: one full-screen photograph (a Maldivian beach at night under the Milky Way, a couple on
@@ -26,25 +26,12 @@ export default async function WelcomePage() {
   if (state.kind === "unverified") redirect(ROUTES.verifyEmail);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
   const db = getDb();
-  const [telegram, emailAuth] = await Promise.all([telegramSignInAvailable(db), emailAuthAvailable(db)]);
+  // The cover joins the pair this page already awaits, so making the background dynamic costs no extra round trip.
+  const [telegram, emailAuth, cover] = await Promise.all([telegramSignInAvailable(db), emailAuthAvailable(db), currentWelcomeCover()]);
 
   return (
-    <AuthShell labelledBy="welcome-title" priority>
-      <AuthHeading id="welcome-title" />
-      <AuthTagline />
-      {/* One surface for every control on the card: the provider buttons use the same translucent glass as the email
-          fields below them, so nothing shouts. The four-colour G is the only brand colour left (DESIGN_SYSTEM §27). */}
-      <div className="mt-4.5 flex w-full flex-col gap-2">
-        <ContinueWithGoogle shape="pill" appearance="glass" textClass="text-cta-lg" heightClass="h-11" markSize={18} />
-        {telegram ? <ContinueWithTelegram shape="pill" appearance="glass" textClass="text-cta-lg" heightClass="h-11" markSize={18} /> : null}
-      </div>
-      {emailAuth ? (
-        <>
-          <AuthDivider />
-          <EmailAuthForm />
-        </>
-      ) : null}
-      <AuthLegalLine />
+    <AuthShell cover={cover} labelledBy="welcome-title" priority>
+      <WelcomeCard telegram={telegram} emailAuth={emailAuth} />
     </AuthShell>
   );
 }

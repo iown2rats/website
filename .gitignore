@@ -15,3 +15,6 @@ next-env.d.ts
 /tmp/
 screenshots/
 .storage/
+
+# scripts/render-hero.mjs scratch output; the values it prints live in src/server/welcome/defaults.ts.
+public/hero/.placeholders.json

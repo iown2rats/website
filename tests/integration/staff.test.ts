@@ -681,7 +681,7 @@ describe("member self-service refuses an operational account", () => {
 
     const { deleteAccount } = await import("@/server/users/deletion");
     const { StaffInMemberDomainError } = await import("@/server/members/guard");
-    const storage = { id: "test", put: async () => {}, delete: async () => {}, getReadUrl: async () => "" };
+    const storage = { id: "test", put: async () => {}, delete: async () => {}, read: async () => null, getReadUrl: async () => "" };
     await expect(deleteAccount({ userId: staff.userId }, { sessionId: resolved!.sessionId }, { db, storage, now: T0 })).rejects.toBeInstanceOf(StaffInMemberDomainError);
     expect((await db.user.findUniqueOrThrow({ where: { id: staff.userId } })).status).toBe("ACTIVE");
   });

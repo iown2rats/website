@@ -1,7 +1,7 @@
-import { AdminPage, KeyValueList, Panel } from "@/components/features/admin/admin-ui";
+import { AdminPage, KeyValueList, Panel, RowLink } from "@/components/features/admin/admin-ui";
 import { StaffSettingsActions } from "@/components/features/admin/staff-settings";
 import { getDb } from "@/lib/db";
-import { requireStaffPage } from "@/server/admin/authz";
+import { hasPermission, requireStaffPage } from "@/server/admin/authz";
 
 export const metadata = { title: "Settings · Admin" };
 export const dynamic = "force-dynamic";
@@ -41,6 +41,11 @@ export default async function AdminSettingsPage() {
           />
           <StaffSettingsActions email={identity?.email ?? null} />
         </Panel>
+        {hasPermission(admin.role, "welcome-cover.manage") ? (
+          <Panel title="App settings" description="Things about the app itself rather than your account.">
+            <RowLink href="/admin/settings/welcome" primary="Welcome Screen" secondary="The cover behind the sign-in screen: upload, preview, schedule and publish." />
+          </Panel>
+        ) : null}
       </div>
     </AdminPage>
   );

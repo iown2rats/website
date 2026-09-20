@@ -21,6 +21,17 @@ import type { AdminReceiptVerificationDto } from "@/server/billing/receipt-dto";
 import { createPaymentMethod, updatePaymentMethod, type PaymentMethodAdminDto } from "@/server/billing/payment-methods";
 import { createPlan, updatePlan, type PlanAdminDto } from "@/server/billing/plans";
 import { adjustSubscriptionPeriod, type AdminSubscriptionDto } from "@/server/billing/subscriptions";
+import { getStorageProvider } from "@/lib/storage";
+import {
+  archiveWelcomeCover,
+  createWelcomeCover,
+  publishWelcomeCover,
+  removeCoverAsset,
+  restoreDefaultWelcomeCover,
+  updateWelcomeCover,
+  type WelcomeCoverDto,
+  type WelcomeCoverListDto,
+} from "@/server/welcome/admin-covers";
 
 /*
  * Admin server actions (docs/ARCHITECTURE.md §21). Each one re-derives the acting admin from the session and the
@@ -194,4 +205,47 @@ export async function claimAdminBootstrap(input: { token: string }): Promise<Boo
   }
   if (claimed) redirect("/admin");
   return { ok: true };
+}
+
+/*
+ * Welcome Screen covers (docs/ARCHITECTURE.md §26). Uploading is a route handler (`/api/admin/welcome-cover`)
+ * because a server action's request body is capped well below an 8 MB photograph; everything else is an action.
+ * `revalidatePath("/")` after a state change is what makes publishing take effect without a deployment.
+ */
+async function coverAction<T>(run: (admin: Awaited<ReturnType<typeof requireAdmin>>) => Promise<T>): Promise<AdminResult<T>> {
+  try {
+    const admin = await requireAdmin("welcome-cover.manage");
+    const data = await run(admin);
+    revalidatePath("/admin/settings/welcome");
+    // Every signed-out screen shares the backdrop, so they all have to forget the old one.
+    revalidatePath("/");
+    revalidatePath("/auth/register");
+    return { ok: true, data };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+export async function adminCreateWelcomeCover(input: { name: string }): Promise<AdminResult<WelcomeCoverDto>> {
+  return coverAction((admin) => createWelcomeCover(admin, { name: input.name }));
+}
+
+export async function adminUpdateWelcomeCover(coverId: string, input: { name?: string; startsAt?: string | null; endsAt?: string | null }): Promise<AdminResult<WelcomeCoverDto>> {
+  return coverAction((admin) => updateWelcomeCover(admin, { coverId: String(coverId), ...input }));
+}
+
+export async function adminPublishWelcomeCover(coverId: string): Promise<AdminResult<WelcomeCoverDto>> {
+  return coverAction((admin) => publishWelcomeCover(admin, String(coverId)));
+}
+
+export async function adminArchiveWelcomeCover(coverId: string): Promise<AdminResult<WelcomeCoverDto>> {
+  return coverAction((admin) => archiveWelcomeCover(admin, String(coverId)));
+}
+
+export async function adminRemoveWelcomeCoverAsset(coverId: string, variant: string): Promise<AdminResult<WelcomeCoverDto>> {
+  return coverAction((admin) => removeCoverAsset(admin, { coverId: String(coverId), variant }, { storage: getStorageProvider() }));
+}
+
+export async function adminRestoreDefaultWelcomeCover(): Promise<AdminResult<WelcomeCoverListDto>> {
+  return coverAction((admin) => restoreDefaultWelcomeCover(admin));
 }

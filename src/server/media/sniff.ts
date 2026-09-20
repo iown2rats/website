@@ -17,7 +17,7 @@ export function sniffUnsupported(bytes: Uint8Array): UnsupportedKind {
 }
 
 /** What the bytes were meant to be; the message tells the person what to do instead in that context. */
-export type UploadContext = "receipt" | "photo" | "selfie";
+export type UploadContext = "receipt" | "photo" | "selfie" | "cover";
 
 const HEIC_FIX = "In Photos, share the picture as a JPEG (or set Camera → Formats → Most Compatible), then try again.";
 
@@ -33,6 +33,10 @@ export const UNSUPPORTED_MESSAGES: Record<UploadContext, Record<Exclude<Unsuppor
   selfie: {
     pdf: "That file is a PDF, not a photo. Choose a JPEG, PNG or WebP selfie instead.",
     heic: "HEIC photos aren't supported yet. Take the selfie with the camera button here, or share it as a JPEG, then try again.",
+  },
+  cover: {
+    pdf: "That file is a PDF, not an image. Choose a JPG, PNG or WebP cover instead.",
+    heic: `HEIC images aren't supported yet. ${HEIC_FIX}`,
   },
 };
 

@@ -10,6 +10,7 @@ function fakeClient(o: { fail?: boolean; omitPath?: boolean } = {}) {
   const client: SupabaseBucketClient = {
     upload: async () => ({ error: null }),
     remove: async () => ({ error: null }),
+    download: async () => ({ data: null, error: null }),
     createSignedUrls: async (keys, ttl) => {
       calls.push({ keys, ttl });
       if (o.fail) return { data: null, error: { message: "boom" } };

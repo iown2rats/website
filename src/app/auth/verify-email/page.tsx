@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { getAuthState } from "@/server/auth/current-user";
 import { getEmailVerificationState } from "@/server/auth/email-identity";
 import { ROUTES } from "@/server/auth/route-access";
+import { currentWelcomeCover } from "@/server/welcome/active-cover";
 
 export const metadata = { title: "Verify your email" };
 export const dynamic = "force-dynamic";
@@ -21,10 +22,11 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams: 
   if (state.kind === "active") redirect(ROUTES.home);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);
   const verification = await getEmailVerificationState(getDb(), state.user.id);
+  const cover = await currentWelcomeCover();
   if (!verification) redirect(ROUTES.onboarding);
   const { expired } = await searchParams;
   return (
-    <AuthShell labelledBy="verify-title">
+    <AuthShell cover={cover} labelledBy="verify-title">
       <AuthHeading id="verify-title" compact title="Verify your email" />
       <VerifyEmailClient email={verification.email} expired={expired === "1"} />
     </AuthShell>

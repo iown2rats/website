@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { redirectIfAuthenticated } from "@/server/auth/current-user";
 import { emailAuthAvailable } from "@/server/auth/email-availability";
 import { ROUTES } from "@/server/auth/route-access";
+import { currentWelcomeCover } from "@/server/welcome/active-cover";
 
 export const metadata = { title: "Forgot password" };
 export const dynamic = "force-dynamic";
@@ -12,8 +13,9 @@ export const dynamic = "force-dynamic";
 export default async function ForgotPasswordPage() {
   await redirectIfAuthenticated();
   if (!(await emailAuthAvailable(getDb()))) redirect(ROUTES.welcome);
+  const cover = await currentWelcomeCover();
   return (
-    <AuthShell labelledBy="forgot-title" below={<AuthBackLink>Back to sign in</AuthBackLink>}>
+    <AuthShell cover={cover} labelledBy="forgot-title" below={<AuthBackLink>Back to sign in</AuthBackLink>}>
       <AuthHeading id="forgot-title" compact title="Reset your password" subtitle="Enter the address you signed up with and we'll send a link." />
       <ForgotPasswordForm />
     </AuthShell>

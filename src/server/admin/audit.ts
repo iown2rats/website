@@ -36,6 +36,15 @@ export const AUDIT_ACTIONS = {
   staffPasswordReset: "staff.password.reset",
   staffConverted: "staff.converted",
   staffChangeRejected: "staff.change.rejected",
+  // Welcome Screen covers (docs/ARCHITECTURE.md §26). Artwork is not sensitive, so the payloads carry what was
+  // changed and which variant, which is what makes "who put that on the front page" answerable.
+  welcomeCoverCreated: "welcome_cover.created",
+  welcomeCoverUpdated: "welcome_cover.updated",
+  welcomeCoverAssetUploaded: "welcome_cover.asset.uploaded",
+  welcomeCoverAssetRemoved: "welcome_cover.asset.removed",
+  welcomeCoverPublished: "welcome_cover.published",
+  welcomeCoverArchived: "welcome_cover.archived",
+  welcomeCoverDefaultsRestored: "welcome_cover.defaults_restored",
   // Existing (user-initiated) actions written elsewhere, listed so the admin log can label them.
   accountDeleted: "account.deleted",
   accountRecreated: "account.recreated",

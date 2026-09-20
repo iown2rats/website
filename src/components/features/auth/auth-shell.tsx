@@ -1,36 +1,68 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Wordmark } from "@/components/brand/logo";
 import { cn } from "@/lib/cn";
 import { ROUTES } from "@/server/auth/route-access";
+import type { WelcomeCoverView } from "@/server/welcome/cover";
 
 /*
  * The shell every signed-out auth screen shares (DESIGN_SYSTEM §26/§27): the night-beach photograph and one centred
  * frosted-glass card. The welcome screen, registration, "verify your email", "forgot password" and "reset password"
  * all render inside it, so the whole flow looks like one place.
  */
-const HERO_WIDTHS = [480, 640, 828, 941] as const;
 const HERO_SIZES = "100vw";
-export const heroSrcSet = (ext: "avif" | "webp") => HERO_WIDTHS.map((w) => `/hero/night-beach-${w}.${ext} ${w}w`).join(", ");
-export const HERO_PLACEHOLDER =
-  "data:image/webp;base64,UklGRqoAAABXRUJQVlA4IJ4AAACQBgCdASoYACsAPu1apk2ppKMiMBqtUTAdiUAXwHfJI/FDxQnfRed3atLJdFMtX2F7/Au+3GFMTmUybP8AAP76ZF+QQChNPQ40reRPEAqP5n1yXBM7QfAPyXKqLBtoq9hpI3w4iDPyYGha0elpym/mpkJ6RxRGV+NGIKIGGcu1YhpzThEAlVht7CQRcxJXg2crX1fLBYHvAn4z+JAAAA==";
 
-/** The photograph, untouched. The glass card carries its own contrast, so there are no scrims. */
-export function AuthBackdrop({ priority = false }: { priority?: boolean }) {
+/**
+ * The cover, art-directed. One `<picture>`, three shapes, and the browser downloads exactly one of them: the
+ * `<source>` list runs widest-first, so the first matching `media` wins and everything below it is never fetched
+ * (src/server/welcome/variants.ts owns those breakpoints).
+ *
+ * `object-fit: cover` does the rest. Whatever the viewport is — a phone held sideways, a tablet, a 4K monitor — the
+ * image fills it, keeps its proportions and is cropped rather than stretched, and the placeholder painted behind it
+ * means the area is never blank while it loads. Intrinsic width/height on every candidate keeps the box reserved,
+ * so nothing shifts when the photograph arrives.
+ *
+ * A plain `<img>` rather than next/image: this is the largest-contentful-paint element on the first screen a
+ * stranger sees, and next/image would put an optimizer hop in front of it. The built-in covers are pre-rendered at
+ * several widths in AVIF and WebP; an uploaded cover is one WebP that the server already resized.
+ */
+export function AuthBackdrop({ cover, priority = false }: { cover: WelcomeCoverView; priority?: boolean }) {
+  // The last entry is the one with no media query: `<picture>`'s required fallback, which must be the <img>.
+  const fallback = cover.images[cover.images.length - 1]!;
+  const sources = cover.images.slice(0, -1);
   return (
     <>
-      {priority ? <link rel="preload" as="image" type="image/avif" imageSrcSet={heroSrcSet("avif")} imageSizes={HERO_SIZES} fetchPriority="high" /> : null}
-      <div aria-hidden="true" className="absolute inset-0 bg-cover bg-[50%_60%]" style={{ backgroundImage: `url("${HERO_PLACEHOLDER}")` }}>
+      {/* One preload per variant, each with its own self-contained media query, so a desktop visitor preloads the
+          desktop file and nothing else. Without the query the phone image would be fetched on every device. */}
+      {priority
+        ? cover.images.map((img) => (
+            <link
+              key={img.variant}
+              rel="preload"
+              as="image"
+              media={img.preloadMedia}
+              type={img.avifSrcSet ? "image/avif" : "image/webp"}
+              imageSrcSet={img.avifSrcSet ?? img.webpSrcSet}
+              imageSizes={HERO_SIZES}
+              fetchPriority="high"
+            />
+          ))
+        : null}
+      <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${fallback.placeholder}")` }}>
         <picture>
-          <source type="image/avif" srcSet={heroSrcSet("avif")} sizes={HERO_SIZES} />
-          {/* A plain <img> inside <picture>: pre-rendered static files with an AVIF/WebP switch and a server-side
-              preload; next/image would put an optimizer hop in front of the largest-contentful-paint element. */}
+          {sources.map((img) => (
+            <Fragment key={img.variant}>
+              {img.avifSrcSet ? <source media={img.media ?? undefined} type="image/avif" srcSet={img.avifSrcSet} sizes={HERO_SIZES} width={img.width} height={img.height} /> : null}
+              <source media={img.media ?? undefined} type="image/webp" srcSet={img.webpSrcSet} sizes={HERO_SIZES} width={img.width} height={img.height} />
+            </Fragment>
+          ))}
+          {fallback.avifSrcSet ? <source type="image/avif" srcSet={fallback.avifSrcSet} sizes={HERO_SIZES} /> : null}
           <img
-            src="/hero/night-beach-941.webp"
-            srcSet={heroSrcSet("webp")}
+            src={fallback.src}
+            srcSet={fallback.webpSrcSet}
             sizes={HERO_SIZES}
-            width={941}
-            height={1672}
+            width={fallback.width}
+            height={fallback.height}
             alt=""
             fetchPriority={priority ? "high" : "auto"}
             decoding="async"
@@ -46,6 +78,8 @@ export interface AuthShellProps {
   children: ReactNode;
   /** Rendered under the card, outside the glass (a "back" link). */
   below?: ReactNode;
+  /** The cover to paint. Every signed-out screen is handed the same one, so the flow never changes background. */
+  cover: WelcomeCoverView;
   /** The welcome screen preloads the photograph; the rest inherit it from the cache. */
   priority?: boolean;
   /** Heading id for the card's `aria-labelledby`. */
@@ -53,10 +87,10 @@ export interface AuthShellProps {
   className?: string;
 }
 
-export function AuthShell({ children, below, priority = false, labelledBy, className }: AuthShellProps) {
+export function AuthShell({ children, below, cover, priority = false, labelledBy, className }: AuthShellProps) {
   return (
     <main className="relative flex min-h-dvh flex-col overflow-hidden bg-[#050d14] text-white">
-      <AuthBackdrop priority={priority} />
+      <AuthBackdrop cover={cover} priority={priority} />
       <div
         className="relative z-[1] flex flex-1 flex-col items-center px-5 md:pt-[8vh]"
         style={{ paddingTop: "calc(6dvh + var(--safe-top))", paddingBottom: "calc(24px + var(--safe-bottom))" }}

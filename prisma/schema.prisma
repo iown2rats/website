@@ -319,6 +319,9 @@ model User {
   staffGrantsRevoked  StaffGrant[]  @relation("StaffGrantRevoker")
   staffInvitesCreated StaffInvite[] @relation("StaffInviteCreator")
 
+  welcomeCovers      WelcomeCover[]      @relation("WelcomeCoverCreator")
+  welcomeCoverAssets WelcomeCoverAsset[] @relation("WelcomeCoverAssetCreator")
+
   @@index([status, onboardingCompletedAt])
   @@index([lastActiveAt])
   @@index([accountType])
@@ -1172,4 +1175,69 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([targetType, targetId])
   @@index([createdAt])
+}
+
+/// Which screen shape a cover image was cut for (docs/ARCHITECTURE.md §26). Not a viewport size: the browser picks
+/// one with a `media` query, and the same image then covers whatever the viewport actually is.
+enum WelcomeCoverVariant {
+  MOBILE
+  TABLET
+  DESKTOP
+}
+
+/// DRAFT and ARCHIVED are stored; "scheduled" and "expired" are NOT. A cover with a future `startsAt` is scheduled
+/// and one whose `endsAt` has passed is expired, both derived from PUBLISHED + the clock at read time. Storing them
+/// would need a job to flip the rows, and a job that has not run yet is a promotion that did not start.
+enum WelcomeCoverStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// One uploaded cover image. Separate from the campaign so its real dimensions, weight and blurhash have a home,
+/// and so an archived campaign keeps pointing at the artwork it published rather than at whatever replaced it.
+model WelcomeCoverAsset {
+  id          String              @id @default(cuid(2))
+  variant     WelcomeCoverVariant
+  /// welcome-covers/<id>.webp — unique per upload, never reused. That is what makes the public URL immutable, so
+  /// publishing new artwork can never leave a browser or CDN showing the old one.
+  storageKey  String              @unique
+  width       Int
+  height      Int
+  bytes       Int
+  blurhash    String
+  createdById String?
+  createdAt   DateTime            @default(now())
+
+  createdBy       User?          @relation("WelcomeCoverAssetCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  coversAsMobile  WelcomeCover[] @relation("WelcomeCoverMobile")
+  coversAsTablet  WelcomeCover[] @relation("WelcomeCoverTablet")
+  coversAsDesktop WelcomeCover[] @relation("WelcomeCoverDesktop")
+}
+
+/// One Welcome Screen cover / promotion. Every variant is optional: a cover with only a mobile image is legitimate,
+/// and the other two fall back to the built-in defaults per device (src/server/welcome/defaults.ts) rather than
+/// stretching the one that was supplied.
+model WelcomeCover {
+  id             String             @id @default(cuid(2))
+  name           String
+  status         WelcomeCoverStatus @default(DRAFT)
+  mobileAssetId  String?
+  tabletAssetId  String?
+  desktopAssetId String?
+  /// Optional promotion window. Null start = live as soon as it is published; null end = until something replaces it.
+  startsAt       DateTime?
+  endsAt         DateTime?
+  publishedAt    DateTime?
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  mobileAsset  WelcomeCoverAsset? @relation("WelcomeCoverMobile", fields: [mobileAssetId], references: [id], onDelete: SetNull)
+  tabletAsset  WelcomeCoverAsset? @relation("WelcomeCoverTablet", fields: [tabletAssetId], references: [id], onDelete: SetNull)
+  desktopAsset WelcomeCoverAsset? @relation("WelcomeCoverDesktop", fields: [desktopAssetId], references: [id], onDelete: SetNull)
+  createdBy    User?              @relation("WelcomeCoverCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// The selection query: PUBLISHED rows whose window contains "now".
+  @@index([status, startsAt, endsAt])
 }

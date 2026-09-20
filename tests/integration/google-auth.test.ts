@@ -201,7 +201,7 @@ describe("identity → User mapping", () => {
 
 describe("deleted accounts and the same Google account", () => {
   it("signing in after deletion never revives the profile: the caller is told, and only an explicit choice creates a NEW account", async () => {
-    const me = await createUser(db, { now: T0, name: "Old" });
+    const me = await createUser(db, { gender: "MAN", now: T0, name: "Old" });
     const identity = await createIdentity(db, me.userId, { email: "same@example.com" });
     const session = await createSession(db, me.userId, {}, T0);
     await recordReauthentication(db, { sessionId: session.sessionId, userId: me.userId, provider: "google", claims: claimsFor(identity.subject, identity.email) }, T0);
@@ -234,7 +234,7 @@ describe("deleted accounts and the same Google account", () => {
 
 describe("recent authentication", () => {
   it("marks only the requesting session, only for the same identity, expires after the window and is consumed once", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const identity = await createIdentity(db, me.userId);
     const stranger = await createUser(db, { now: T0 });
     const strangerIdentity = await createIdentity(db, stranger.userId);

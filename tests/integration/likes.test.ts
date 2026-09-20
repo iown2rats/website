@@ -24,13 +24,13 @@ afterAll(() => disconnectDb());
 
 describe("Free like allowance (30 per rolling 24 hours)", () => {
   it("starts with the full allowance and no open window", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await getLikeAllowance(db, me.userId, T0);
     expect(a).toMatchObject({ limit: 30, used: 0, remaining: 30, resetsAt: null, tier: "FREE" });
   });
 
   it("a like consumes one, a pass consumes nothing", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const [a, b] = await targets(2);
     await likeUser(me, a!.userId, { db, now: T0 });
     await passUser(me, b!.userId, { db, now: T0 });
@@ -41,7 +41,7 @@ describe("Free like allowance (30 per rolling 24 hours)", () => {
   });
 
   it("the 30th like succeeds and the 31st is rejected with the window reset time", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const list = await targets(31);
     await likeAll(me, list.slice(0, 29), T0);
     const thirtieth = await likeUser(me, list[29]!.userId, { db, now: at(T0, hours(1)) });
@@ -56,7 +56,7 @@ describe("Free like allowance (30 per rolling 24 hours)", () => {
   });
 
   it("the allowance becomes available again once the 24-hour window has ended", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const list = await targets(31);
     await likeAll(me, list.slice(0, 30), T0);
     await expect(likeUser(me, list[30]!.userId, { db, now: at(T0, hours(23)) })).rejects.toBeInstanceOf(LikeLimitReachedError);
@@ -68,7 +68,7 @@ describe("Free like allowance (30 per rolling 24 hours)", () => {
   });
 
   it("re-liking the same person is idempotent and does not consume", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const [a] = await targets(1);
     const first = await likeUser(me, a!.userId, { db, now: T0 });
     const second = await likeUser(me, a!.userId, { db, now: at(T0, 1000) });
@@ -78,7 +78,7 @@ describe("Free like allowance (30 per rolling 24 hours)", () => {
   });
 
   it("is not reset by anything client-side: the counter lives on the user row (new session, new client)", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const list = await targets(31);
     await likeAll(me, list.slice(0, 30), T0);
     // A fresh session/device/client is just another connection to the same server state.
@@ -91,7 +91,7 @@ describe("Free like allowance (30 per rolling 24 hours)", () => {
   });
 
   it("concurrent requests with one like remaining yield exactly one success", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const list = await targets(35);
     await likeAll(me, list.slice(0, 29), T0);
     const contenders = list.slice(29, 35);
@@ -109,7 +109,7 @@ describe("Free like allowance (30 per rolling 24 hours)", () => {
 
 describe("Plus like allowance (90 per rolling 24 hours)", () => {
   it("Plus receives 90; the 90th succeeds and the 91st fails", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24 * 30)));
     expect((await getLikeAllowance(db, me.userId, T0)).limit).toBe(PRODUCT_RULES.PLUS.dailyLikeLimit);
     const list = await targets(91);
@@ -120,7 +120,7 @@ describe("Plus like allowance (90 per rolling 24 hours)", () => {
   });
 
   it("subscription expiry returns the user to the Free limit within the same window", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await createSubscription(db, me.userId, { status: "ACTIVE", periodStart: at(T0, -hours(24 * 29)), periodEnd: at(T0, hours(2)) });
     const list = await targets(32);
     // 31 likes while Plus (limit 90): fine.

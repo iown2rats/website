@@ -45,20 +45,21 @@ describe("Matching", () => {
     const woman27 = await createUser(db, { now: T0, gender: "WOMAN", age: 27 });
     const woman40 = await createUser(db, { now: T0, gender: "WOMAN", age: 40 });
     const man27 = await createUser(db, { now: T0, gender: "MAN", age: 27 });
-    const womanWantsWomen = await createUser(db, { now: T0, gender: "WOMAN", age: 26, interestedIn: "WOMEN" });
+    // A stale same-gender preference on a Dating row no longer narrows her deck: Dating is opposite-gender by the
+    // rule, not by whatever `interestedIn` happens to hold (docs/ARCHITECTURE.md §7.5).
+    const womanStoredAsWantingWomen = await createUser(db, { now: T0, gender: "WOMAN", age: 26, interestedIn: "WOMEN" });
     const deck = await getDeckCandidateIds(db, viewer, { now: T0 });
-    expect(deck).toEqual([woman27.userId]);
+    expect(deck.sort()).toEqual([woman27.userId, womanStoredAsWantingWomen.userId].sort());
     expect(deck).not.toContain(woman40.userId);
     expect(deck).not.toContain(man27.userId);
-    expect(deck).not.toContain(womanWantsWomen.userId);
     await passUser(viewer, woman27.userId, { db, now: T0 });
-    expect(await getDeckCandidateIds(db, viewer, { now: T0 })).toEqual([]);
+    expect(await getDeckCandidateIds(db, viewer, { now: T0 })).toEqual([womanStoredAsWantingWomen.userId]);
   });
 
   it("location scopes filter by Greater Malé and atoll", async () => {
     const male = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
     const addu = await createLocation(db, { name: "Addu City", atollCode: "S" });
-    const viewer = await createUser(db, { now: T0, locationId: male.id });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, locationId: male.id });
     const inMale = await createUser(db, { now: T0, locationId: male.id });
     const inAddu = await createUser(db, { now: T0, locationId: addu.id });
     await db.discoveryPreferences.update({ where: { userId: viewer.userId }, data: { locationScope: "GREATER_MALE" } });
@@ -70,7 +71,7 @@ describe("Matching", () => {
   });
 
   it("hidden or paused users are not discoverable", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const hidden = await createUser(db, { now: T0, visibility: "HIDDEN" });
     const paused = await createUser(db, { now: T0 });
     await db.privacySettings.update({ where: { userId: paused.userId }, data: { pausedAt: T0 } });
@@ -90,7 +91,7 @@ describe("Undo (Plus)", () => {
   });
 
   it("restores only the most recent pass, once, within the time window", async () => {
-    const a = await createUser(db, { now: T0 });
+    const a = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const [b, c] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
     await passUser(a, b.userId, { db, now: T0 });

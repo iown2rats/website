@@ -43,7 +43,7 @@ afterAll(() => disconnectDb());
  */
 describe("the visibility rule", () => {
   it("FREE + unmatched sees the main photo and nothing else", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 4 });
     const photos = await photosSeenBy(viewer, target);
 
@@ -54,7 +54,7 @@ describe("the visibility rule", () => {
   });
 
   it("PLUS + unmatched sees every eligible photo", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 4 });
     await plus(viewer);
     const photos = await photosSeenBy(viewer, target);
@@ -62,7 +62,7 @@ describe("the visibility rule", () => {
   });
 
   it("FREE + matched sees every eligible photo", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 4 });
     await match(viewer, target);
     const photos = await photosSeenBy(viewer, target);
@@ -70,7 +70,7 @@ describe("the visibility rule", () => {
   });
 
   it("PLUS + matched sees every eligible photo", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 4 });
     await plus(viewer);
     await match(viewer, target);
@@ -85,7 +85,7 @@ describe("the visibility rule", () => {
   });
 
   it("locks again after an unmatch", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 4 });
     const conversationId = await match(viewer, target);
     expect((await photosSeenBy(viewer, target)).every((p) => !p.locked)).toBe(true);
@@ -98,7 +98,7 @@ describe("the visibility rule", () => {
 
 describe("the main photo", () => {
   it("changing it changes the single photo a FREE unmatched viewer can see", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 3 });
     const before = await photosSeenBy(viewer, target);
     const originallyVisible = before.find((p) => !p.locked)!.id;
@@ -118,7 +118,7 @@ describe("the main photo", () => {
 
   it("falls back to the first ELIGIBLE photo when position 0 is not displayable", async () => {
     // An existing profile whose primary photo was later rejected still has a public photo, without re-uploading.
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 3 });
     const owned = await db.profilePhoto.findMany({ where: { profile: { userId: target.userId } }, orderBy: { position: "asc" }, select: { id: true } });
     await db.profilePhoto.update({ where: { id: owned[0]!.id }, data: { moderation: "REJECTED" } });
@@ -131,7 +131,7 @@ describe("the main photo", () => {
   });
 
   it("needs no re-upload: a profile seeded only with positions already has a main photo", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 2 });
     // Nothing was set beyond `position`, which is what every pre-existing row has.
     const photos = await photosSeenBy(viewer, target);
@@ -141,7 +141,7 @@ describe("the main photo", () => {
 
 describe("moderation is never overridden", () => {
   it("keeps PENDING and REJECTED photos away from a PLUS matched viewer", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 3 });
     await plus(viewer);
     await match(viewer, target);
@@ -161,7 +161,7 @@ describe("moderation is never overridden", () => {
 
 describe("the protected original never reaches the client", () => {
   it("a locked photo carries no storage key at all", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 4 });
     const photos = await photosSeenBy(viewer, target);
 
@@ -173,7 +173,7 @@ describe("the protected original never reaches the client", () => {
   });
 
   it("no protected key or URL survives into the discovery card a browser receives", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 4 });
     const [card] = await buildDiscoveryCards(db, viewer.userId, [target.userId], T0, storage);
     const locked = card!.photos.filter((p) => p.locked);
@@ -202,7 +202,7 @@ describe("the protected original never reaches the client", () => {
 
 describe("the entitlement boundary itself", () => {
   it("reads Plus from stored subscription state, not from anything a caller passes", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 3 });
 
     const before = await resolvePhotoAccess(db, viewer.userId, [target.userId], T0);
@@ -215,7 +215,7 @@ describe("the entitlement boundary itself", () => {
   });
 
   it("stops unlocking the moment Plus lapses", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 3 });
     await grantPlus(db, viewer.userId, T0, at(T0, hours(1)));
 
@@ -252,7 +252,7 @@ describe("staff isolation", () => {
 
 describe("Discover stays usable on FREE", () => {
   it("shows the same profiles, each with a real main photo", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const targets = await Promise.all([1, 2, 3].map(() => createUser(db, { now: T0, photos: 3 })));
     const cards = await buildDiscoveryCards(db, viewer.userId, targets.map((t) => t.userId), T0, storage);
 
@@ -265,7 +265,7 @@ describe("Discover stays usable on FREE", () => {
   });
 
   it("tells the client a lock exists so it can offer the upgrade", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const target = await createUser(db, { now: T0, photos: 3 });
     const [card] = await buildDiscoveryCards(db, viewer.userId, [target.userId], T0, storage);
     // The UI opens the existing Plus sheet off exactly this; without it there would be nothing to tap.
@@ -276,7 +276,7 @@ describe("Discover stays usable on FREE", () => {
 
 describe("no N+1", () => {
   it("answers a whole deck with a constant number of queries", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const targets = await Promise.all(Array.from({ length: 8 }, () => createUser(db, { now: T0, photos: 3 })));
     await createIdentity(db, viewer.userId);
 

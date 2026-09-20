@@ -32,7 +32,7 @@ afterAll(() => disconnectDb());
 describe("conversation list and header DTOs", () => {
   it("splits new matches from conversations, orders by activity and counts unread from read state; payload is safe", async () => {
     const male = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
-    const me = await createUser(db, { now: T0, name: "Ismail" });
+    const me = await createUser(db, { gender: "MAN", now: T0, name: "Ismail" });
     const a = await createUser(db, { now: T0, name: "Aishath", verified: true, locationId: male.id });
     const b = await createUser(db, { now: T0, name: "Ibrahim" });
     await grantPlus(db, b.userId, at(T0, -hours(1)), at(T0, hours(24)));
@@ -65,7 +65,7 @@ describe("conversation list and header DTOs", () => {
   });
 
   it("does not reorder conversations on background updates; only a new message moves one up", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0, name: "A" });
     const b = await createUser(db, { now: T0, name: "B" });
     const convA = await match(me, a, T0);
@@ -83,7 +83,7 @@ describe("conversation list and header DTOs", () => {
 
 describe("history, polling and read state", () => {
   it("pages history newest-first with a stable cursor, and polls incrementally", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const other = await createUser(db, { now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     await grantPlus(db, other.userId, at(T0, -hours(1)), at(T0, hours(24)));
@@ -112,7 +112,7 @@ describe("history, polling and read state", () => {
   });
 
   it("marks incoming messages read only when the conversation is opened; loading the list does not", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const b = await createUser(db, { now: T0 });
     const convA = await match(me, a, T0);
@@ -137,7 +137,7 @@ describe("history, polling and read state", () => {
   });
 
   it("the sender is never notified and receives at most one unread notification per conversation", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const conv = await match(me, a, T0);
@@ -150,7 +150,7 @@ describe("history, polling and read state", () => {
 
 describe("validation and send edge cases", () => {
   it("stores markup as text, rejects empty and oversized messages, strips control characters", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);
     const xss = "<img src=x onerror=alert(1)> <b>hi</b>";
@@ -164,7 +164,7 @@ describe("validation and send edge cases", () => {
   });
 
   it("a rejected send leaves no trace and does not affect the next one", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);
     await sendMessage(me, conv, "first", { db, now: T0 });
@@ -175,7 +175,7 @@ describe("validation and send edge cases", () => {
   });
 
   it("Plus is still subject to the anti-spam ceiling, which is not an entitlement", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const conv = await match(me, a, T0);
@@ -186,7 +186,7 @@ describe("validation and send edge cases", () => {
   });
 
   it("a Free sender is never gated on tier: consecutive sends succeed with and without Plus", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);
     await sendMessage(me, conv, "free one", { db, now: T0 });
@@ -200,7 +200,7 @@ describe("validation and send edge cases", () => {
 
   it("Invisible Mode has no effect on an existing match's conversation", async () => {
     const ghost = await createUser(db, { now: T0 });
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const conv = await match(ghost, me, T0);
     await grantPlus(db, ghost.userId, at(T0, -hours(1)), at(T0, hours(24)));
     await setInvisibleMode(ghost, true, { db, now: T0 });
@@ -214,7 +214,7 @@ describe("validation and send edge cases", () => {
 describe("block, unmatch and report", () => {
   it("a send racing a block never lands after the block; history is preserved", async () => {
     for (let round = 0; round < 5; round++) {
-      const me = await createUser(db, { now: T0 });
+      const me = await createUser(db, { gender: "MAN", now: T0 });
       const a = await createUser(db, { now: T0 });
       await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
       const conv = await match(me, a, T0);
@@ -236,7 +236,7 @@ describe("block, unmatch and report", () => {
   });
 
   it("unmatch ends messaging both ways with soft state and keeps history; the header stops offering unmatch", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);
     await sendMessage(me, conv, "hello", { db, now: T0 });
@@ -258,7 +258,7 @@ describe("block, unmatch and report", () => {
   });
 
   it("reporting stores evidence with the approved reason, then blocks; the target is resolved server-side", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);
     await sendMessage(a, conv, "send me money", { db, now: T0 });
@@ -273,7 +273,7 @@ describe("block, unmatch and report", () => {
   });
 
   it("a non-participant cannot read the header, poll, mark read, unmatch or view the match profile", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const c = await createUser(db, { now: T0 });
     const conv = await match(me, a, T0);

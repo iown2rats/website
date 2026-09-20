@@ -27,7 +27,7 @@ afterAll(() => disconnectDb());
 
 describe("community feed", () => {
   it("shows eligible posts newest first and excludes blocked (both ways), suspended, deleted and hidden-media posts", async () => {
-    const me = await createUser(db, { now: T0, name: "Ismail" });
+    const me = await createUser(db, { gender: "MAN", now: T0, name: "Ismail" });
     const a = await createUser(db, { now: T0, name: "Ahmed" });
     const iBlocked = await createUser(db, { now: T0, name: "Bisma" });
     const blockedMe = await createUser(db, { now: T0, name: "Rifga" });
@@ -61,7 +61,7 @@ describe("community feed", () => {
   });
 
   it("paginates with a stable cursor and no duplicates; New shows only the last 24 hours", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(48)), at(T0, hours(1)));
     for (let i = 0; i < 30; i++) {
@@ -83,7 +83,7 @@ describe("community feed", () => {
   });
 
   it("hides a photo post from others until its media is displayable, while the author sees it under review", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const row = await db.communityPost.create({ data: { authorId: a.userId, kind: "PHOTO", body: "Sunrise", photoKey: `community-photos/${a.userId}/x/full.webp`, photoBlurhash: "LKO2?U%2Tw=w]~RBVZRi};RPxuwH", photoModeration: "REJECTED", createdAt: T0 } });
     expect((await getFeed(me, {}, deps())).posts.map((p) => p.id)).not.toContain(row.id);
@@ -98,7 +98,7 @@ describe("community feed", () => {
 describe("community DTO privacy", () => {
   it("carries only public identity; hidden location is absent; nothing private leaks", async () => {
     const male = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const open = await createUser(db, { now: T0, name: "Open", locationId: male.id, verified: true });
     const shy = await createUser(db, { now: T0, name: "Shy", locationId: male.id, hideLocation: true, hideAge: true });
     await grantPlus(db, open.userId, at(T0, -hours(1)), at(T0, hours(1)));
@@ -118,7 +118,7 @@ describe("community DTO privacy", () => {
 
 describe("posting", () => {
   it("validates body, kind and ownership; treats markup as text; only the author can delete", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const other = await createUser(db, { now: T0 });
     await expect(post(me, "   ")).rejects.toBeInstanceOf(ValidationError);
     await expect(post(me, "x".repeat(COMMUNITY.postMaxLength + 1))).rejects.toBeInstanceOf(ValidationError);
@@ -141,7 +141,7 @@ describe("posting", () => {
   });
 
   it("applies the per-hour posting ceiling", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     for (let i = 0; i < COMMUNITY.postsPerHour; i++) await post(me, `p${i}`, at(T0, i * 1000));
     await expect(post(me, "one more", at(T0, minutes(30)))).rejects.toBeInstanceOf(ValidationError);
     expect((await post(me, "next hour", at(T0, hours(1) + 1000))).body).toBe("next hour");
@@ -150,7 +150,7 @@ describe("posting", () => {
 
 describe("reactions", () => {
   it("is idempotent, toggles, keeps the count exact under concurrency and never touches dating state", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const p = await post(a, "benches");
     const first = await setReaction(me, p.id, true, { db, now: T0 });
@@ -174,7 +174,7 @@ describe("reactions", () => {
   });
 
   it("a blocked pair cannot react or comment; existing reactions from the blocked side no longer show the post", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const p = await post(a, "hello");
     await blockUser(a, me.userId, { db, now: T0 });
@@ -186,7 +186,7 @@ describe("reactions", () => {
 
 describe("comments", () => {
   it("persists, paginates oldest first, hides blocked and non-active authors, and counts correctly", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0, name: "Ahmed" });
     const b = await createUser(db, { now: T0, name: "Bisma" });
     const p = await post(a, "Question: best breakfast spot?", T0, "QUESTION");
@@ -215,7 +215,7 @@ describe("comments", () => {
   });
 
   it("notifies the author of reactions and comments only when they opted in, never for their own actions or across a block", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     await db.notificationSettings.update({ where: { userId: a.userId }, data: { community: true } });
     const p = await post(a, "hello");
@@ -237,7 +237,7 @@ describe("comments", () => {
 
 describe("report and block from Community", () => {
   it("reporting a post or comment stores evidence with the approved reason and does NOT block; blocking is separate and hides both ways", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const p = await post(a, "send me money");
     const c = await addComment(a, p.id, "cash only", deps(at(T0, 1000)));

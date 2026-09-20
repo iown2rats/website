@@ -163,31 +163,48 @@ export function intentCompatibilitySql(v: ViewerContext): Prisma.Sql {
 }
 
 /**
- * Mutual compatibility, independent of the viewer's optional filters (docs/ARCHITECTURE.md §7.1):
- *  - the viewer and the candidate must be here for the same thing (Dating or Friendship);
- *  - the viewer's "Show me" must include the candidate's gender, AND the candidate's "Show me" must include the
- *    viewer's gender ("Prefer not to say" is only shown to people who chose Everyone, in both directions);
- *  - the candidate must have a date of birth, and the viewer's age must fall inside the candidate's age range.
+ * Gender compatibility, which is a different rule in each pool.
  *
- * The gender clauses are unchanged and need no branch for Friendship: `interestedIn` always holds the preference
- * for whichever intent is active, and the clause above has already guaranteed both sides are on the same one. So
- * "Friendship → Everyone" works through exactly the same reciprocal rule that dating uses, and a man looking for
- * male friends is matched against men whose own Friendship answer includes men.
+ * DATING is strictly opposite gender, and that is expressed here as the rule itself rather than by comparing the
+ * two stored `interestedIn` values. The stored value is derived from gender on every write, so for a row written
+ * under the current policy the two formulations agree — but rows predating the policy exist, and a stale one must
+ * not be able to widen anybody's deck. Stating the rule directly means it holds for every row, whatever is stored:
+ * a man is shown women and a woman men, full stop, and "Prefer not to say" falls out of Dating discovery on both
+ * sides because it satisfies neither branch. Nothing is rewritten to make this true.
+ *
+ * FRIENDSHIP is the reciprocal preference check, where `interestedIn` IS the member's own answer and both
+ * directions must agree ("Prefer not to say" is only shown to people who chose Everyone, in both directions).
  */
-export function compatibilitySql(v: ViewerContext): Prisma.Sql {
+export function genderCompatibilitySql(v: ViewerContext): Prisma.Sql {
   const viewerGender = v.gender ?? "UNSPECIFIED";
-  const parts: Prisma.Sql[] = [
-    intentCompatibilitySql(v),
-    Prisma.sql`(
+  if (v.connectionIntent === "DATING") {
+    return Prisma.sql`(
+      (u.gender = 'WOMAN' AND ${viewerGender} = 'MAN')
+      OR (u.gender = 'MAN' AND ${viewerGender} = 'WOMAN')
+    )`;
+  }
+  return Prisma.sql`(
       ${v.interestedIn} = 'EVERYONE'
       OR (u.gender = 'WOMAN' AND ${v.interestedIn} = 'WOMEN')
       OR (u.gender = 'MAN' AND ${v.interestedIn} = 'MEN')
-    )`,
-    Prisma.sql`(
+    )
+    AND (
       cp."interestedIn" = 'EVERYONE'
       OR (${viewerGender} = 'WOMAN' AND cp."interestedIn" = 'WOMEN')
       OR (${viewerGender} = 'MAN' AND cp."interestedIn" = 'MEN')
-    )`,
+    )`;
+}
+
+/**
+ * Mutual compatibility, independent of the viewer's optional filters (docs/ARCHITECTURE.md §7.1):
+ *  - the viewer and the candidate must be here for the same thing (Dating or Friendship);
+ *  - their genders must be compatible, by the rule that belongs to that pool (`genderCompatibilitySql`);
+ *  - the candidate must have a date of birth, and the viewer's age must fall inside the candidate's age range.
+ */
+export function compatibilitySql(v: ViewerContext): Prisma.Sql {
+  const parts: Prisma.Sql[] = [
+    intentCompatibilitySql(v),
+    genderCompatibilitySql(v),
     Prisma.sql`u."dateOfBirth" IS NOT NULL`,
   ];
   if (v.age != null) parts.push(Prisma.sql`${v.age} BETWEEN cp."ageMin" AND cp."ageMax"`);

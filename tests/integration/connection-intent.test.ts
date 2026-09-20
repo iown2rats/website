@@ -243,3 +243,62 @@ describe("discovery keeps the two pools apart", () => {
     expect(ids).not.toContain(unmoderated.userId);
   });
 });
+
+/*
+ * Rows written before this policy existed.
+ *
+ * Production carries two: a man on Dating whose "Show me" says EVERYONE, and a member who chose "Prefer not to
+ * say". Neither is rewritten by the migration — their data is theirs — so the invariant has to hold at read time
+ * instead, which is what `genderCompatibilitySql` does for the Dating pool. These tests reproduce both rows exactly
+ * as production holds them.
+ */
+describe("legacy rows are honoured without being rewritten", () => {
+  it("a man on Dating stored as EVERYONE still sees only women, and is seen only by women", async () => {
+    const legacy = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "DATING", interestedIn: "EVERYONE" });
+    const woman = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "DATING", interestedIn: "MEN" });
+    const man = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "DATING", interestedIn: "WOMEN" });
+
+    const sees = await getDeckCandidateIds(db, legacy, { now: T0 });
+    expect(sees).toContain(woman.userId);
+    expect(sees).not.toContain(man.userId);
+    // And the other way: the woman sees him, the man does not.
+    expect(await getDeckCandidateIds(db, woman, { now: T0 })).toContain(legacy.userId);
+    expect(await getDeckCandidateIds(db, man, { now: T0 })).not.toContain(legacy.userId);
+
+    // The stored row is untouched by any of that reading.
+    expect((await prefs(legacy.userId)).interestedIn).toBe("EVERYONE");
+  });
+
+  it("an UNSPECIFIED member defaulted to Dating is out of the pool in both directions, and their row is intact", async () => {
+    const legacy = await createUser(db, { now: T0, gender: "UNSPECIFIED", connectionIntent: "DATING", interestedIn: "WOMEN" });
+    const woman = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "DATING", interestedIn: "MEN" });
+    const man = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "DATING", interestedIn: "WOMEN" });
+
+    expect(await getDeckCandidateIds(db, legacy, { now: T0 })).toEqual([]);
+    expect(await getDeckCandidateIds(db, woman, { now: T0 })).not.toContain(legacy.userId);
+    expect(await getDeckCandidateIds(db, man, { now: T0 })).not.toContain(legacy.userId);
+
+    const row = await prefs(legacy.userId);
+    expect(row.interestedIn).toBe("WOMEN");
+    expect(row.connectionIntent).toBe("DATING");
+  });
+
+  it("resolving the gender to Man puts them into Dating discovery, with the preference derived", async () => {
+    const location = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
+    const legacy = await createUser(db, { now: T0, gender: "UNSPECIFIED", connectionIntent: "DATING", interestedIn: "WOMEN", locationId: location.id });
+    const woman = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "DATING", interestedIn: "MEN" });
+    expect(await getDeckCandidateIds(db, legacy, { now: T0 })).toEqual([]);
+
+    await updateInfo(legacy, { gender: "MAN", locationId: location.id, homeLocationId: null, occupation: "", education: "", heightCm: null }, { db });
+
+    expect((await prefs(legacy.userId)).interestedIn).toBe("WOMEN");
+    expect(await getDeckCandidateIds(db, legacy, { now: T0 })).toContain(woman.userId);
+    expect(await getDeckCandidateIds(db, woman, { now: T0 })).toContain(legacy.userId);
+  });
+
+  it("an UNSPECIFIED member can still use Friendship, which asks rather than deriving", async () => {
+    const legacy = await createUser(db, { now: T0, gender: "UNSPECIFIED", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE" });
+    const friend = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE" });
+    expect(await getDeckCandidateIds(db, legacy, { now: T0 })).toContain(friend.userId);
+  });
+});

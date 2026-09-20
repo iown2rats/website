@@ -57,13 +57,13 @@ describe("unread counts", () => {
   });
 
   it("is zero with no rows, and the feed reports it alongside the items", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const feed = await getNotificationFeed(me, {}, deps);
     expect(feed).toEqual({ items: [], unread: 0, nextCursor: null });
   });
 
   it("the feed's count is the whole account, not just the page", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     for (let i = 0; i < 8; i += 1) await notify(me.userId, "ACCOUNT_NOTICE", { createdAt: at(T0, -minutes(i)) });
     const feed = await getNotificationFeed(me, { limit: 3 }, deps);
     expect(feed.items).toHaveLength(3);
@@ -113,7 +113,7 @@ describe("ownership and authorization", () => {
 
 describe("marking read", () => {
   it("marks one row and leaves the rest unread", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const first = await notify(me.userId, "ACCOUNT_NOTICE", { createdAt: T0 });
     await notify(me.userId, "SAFETY_NOTICE", { createdAt: at(T0, -minutes(5)) });
 
@@ -124,7 +124,7 @@ describe("marking read", () => {
   });
 
   it("marking an already-read row again is a no-op that does not move the timestamp", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const row = await notify(me.userId, "ACCOUNT_NOTICE");
     await markNotificationRead(me, row.id, { db, now: T0 });
     const readAt = (await db.notification.findUniqueOrThrow({ where: { id: row.id } })).readAt;
@@ -135,7 +135,7 @@ describe("marking read", () => {
   });
 
   it("mark-all keeps every row — reading is not deleting", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await notify(me.userId, "ACCOUNT_NOTICE");
     await notify(me.userId, "SAFETY_NOTICE", { createdAt: at(T0, -minutes(1)) });
 
@@ -147,14 +147,14 @@ describe("marking read", () => {
   });
 
   it("mark-all on an empty inbox reports nothing marked", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     expect(await markAllNotificationsRead(me, { db, now: T0 })).toEqual({ marked: 0, unread: 0 });
   });
 });
 
 describe("privacy: who a row may name", () => {
   it("a Free member's like row names nobody and carries no photo", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const liker = await createUser(db, { now: T0, name: "Hassan" });
     await notify(me.userId, "LIKE_RECEIVED", { actorId: liker.userId });
 
@@ -170,7 +170,7 @@ describe("privacy: who a row may name", () => {
   });
 
   it("a Plus member's like row names the liker", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const liker = await createUser(db, { now: T0, name: "Hassan" });
     await notify(me.userId, "LIKE_RECEIVED", { actorId: liker.userId });
@@ -182,7 +182,7 @@ describe("privacy: who a row may name", () => {
   });
 
   it("an intro row follows the same paywall as a like", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const other = await createUser(db, { now: T0, name: "Zara" });
     await notify(me.userId, "INTRO_RECEIVED", { actorId: other.userId });
     expect((await getNotificationFeed(me, {}, deps)).items[0]!.title).toBe("Someone sent you an intro");
@@ -192,7 +192,7 @@ describe("privacy: who a row may name", () => {
   });
 
   it("a Plus member is not told about a liker whose account is no longer active", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const liker = await createUser(db, { now: T0, name: "Hassan" });
     await notify(me.userId, "LIKE_RECEIVED", { actorId: liker.userId });
@@ -204,7 +204,7 @@ describe("privacy: who a row may name", () => {
   });
 
   it("a blocked member is never named, whatever the row is", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const them = await createUser(db, { now: T0, name: "Zara" });
     const p = await post(me.userId);
     await notify(me.userId, "COMMUNITY_COMMENT", { actorId: them.userId, postId: p.id });
@@ -218,7 +218,7 @@ describe("privacy: who a row may name", () => {
   });
 
   it("a block made by the other person hides them too", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const them = await createUser(db, { now: T0, name: "Zara" });
     const p = await post(me.userId);
     await notify(me.userId, "COMMUNITY_LIKE", { actorId: them.userId, postId: p.id });
@@ -228,7 +228,7 @@ describe("privacy: who a row may name", () => {
   });
 
   it("a row never carries storage keys, ids or contact data", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const them = await createUser(db, { now: T0, name: "Zara" });
     const conv = await match(me, them);
     await sendMessage(them, conv, "Are you free tonight?", { db, now: T0 });
@@ -282,7 +282,7 @@ describe("message previews", () => {
 
 describe("navigation targets", () => {
   it("routes each type to the screen that shows it", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const them = await createUser(db, { now: T0 });
     const conv = await match(me, them);
     const p = await post(me.userId);
@@ -313,7 +313,7 @@ describe("navigation targets", () => {
   });
 
   it("a deleted Community post leaves the row without a destination", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const them = await createUser(db, { now: T0 });
     const p = await post(me.userId);
     const row = await notify(me.userId, "COMMUNITY_COMMENT", { actorId: them.userId, postId: p.id });
@@ -326,7 +326,7 @@ describe("navigation targets", () => {
   });
 
   it("a match whose conversation is gone still leads somewhere useful", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await notify(me.userId, "NEW_MATCH");
     expect((await getNotificationFeed(me, {}, deps)).items[0]!.href).toBe("/likes");
   });
@@ -334,7 +334,7 @@ describe("navigation targets", () => {
 
 describe("ordering and paging", () => {
   it("returns the newest first and pages without dropping a row", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     for (let i = 0; i < 12; i += 1) await notify(me.userId, "ACCOUNT_NOTICE", { createdAt: at(T0, -minutes(i)) });
 
     const first = await getNotificationFeed(me, { limit: 5 }, deps);
@@ -351,7 +351,7 @@ describe("ordering and paging", () => {
   });
 
   it("does not skip a row when two share a timestamp across a page boundary", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     for (let i = 0; i < 4; i += 1) await notify(me.userId, "ACCOUNT_NOTICE", { createdAt: T0 });
 
     const first = await getNotificationFeed(me, { limit: 2 }, deps);
@@ -360,7 +360,7 @@ describe("ordering and paging", () => {
   });
 
   it("a malformed cursor is ignored rather than trusted", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await notify(me.userId, "ACCOUNT_NOTICE");
     for (const cursor of ["", "nonsense", "not-a-date|abc", "|abc", `${T0.toISOString()}|`]) {
       const feed = await getNotificationFeed(me, { limit: 5, cursor }, deps);
@@ -369,7 +369,7 @@ describe("ordering and paging", () => {
   });
 
   it("caps the page size a caller can ask for", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     for (let i = 0; i < NOTIFICATION_FEED.maxPageSize + 5; i += 1) {
       await notify(me.userId, "ACCOUNT_NOTICE", { createdAt: at(T0, -minutes(i)) });
     }
@@ -380,7 +380,7 @@ describe("ordering and paging", () => {
 
 describe("row content", () => {
   it("carries the payload's own context and nothing invented", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await notify(me.userId, "PAYMENT_REJECTED", { data: { reason: "Reference did not match" }, createdAt: T0 });
     await notify(me.userId, "VERIFICATION_UPDATE", { data: { status: "VERIFIED" }, createdAt: at(T0, -minutes(1)) });
     await notify(me.userId, "SUBSCRIPTION_EXPIRING", { createdAt: at(T0, -minutes(2)) });

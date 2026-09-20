@@ -282,7 +282,7 @@ describe("identity → User mapping (Telegram beside Google)", () => {
   });
 
   it("re-authentication is bound to the same provider and subject: a Google token for the same user, or a Telegram token for someone else, never marks the session", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await db.authIdentity.create({ data: { userId: me.userId, provider: "TELEGRAM", providerSubject: "me-tg", email: null, providerUsername: "me" } });
     const other = await createUser(db, { now: T0 });
     await db.authIdentity.create({ data: { userId: other.userId, provider: "TELEGRAM", providerSubject: "other-tg", email: null } });

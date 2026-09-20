@@ -24,7 +24,7 @@ afterAll(() => disconnectDb());
 
 describe("discovery eligibility", () => {
   it("excludes self, incomplete, suspended, deleted, hidden, paused and under-photographed accounts", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const ok = await createUser(db, { now: T0 });
     const onboarding = await createUser(db, { now: T0, status: "ONBOARDING" });
     const suspended = await createUser(db, { now: T0 });
@@ -60,7 +60,7 @@ describe("discovery eligibility", () => {
   });
 
   it("excludes blocks in both directions, existing matches, active likes and recent passes; resurfaces old passes", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const iBlocked = await createUser(db, { now: T0 });
     const blockedMe = await createUser(db, { now: T0 });
     const matched = await createUser(db, { now: T0 });
@@ -86,17 +86,41 @@ describe("discovery eligibility", () => {
     expect(await getDeckCandidateIds(db, viewer, { now: at(T0, PASS_TTL_MS + 1000) })).toContain(passed.userId);
   });
 
-  it("enforces mutual gender preference without assuming heterosexual matching", async () => {
+  /*
+   * Gender compatibility is now two rules, one per pool (docs/ARCHITECTURE.md §7.5).
+   *
+   * Dating became strictly opposite-gender by product decision, so the same-gender and "prefer not to say" cases
+   * this suite used to cover moved to Friendship rather than being dropped — Friendship is where they live now.
+   */
+  it("Dating is strictly opposite gender, whatever either side has stored", async () => {
     const womanWantsWomen = await createUser(db, { now: T0, gender: "WOMAN", interestedIn: "WOMEN" });
-    const womanWantsWomen2 = await createUser(db, { now: T0, gender: "WOMAN", interestedIn: "WOMEN" });
     const womanWantsMen = await createUser(db, { now: T0, gender: "WOMAN", interestedIn: "MEN" });
     const manWantsEveryone = await createUser(db, { now: T0, gender: "MAN", interestedIn: "EVERYONE" });
     const manWantsWomen = await createUser(db, { now: T0, gender: "MAN", interestedIn: "WOMEN" });
-    const unspecifiedEveryone = await createUser(db, { now: T0, gender: "UNSPECIFIED", interestedIn: "EVERYONE" });
+    const unspecified = await createUser(db, { now: T0, gender: "UNSPECIFIED", interestedIn: "EVERYONE" });
+
+    // A woman sees men and only men, whichever of them stored what.
+    expect((await getDeckCandidateIds(db, womanWantsWomen, { now: T0 })).sort()).toEqual([manWantsEveryone.userId, manWantsWomen.userId].sort());
+    // A man stored as EVERYONE still sees only women: the rule is applied, not the stale column.
+    expect((await getDeckCandidateIds(db, manWantsEveryone, { now: T0 })).sort()).toEqual([womanWantsMen.userId, womanWantsWomen.userId].sort());
+    // "Prefer not to say" is out of Dating in both directions until they resolve it.
+    expect(await getDeckCandidateIds(db, unspecified, { now: T0 })).toEqual([]);
+    for (const viewer of [womanWantsMen, manWantsWomen, manWantsEveryone]) {
+      expect(await getDeckCandidateIds(db, viewer, { now: T0 })).not.toContain(unspecified.userId);
+    }
+  });
+
+  it("Friendship enforces mutual preference without assuming heterosexual matching", async () => {
+    const f = { connectionIntent: "FRIENDSHIP" as const, now: T0 };
+    const womanWantsWomen = await createUser(db, { ...f, gender: "WOMAN", interestedIn: "WOMEN" });
+    const womanWantsWomen2 = await createUser(db, { ...f, gender: "WOMAN", interestedIn: "WOMEN" });
+    const womanWantsMen = await createUser(db, { ...f, gender: "WOMAN", interestedIn: "MEN" });
+    const manWantsEveryone = await createUser(db, { ...f, gender: "MAN", interestedIn: "EVERYONE" });
+    const manWantsWomen = await createUser(db, { ...f, gender: "MAN", interestedIn: "WOMEN" });
+    const unspecifiedEveryone = await createUser(db, { ...f, gender: "UNSPECIFIED", interestedIn: "EVERYONE" });
 
     const deck = await getDeckCandidateIds(db, womanWantsWomen, { now: T0 });
     expect(deck).toEqual([womanWantsWomen2.userId]); // womanWantsMen is a woman but does not want women back
-    // The man who wants women sees both women who want men... only womanWantsMen wants men.
     const manDeck = await getDeckCandidateIds(db, manWantsWomen, { now: T0 });
     expect(manDeck).toEqual([womanWantsMen.userId]);
     // Everyone ↔ Everyone includes "prefer not to say" in both directions.
@@ -106,7 +130,7 @@ describe("discovery eligibility", () => {
   });
 
   it("applies the viewer's age range and the candidate's age range (mutual)", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 25, ageMax: 35 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 25, ageMax: 35 });
     const inRange = await createUser(db, { now: T0, age: 28, ageMin: 18, ageMax: 99 });
     const tooYoung = await createUser(db, { now: T0, age: 22 });
     const tooOld = await createUser(db, { now: T0, age: 40 });
@@ -123,7 +147,7 @@ describe("discovery eligibility", () => {
     const hulhumale = await createLocation(db, { name: "Hulhumalé", atollCode: "K", isGreaterMale: true });
     const maafushi = await createLocation(db, { name: "Maafushi", atollCode: "K" });
     const addu = await createLocation(db, { name: "Addu City", atollCode: "S" });
-    const viewer = await createUser(db, { now: T0, locationId: male.id });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, locationId: male.id });
     const inHulhumale = await createUser(db, { now: T0, locationId: hulhumale.id });
     const inMaafushi = await createUser(db, { now: T0, locationId: maafushi.id });
     const inAddu = await createUser(db, { now: T0, locationId: addu.id });
@@ -140,7 +164,7 @@ describe("discovery eligibility", () => {
   });
 
   it("tells an over-restrictive filter apart from an exhausted pool", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 50, ageMax: 60 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 50, ageMax: 60 });
     await createUser(db, { now: T0, age: 30 });
     expect(await getDeckCandidateIds(db, viewer, { now: T0 })).toEqual([]);
     expect(await countRelaxedCandidates(db, viewer, T0)).toBe(1);
@@ -154,7 +178,7 @@ describe("discovery eligibility", () => {
 
 describe("discovery pagination and ranking", () => {
   it("returns bounded batches that never overlap when the client passes what it holds", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     for (let i = 0; i < 30; i++) await createUser(db, { now: T0 });
     const first = await getDeckCandidateIds(db, viewer, { now: T0, limit: 12 });
     expect(first).toHaveLength(12);
@@ -170,7 +194,7 @@ describe("discovery pagination and ranking", () => {
   });
 
   it("ranks active boosts first, then verified, then recently active; expired boosts lose priority", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const stale = await createUser(db, { now: T0, lastActiveAt: at(T0, -hours(48)) });
     const recent = await createUser(db, { now: T0, lastActiveAt: at(T0, -hours(1)) });
     const verified = await createUser(db, { now: T0, verified: true, lastActiveAt: at(T0, -hours(72)) });
@@ -187,7 +211,7 @@ describe("discovery pagination and ranking", () => {
 
 describe("discovery card DTO", () => {
   it("contains exactly the allow-listed keys and none of the private fields", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const c = await createUser(db, { now: T0, name: "Aishath", age: 26 });
     await db.profile.update({ where: { userId: c.userId }, data: { occupation: "Marketing", education: "Villa College", languages: ["Dhivehi"], heightCm: 162 } });
     await grantPlus(db, c.userId, at(T0, -hours(1)), at(T0, hours(24)));
@@ -209,7 +233,7 @@ describe("discovery card DTO", () => {
 
   it("omits location and age entirely when the candidate hides them", async () => {
     const male = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const shy = await createUser(db, { now: T0, locationId: male.id, hideLocation: true, hideAge: true, age: 31 });
     const open = await createUser(db, { now: T0, locationId: male.id, age: 31 });
     const cards = await buildDiscoveryCards(db, viewer.userId, [shy.userId, open.userId], T0, storage);
@@ -219,7 +243,7 @@ describe("discovery card DTO", () => {
   });
 
   it("only includes displayable photos, in position order", async () => {
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     const c = await createUser(db, { now: T0, photos: 3 });
     const profile = await db.profile.findUniqueOrThrow({ where: { userId: c.userId } });
     await db.profilePhoto.update({ where: { profileId_position: { profileId: profile.id, position: 1 } }, data: { moderation: "REJECTED" } });

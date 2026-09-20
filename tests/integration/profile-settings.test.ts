@@ -57,7 +57,7 @@ afterAll(() => disconnectDb());
 
 describe("own profile and editing", () => {
   it("loads the owner's data (including their own DOB) and never someone else's", async () => {
-    const me = await createUser(db, { now: T0, name: "Ismail", age: 27 });
+    const me = await createUser(db, { gender: "MAN", now: T0, name: "Ismail", age: 27 });
     const data = await getEditProfileData(me, { db });
     expect(data.name).toBe("Ismail");
     expect(data.age).toBe(27);
@@ -83,7 +83,7 @@ describe("own profile and editing", () => {
 
   it("rejects invalid edits and strips unknown fields at the schema", async () => {
     const { male } = await fixtures();
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await expect(updateInfo(me, { gender: "MAN", locationId: "nope", occupation: "x" }, { db })).rejects.toBeInstanceOf(ValidationError);
     await expect(updateInfo(me, { gender: "MAN", locationId: male.id, occupation: "<b>bold</b>" }, { db })).rejects.toBeInstanceOf(ValidationError);
     await expect(updateInfo(me, { gender: "MAN", locationId: male.id, heightCm: 90 }, { db })).rejects.toBeInstanceOf(ValidationError);
@@ -94,7 +94,7 @@ describe("own profile and editing", () => {
 
   it("About edits reuse the onboarding rules and recalculate completion", async () => {
     const { male, interests, prompt } = await fixtures();
-    const me = await createUser(db, { now: T0, locationId: male.id });
+    const me = await createUser(db, { gender: "MAN", now: T0, locationId: male.id });
     await db.profile.update({ where: { userId: me.userId }, data: { bio: null } });
     const before = (await getEditProfileData(me, { db })).completion.percent;
     await expect(updateAbout(me, { bio: "hi", intent: "DATING", interestIds: ["bogus"], prompts: [] }, { db })).rejects.toBeInstanceOf(ValidationError);
@@ -111,7 +111,7 @@ describe("own profile and editing", () => {
 
 describe("profile photos", () => {
   it("the owner can reorder and choose the main photo; foreign mutation is refused", async () => {
-    const me = await createUser(db, { now: T0, photos: 3 });
+    const me = await createUser(db, { gender: "MAN", now: T0, photos: 3 });
     const other = await createUser(db, { now: T0, photos: 2 });
     const mine = await listPhotos(me, { db, storage });
     await reorderPhotos(me, [mine[2]!.id, mine[0]!.id, mine[1]!.id], { db });
@@ -124,7 +124,7 @@ describe("profile photos", () => {
   });
 
   it("a completed profile cannot drop below the minimum, a rejected photo can always go, and onboarding is unaffected", async () => {
-    const me = await createUser(db, { now: T0, photos: 3 });
+    const me = await createUser(db, { gender: "MAN", now: T0, photos: 3 });
     const photos = await listPhotos(me, { db, storage });
     await deletePhoto(me, photos[2]!.id, { db, storage });
     expect(await listPhotos(me, { db, storage })).toHaveLength(2);
@@ -144,10 +144,10 @@ describe("profile photos", () => {
   });
 
   it("keeps the maximum of six and the production photo policy", async () => {
-    const me = await createUser(db, { now: T0, photos: 6 });
+    const me = await createUser(db, { gender: "MAN", now: T0, photos: 6 });
     await expect(processAndStorePhoto(me, { bytes: new Uint8Array(64), size: 64, declaredType: "image/jpeg" }, { db, storage, now: T0 })).rejects.toThrow(/up to 6/);
     const pending = await createUser(db, { now: T0, photos: 2, photoModeration: "PENDING" });
-    const viewer = await createUser(db, { now: T0 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     process.env.PHOTO_VISIBILITY_POLICY = "approved-only";
     resetEnvCache();
     const [profile] = await buildVisibleProfiles(db, viewer.userId, [pending.userId], T0);
@@ -173,7 +173,7 @@ describe("discovery settings", () => {
   });
 
   it("stores advanced filters for Plus users", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const saved = await saveDiscoveryFilters(me, { connectionIntent: "DATING", interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", heightMinCm: 165, heightMaxCm: 185, education: "MNU" }, { db, now: T0 });
     expect(saved).toMatchObject({ heightMinCm: 165, heightMaxCm: 185, education: "MNU", advancedEnabled: true });
@@ -183,8 +183,8 @@ describe("discovery settings", () => {
 describe("privacy", () => {
   it("hide location and hide age persist and are absent from what other users receive", async () => {
     const male = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
-    const me = await createUser(db, { now: T0, locationId: male.id, age: 29 });
-    const viewer = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0, locationId: male.id, age: 29 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0 });
     let cards = await buildDiscoveryCards(db, viewer.userId, [me.userId], T0, storage);
     expect(cards[0]).toMatchObject({ location: "Malé", age: 29 });
     const updated = await updatePrivacyToggles(me, { hideLocation: true, hideAge: true, hideActiveStatus: true, invisibleMode: true, visibility: "HIDDEN" }, { db });
@@ -247,7 +247,7 @@ describe("privacy", () => {
   });
 
   it("contact hashes are stored as digests only, bounded, and cleared on request", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const hex = (n: number) => n.toString(16).padStart(64, "0");
     const r = await addContactHashes(me, { hashes: [hex(1), hex(2), hex(2)], source: "MANUAL" }, { db, now: T0 });
     expect(r).toEqual({ added: 2, total: 2 });
@@ -304,7 +304,7 @@ describe("notification settings", () => {
 
 describe("account: sessions, deletion", () => {
   it("logout revokes exactly the current session", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createSession(db, me.userId, {}, T0);
     const b = await createSession(db, me.userId, {}, T0);
     expect(await revokeSession(db, a.token)).toBe(true);
@@ -313,7 +313,7 @@ describe("account: sessions, deletion", () => {
   });
 
   it("deletion requires a recent Google re-authentication on the current session; a foreign or stale confirmation changes nothing", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const other = await createUser(db, { now: T0 });
     const mine = await createIdentity(db, me.userId);
     const theirs = await createIdentity(db, other.userId);
@@ -378,7 +378,7 @@ describe("account: sessions, deletion", () => {
 describe("safe presentation DTOs", () => {
   it("membership carries tier, plan and period only; privacy, blocked and profile payloads carry nothing private", async () => {
     await db.subscriptionPlan.create({ data: { code: "MONTHLY", name: "1 month", intervalDays: 30, priceMinor: 14900, isPlaceholderPrice: true } });
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const plan = await db.subscriptionPlan.findUniqueOrThrow({ where: { code: "MONTHLY" } });
     await db.subscription.create({ data: { userId: me.userId, planId: plan.id, status: "ACTIVE", provider: "stub", providerCustomerRef: "cus_secret", providerSubscriptionRef: "sub_secret", startedAt: T0, currentPeriodStart: T0, currentPeriodEnd: at(T0, hours(24 * 30)) } });
     const m = await getMembership(me, { db, now: T0 });

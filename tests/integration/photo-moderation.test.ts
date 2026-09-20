@@ -219,7 +219,7 @@ describe("stale and double decisions", () => {
 describe("production discovery visibility", () => {
   it("shows a member only once enough of their photos are approved, and never a rejected one", async () => {
     const admin = await makeAdmin();
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 99 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     const member = await createUser(db, { now: T0, photos: 3, photoModeration: "PENDING" });
     const ids = await photoIds(member);
 
@@ -244,7 +244,7 @@ describe("production discovery visibility", () => {
 
 describe("the empty-deck reason", () => {
   it("says people are being reviewed rather than claiming the viewer has seen everyone", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 99 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     await createUser(db, { now: T0, photos: 2, photoModeration: "PENDING" });
 
     await underProductionPolicy(async () => {
@@ -257,7 +257,7 @@ describe("the empty-deck reason", () => {
   });
 
   it("still says EXHAUSTED when there is genuinely nobody, and FILTERS when the viewer's own filters are the cause", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 99 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     await underProductionPolicy(async () => {
       expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("EXHAUSTED");
     });
@@ -273,7 +273,7 @@ describe("the empty-deck reason", () => {
   });
 
   it("prefers FILTERS over REVIEW, because only the filters are the viewer's to change", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 99 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     await createUser(db, { now: T0, age: 55, photos: 2, photoModeration: "APPROVED" });
     await createUser(db, { now: T0, age: 30, photos: 2, photoModeration: "PENDING" });
     await db.discoveryPreferences.update({ where: { userId: viewer.userId }, data: { ageMin: 18, ageMax: 35 } });
@@ -283,7 +283,7 @@ describe("the empty-deck reason", () => {
   });
 
   it("does not count people the viewer has already acted on, or who are hidden from them", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 99 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     const swiped = await createUser(db, { now: T0, photos: 2, photoModeration: "PENDING" });
     await likeUser(viewer, swiped.userId, { db, now: T0 });
     const paused = await createUser(db, { now: T0, photos: 2, photoModeration: "PENDING" });
@@ -296,7 +296,7 @@ describe("the empty-deck reason", () => {
   });
 
   it("is never REVIEW under a policy where pending photos are already displayable", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 99 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     await createUser(db, { now: T0, photos: 2, photoModeration: "PENDING" });
     // Test/development policy: a pending photo counts, so the member is simply in the deck.
     expect(await countAwaitingPhotoReview(db, viewer, T0)).toBe(0);

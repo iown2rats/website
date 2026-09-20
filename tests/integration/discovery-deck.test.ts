@@ -21,7 +21,7 @@ afterAll(() => disconnectDb());
 
 describe("deck page", () => {
   it("returns safe cards, the allowance, server time and capabilities; empty reasons are distinct", async () => {
-    const viewer = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 99 });
+    const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     const a = await createUser(db, { now: T0 });
     const page = await getDeck(viewer, {}, deps());
     expect(page.cards.map((c) => c.handle)).toEqual([a.handle]);
@@ -41,7 +41,7 @@ describe("deck page", () => {
   });
 
   it("the liker-facing flow: like decrements, pass does not, the 30th succeeds, the 31st is refused with the reset time", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const people = [];
     for (let i = 0; i < 32; i++) people.push(await createUser(db, { now: T0 }));
     await passByHandle(me, people[31]!.handle, deps());
@@ -58,7 +58,7 @@ describe("deck page", () => {
   });
 
   it("Plus: the 90th like succeeds and the 91st is refused; nobody is told Plus is unlimited", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(48)));
     const people = [];
     for (let i = 0; i < 91; i++) people.push(await createUser(db, { now: T0 }));
@@ -89,7 +89,7 @@ describe("deck page", () => {
   });
 
   it("unknown handles and blocked people answer NotFound, never revealing existence", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const other = await createUser(db, { now: T0 });
     await blockUser(other, me.userId, { db, now: T0 });
     await expect(likeByHandle(me, "nobody-here", deps())).rejects.toBeInstanceOf(NotFoundError);
@@ -127,7 +127,7 @@ describe("blocking races", () => {
 
 describe("undo through the deck", () => {
   it("Free is refused; Plus restores only the most recent eligible pass as a card, without duplicates", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const a = await createUser(db, { now: T0 });
     const b = await createUser(db, { now: T0 });
     await passByHandle(me, a.handle, deps());
@@ -144,7 +144,7 @@ describe("undo through the deck", () => {
   });
 
   it("returns no card when the restored person is no longer a valid candidate", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const a = await createUser(db, { now: T0 });
     await passByHandle(me, a.handle, deps());
@@ -181,7 +181,7 @@ describe("filters", () => {
   });
 
   it("validates ranges, location and markup", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const base = { connectionIntent: "DATING", interestedIn: "EVERYONE", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE" };
     await expect(saveDiscoveryFilters(me, { ...base, ageMin: 40 }, { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);
     await expect(saveDiscoveryFilters(me, { ...base, ageMin: 17 }, { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);
@@ -202,8 +202,8 @@ describe("Invisible Mode through the deck", () => {
     const ghost = await createUser(db, { now: T0, name: "Ghost" });
     await grantPlus(db, ghost.userId, at(T0, -hours(1)), at(T0, hours(1)));
     await setInvisibleMode(ghost, true, { db, now: T0 });
-    const liked = await createUser(db, { now: T0 });
-    const stranger = await createUser(db, { now: T0 });
+    const liked = await createUser(db, { gender: "MAN", now: T0 });
+    const stranger = await createUser(db, { gender: "MAN", now: T0 });
     await likeUser(ghost, liked.userId, { db, now: T0 });
 
     expect((await getDeck(liked, {}, deps())).cards.map((c) => c.handle)).toContain(ghost.handle);

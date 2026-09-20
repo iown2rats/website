@@ -46,7 +46,13 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
   const dob = new Date(Date.UTC(now.getUTCFullYear() - age, now.getUTCMonth(), Math.max(1, now.getUTCDate() - 1)));
   const phoneE164 = o.phone === null ? null : (o.phone ?? `+9607${String(100000 + seq).padStart(6, "0")}`);
   const handle = `u${seq}_${Math.random().toString(36).slice(2, 8)}`;
-  const gender = o.gender ?? (seq % 2 === 0 ? "WOMAN" : "MAN");
+  /*
+   * Deterministic, not alternating. The old default flipped on a module-level counter, so whether two fixtures
+   * were opposite genders depended on the order they happened to be created in — invisible until Dating became
+   * strictly opposite-gender and a dozen unrelated tests started failing on it. A test that cares about gender
+   * says so; one that does not gets the same answer every time.
+   */
+  const gender = o.gender ?? "WOMAN";
   const status = o.status ?? "ACTIVE";
 
   const user = await db.user.create({

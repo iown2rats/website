@@ -18,7 +18,7 @@ afterAll(() => disconnectDb());
 describe("Invisible Mode", () => {
   it("a normal user is discoverable normally", async () => {
     const a = await createUser(db, { now: T0 });
-    const c = await createUser(db, { now: T0 });
+    const c = await createUser(db, { gender: "MAN", now: T0 });
     expect(await getDeckCandidateIds(db, c, { now: T0 })).toContain(a.userId);
     expect(await canView(db, c.userId, a.userId, T0)).toBe(true);
   });
@@ -27,7 +27,7 @@ describe("Invisible Mode", () => {
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
     await setInvisibleMode(a, true, { db, now: T0 });
-    const c = await createUser(db, { now: T0 });
+    const c = await createUser(db, { gender: "MAN", now: T0 });
     expect(await getDeckCandidateIds(db, c, { now: T0 })).not.toContain(a.userId);
     expect(await canView(db, c.userId, a.userId, T0)).toBe(false);
     // C cannot like A either: the like path uses the same predicate.
@@ -38,8 +38,8 @@ describe("Invisible Mode", () => {
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
     await setInvisibleMode(a, true, { db, now: T0 });
-    const b = await createUser(db, { now: T0 });
-    const c = await createUser(db, { now: T0 });
+    const b = await createUser(db, { gender: "MAN", now: T0 });
+    const c = await createUser(db, { gender: "MAN", now: T0 });
     await likeUser(a, b.userId, { db, now: T0 });
     expect(await getDeckCandidateIds(db, b, { now: T0 })).toContain(a.userId);
     expect(await getDeckCandidateIds(db, c, { now: T0 })).not.toContain(a.userId);
@@ -50,7 +50,7 @@ describe("Invisible Mode", () => {
 
   it("existing matches and chats remain available after enabling", async () => {
     const a = await createUser(db, { now: T0 });
-    const b = await createUser(db, { now: T0 });
+    const b = await createUser(db, { gender: "MAN", now: T0 });
     await likeUser(a, b.userId, { db, now: T0 });
     const r = await likeUser(b, a.userId, { db, now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
@@ -70,7 +70,7 @@ describe("Invisible Mode", () => {
   it("a Plus member with the flag off is discoverable like anyone else", async () => {
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(24)));
-    const c = await createUser(db, { now: T0 });
+    const c = await createUser(db, { gender: "MAN", now: T0 });
     expect((await getInvisibleModeState(a, { db, now: T0 }))).toEqual({ enabled: false, effective: false, suspended: false });
     expect(await getDeckCandidateIds(db, c, { now: T0 })).toContain(a.userId);
     expect(await canView(db, c.userId, a.userId, T0)).toBe(true);
@@ -84,7 +84,7 @@ describe("Invisible Mode", () => {
   it("stays hidden when the flag is set and the account has never held Plus", async () => {
     const a = await createUser(db, { now: T0 });
     await db.privacySettings.update({ where: { userId: a.userId }, data: { invisibleMode: true } });
-    const c = await createUser(db, { now: T0 });
+    const c = await createUser(db, { gender: "MAN", now: T0 });
     expect(await getDeckCandidateIds(db, c, { now: T0 })).not.toContain(a.userId);
     expect(await canView(db, c.userId, a.userId, T0)).toBe(false);
     expect(await getInvisibleModeState(a, { db, now: T0 })).toEqual({ enabled: true, effective: false, suspended: true });
@@ -94,8 +94,8 @@ describe("Invisible Mode", () => {
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(1)));
     await setInvisibleMode(a, true, { db, now: T0 });
-    const b = await createUser(db, { now: T0 });
-    const c = await createUser(db, { now: T0 });
+    const b = await createUser(db, { gender: "MAN", now: T0 });
+    const c = await createUser(db, { gender: "MAN", now: T0 });
     await likeUser(a, b.userId, { db, now: T0 });
 
     const afterLapse = at(T0, hours(2));
@@ -118,8 +118,8 @@ describe("Invisible Mode", () => {
     const a = await createUser(db, { now: T0 });
     await grantPlus(db, a.userId, at(T0, -hours(1)), at(T0, hours(1)));
     await setInvisibleMode(a, true, { db, now: T0 });
-    const b = await createUser(db, { now: T0 });
-    const c = await createUser(db, { now: T0 });
+    const b = await createUser(db, { gender: "MAN", now: T0 });
+    const c = await createUser(db, { gender: "MAN", now: T0 });
     await likeUser(a, b.userId, { db, now: T0 });
 
     const lapsed = at(T0, hours(2));

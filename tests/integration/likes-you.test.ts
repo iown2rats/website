@@ -12,7 +12,7 @@ afterAll(() => disconnectDb());
 
 describe("Likes You", () => {
   it("a Free user gets the count and placeholders with no identifying fields", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     const likers = [await createUser(db, { now: T0, name: "Hassan" }), await createUser(db, { now: T0, name: "Zara" })];
     for (const l of likers) await likeUser(l, me.userId, { db, now: T0 });
 
@@ -37,7 +37,7 @@ describe("Likes You", () => {
   });
 
   it("a Plus user gets the actual profiles", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const liker = await createUser(db, { now: T0, name: "Hassan" });
     await likeUser(liker, me.userId, { db, now: T0 });
@@ -55,7 +55,7 @@ describe("Likes You", () => {
   });
 
   it("excludes blocked users and people already responded to", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const blocked = await createUser(db, { now: T0 });
     const matched = await createUser(db, { now: T0 });
@@ -70,7 +70,7 @@ describe("Likes You", () => {
   });
 
   it("honours hideAge and hideLocation in the Plus DTO", async () => {
-    const me = await createUser(db, { now: T0 });
+    const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const liker = await createUser(db, { now: T0, age: 31 });
     await db.privacySettings.update({ where: { userId: liker.userId }, data: { hideAge: true } });

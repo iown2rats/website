@@ -56,6 +56,11 @@ export async function createSession(db: DbLike, userId: string, meta: SessionMet
 
 export interface SessionUser {
   id: string;
+  /**
+   * Which domain this account belongs to (docs/ARCHITECTURE.md §22.1). MEMBER is a dating account; STAFF is an
+   * operational one. Read on every request, so the member/staff boundary costs no extra query.
+   */
+  accountType: "MEMBER" | "STAFF";
   role: "USER" | "MODERATOR" | "ADMIN";
   status: "ONBOARDING" | "ACTIVE" | "SUSPENDED" | "BANNED" | "DELETED";
   onboardingStage: string;
@@ -73,15 +78,20 @@ export interface ResolvedSession {
   expiresAt: Date;
 }
 
-export type UserAuthKind = "onboarding" | "active" | "blocked" | "unverified";
+export type UserAuthKind = "onboarding" | "active" | "blocked" | "unverified" | "staff";
 
 /**
- * Pure classification shared by the request-scoped auth state and tests. "unverified" comes before everything but
- * "blocked": an email account that has not confirmed its address holds a session and nothing else, so it can never
- * be read as onboarding or active anywhere in the app.
+ * Pure classification shared by the request-scoped auth state and tests.
+ *
+ * Order matters, and "staff" sits immediately after "blocked" on purpose. A STAFF account must never be readable
+ * as a member state anywhere in the app: not "active" (which is what opens discovery, likes, chats and Community),
+ * not "onboarding" (which would send an operator into the dating sign-up flow), and not "unverified" (which would
+ * park them on the member's confirm-your-email screen). Classifying once, here, is what makes the separation hold
+ * at every call site that already uses these guards instead of relying on each of them to remember.
  */
-export function authKindForUser(user: Pick<SessionUser, "status" | "onboardingCompletedAt"> & { emailVerificationPending?: boolean }): UserAuthKind {
+export function authKindForUser(user: Pick<SessionUser, "status" | "onboardingCompletedAt"> & { accountType?: "MEMBER" | "STAFF"; emailVerificationPending?: boolean }): UserAuthKind {
   if (user.status === "SUSPENDED" || user.status === "BANNED" || user.status === "DELETED") return "blocked";
+  if (user.accountType === "STAFF") return "staff";
   if (user.emailVerificationPending) return "unverified";
   if (user.status === "ACTIVE" && user.onboardingCompletedAt) return "active";
   return "onboarding";
@@ -109,6 +119,7 @@ export async function resolveSession(db: DbLike, token: string | null | undefine
       user: {
         select: {
           id: true,
+          accountType: true,
           role: true,
           status: true,
           onboardingStage: true,

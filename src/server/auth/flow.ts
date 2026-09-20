@@ -107,5 +107,6 @@ export async function completeSignIn(request: NextRequest, provider: OidcSignInP
   const forwarded = request.headers.get("x-forwarded-for");
   const session = await createSession(db, outcome.userId, { ip: forwarded ? forwarded.split(",")[0]!.trim() : null, userAgent: request.headers.get("user-agent") }, now);
   await setSessionCookie(session.token, session.expiresAt);
-  return NextResponse.redirect(new URL(outcome.destination === "app" ? ROUTES.home : ROUTES.onboarding, request.url));
+  const landing = outcome.destination === "admin" ? ROUTES.staffHome : outcome.destination === "app" ? ROUTES.home : ROUTES.onboarding;
+  return NextResponse.redirect(new URL(landing, request.url));
 }

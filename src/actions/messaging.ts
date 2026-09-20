@@ -4,7 +4,7 @@ import { z } from "zod";
 import { MESSAGE_LIMITS } from "@/config/product";
 import { getDb } from "@/lib/db";
 import { isDomainError } from "@/lib/errors";
-import { requireActor } from "@/server/auth/current-user";
+import { requireMember } from "@/server/auth/current-user";
 import { listConversations, type ChatsListDto } from "@/server/conversations/list";
 import { getConversationForActor, listMessages, markConversationRead, pollConversation, sendMessage, type MessageDto, type MessagePageDto, type PollDto } from "@/server/conversations/messages";
 import { getMatchProfile } from "@/server/conversations/profile";
@@ -54,7 +54,7 @@ function failure(e: unknown): MessagingFailure {
 
 export async function sendChatMessage(input: unknown): Promise<{ ok: true; message: MessageDto; serverNow: string } | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const parsed = sendSchema.parse(input);
     const sent = await sendMessage(actor, parsed.conversationId, parsed.body);
     return { ok: true, message: { id: sent.id, fromMe: true, kind: "TEXT", body: sent.body, at: sent.createdAt.toISOString() }, serverNow: new Date().toISOString() };
@@ -65,7 +65,7 @@ export async function sendChatMessage(input: unknown): Promise<{ ok: true; messa
 
 export async function loadOlderMessages(input: unknown): Promise<({ ok: true } & MessagePageDto) | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const parsed = pageSchema.parse(input);
     return { ok: true, ...(await listMessages(actor, parsed.conversationId, { cursor: parsed.cursor ?? undefined })) };
   } catch (e) {
@@ -75,7 +75,7 @@ export async function loadOlderMessages(input: unknown): Promise<({ ok: true } &
 
 export async function pollChatMessages(input: unknown): Promise<({ ok: true } & PollDto) | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const parsed = pollSchema.parse(input);
     return { ok: true, ...(await pollConversation(actor, parsed.conversationId, { afterId: parsed.afterId ?? null })) };
   } catch (e) {
@@ -86,7 +86,7 @@ export async function pollChatMessages(input: unknown): Promise<({ ok: true } & 
 /** Called when the conversation is actually on screen (never from the list). */
 export async function markChatRead(input: unknown): Promise<{ ok: true; unreadCleared: boolean } | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const { conversationId } = convSchema.parse(input);
     return { ok: true, ...(await markConversationRead(actor, conversationId)) };
   } catch (e) {
@@ -96,7 +96,7 @@ export async function markChatRead(input: unknown): Promise<{ ok: true; unreadCl
 
 export async function refreshChats(): Promise<({ ok: true } & ChatsListDto) | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     return { ok: true, ...(await listConversations(actor)) };
   } catch (e) {
     return failure(e);
@@ -105,7 +105,7 @@ export async function refreshChats(): Promise<({ ok: true } & ChatsListDto) | Me
 
 export async function loadMatchProfile(input: unknown): Promise<{ ok: true; profile: DiscoveryCardDto | null } | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const { conversationId } = convSchema.parse(input);
     return { ok: true, profile: await getMatchProfile(actor, conversationId) };
   } catch (e) {
@@ -115,7 +115,7 @@ export async function loadMatchProfile(input: unknown): Promise<{ ok: true; prof
 
 export async function unmatchChat(input: unknown): Promise<{ ok: true } | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const { conversationId } = convSchema.parse(input);
     await unmatchConversation(actor, conversationId);
     return { ok: true };
@@ -127,7 +127,7 @@ export async function unmatchChat(input: unknown): Promise<{ ok: true } | Messag
 /** Blocks the other participant of a conversation; the target is resolved server-side from the conversation. */
 export async function blockChatPartner(input: unknown): Promise<{ ok: true } | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const { conversationId } = convSchema.parse(input);
     const conversation = await getConversationForActor(getDb(), actor, conversationId);
     await blockUser(actor, conversation.otherUserId);
@@ -139,7 +139,7 @@ export async function blockChatPartner(input: unknown): Promise<{ ok: true } | M
 
 export async function reportChatPartner(input: unknown): Promise<{ ok: true } | MessagingFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await reportConversationPartner(actor, input);
     return { ok: true };
   } catch (e) {

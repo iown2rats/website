@@ -25,6 +25,9 @@ export async function confirmAccountDeletion(): Promise<DeletionConfirmResult> {
   try {
     const state = await getAuthState();
     if (state.kind === "anonymous") return { ok: false, code: "ERROR", message: "Your session ended. Sign in again." };
+    // Member account deletion anonymises a dating profile and its graph. An operational account has none of that,
+    // and removing one is a staff-revocation decision made in the portal, not a self-service action (§16).
+    if (state.kind === "staff") return { ok: false, code: "ERROR", message: "Staff accounts are removed from the admin portal, not here." };
     const r = await deleteAccount({ userId: state.user.id }, { sessionId: state.sessionId }, { storage: getStorageProvider(), db: getDb() });
     if (!r.ok) return { ok: false, code: "REAUTH_REQUIRED", message: "Your confirmation has expired. Sign in again to delete your account." };
     deleted = true;

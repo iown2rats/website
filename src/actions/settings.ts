@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { isDomainError } from "@/lib/errors";
 import { handleSchema } from "@/lib/validation/profile";
-import { requireActor } from "@/server/auth/current-user";
+import { requireMember } from "@/server/auth/current-user";
 import { getNotificationSettings, updateNotificationSettings, type NotificationSettingsDto } from "@/server/notifications/settings";
 import { addContactHashes, clearContactHashes, getContactHashKey } from "@/server/privacy/contact-hashes";
 import { setInvisibleMode } from "@/server/privacy/invisible-mode";
@@ -32,7 +32,7 @@ type PrivacyResult = { ok: true; privacy: PrivacySettingsDto } | SettingsFailure
 
 export async function savePrivacyToggles(input: unknown): Promise<PrivacyResult> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     return { ok: true, privacy: await updatePrivacyToggles(actor, input) };
   } catch (e) {
     return failure(e);
@@ -41,7 +41,7 @@ export async function savePrivacyToggles(input: unknown): Promise<PrivacyResult>
 
 export async function saveInvisibleMode(input: unknown): Promise<PrivacyResult> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const enabled = z.object({ enabled: z.boolean() }).parse(input).enabled;
     await setInvisibleMode(actor, enabled);
     return { ok: true, privacy: await getPrivacySettings(actor) };
@@ -52,7 +52,7 @@ export async function saveInvisibleMode(input: unknown): Promise<PrivacyResult> 
 
 export async function savePausedDating(input: unknown): Promise<PrivacyResult> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const paused = z.object({ paused: z.boolean() }).parse(input).paused;
     return { ok: true, privacy: await setDatingPaused(actor, paused) };
   } catch (e) {
@@ -62,7 +62,7 @@ export async function savePausedDating(input: unknown): Promise<PrivacyResult> {
 
 export async function saveNotificationSettings(input: unknown): Promise<{ ok: true; settings: NotificationSettingsDto } | SettingsFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     return { ok: true, settings: await updateNotificationSettings(actor, input) };
   } catch (e) {
     return failure(e);
@@ -71,7 +71,7 @@ export async function saveNotificationSettings(input: unknown): Promise<{ ok: tr
 
 export async function loadNotificationSettings(): Promise<{ ok: true; settings: NotificationSettingsDto } | SettingsFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     return { ok: true, settings: await getNotificationSettings(actor) };
   } catch (e) {
     return failure(e);
@@ -80,7 +80,7 @@ export async function loadNotificationSettings(): Promise<{ ok: true; settings: 
 
 export async function unblock(input: unknown): Promise<{ ok: true; blocked: BlockedUserDto[] } | SettingsFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const { handle } = handleSchema.parse(input);
     await unblockUser(actor, handle);
     return { ok: true, blocked: await listBlockedUsers(actor) };
@@ -92,7 +92,7 @@ export async function unblock(input: unknown): Promise<{ ok: true; blocked: Bloc
 /** The public salt the device needs to hash numbers exactly like the server (docs/CONTACT_BLOCKING.md §4). */
 export async function loadContactHashKey(): Promise<{ ok: true; key: string; version: number } | SettingsFailure> {
   try {
-    await requireActor();
+    await requireMember();
     return { ok: true, ...getContactHashKey() };
   } catch (e) {
     return failure(e);
@@ -101,7 +101,7 @@ export async function loadContactHashKey(): Promise<{ ok: true; key: string; ver
 
 export async function addHiddenContacts(input: unknown): Promise<{ ok: true; added: number; total: number; privacy: PrivacySettingsDto } | SettingsFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const result = await addContactHashes(actor, input);
     return { ok: true, ...result, privacy: await getPrivacySettings(actor) };
   } catch (e) {
@@ -111,7 +111,7 @@ export async function addHiddenContacts(input: unknown): Promise<{ ok: true; add
 
 export async function clearHiddenContacts(): Promise<PrivacyResult> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await clearContactHashes(actor);
     return { ok: true, privacy: await getPrivacySettings(actor) };
   } catch (e) {

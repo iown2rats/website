@@ -40,9 +40,9 @@ export interface DashboardMetrics {
 
 /** Plain-language definition per metric key, shown in the UI so a number is never ambiguous. */
 export const METRIC_DEFINITIONS: Record<string, string> = {
-  "users.total": "Every account row ever created, including deleted (anonymised) ones.",
-  "users.nonDeleted": "Accounts whose status is not DELETED.",
-  "users.completedProfiles": "Non-deleted accounts that finished onboarding.",
+  "users.total": "Every member account row ever created, including deleted (anonymised) ones. Staff accounts are not counted.",
+  "users.nonDeleted": "Member accounts whose status is not DELETED.",
+  "users.completedProfiles": "Non-deleted member accounts that finished onboarding.",
   "users.onboarding": "Accounts still in onboarding (status ONBOARDING).",
   "users.newToday": "Accounts created since 00:00 Maldives time today.",
   "users.new7d": "Accounts created in the last 7 × 24 hours.",
@@ -71,21 +71,24 @@ export async function getDashboardMetrics(deps: { db?: Db; now?: Date } = {}): P
   const d7 = new Date(now.getTime() - 7 * 86_400_000);
   const d30 = new Date(now.getTime() - 30 * 86_400_000);
   const notDeleted = { status: { not: "DELETED" as const } };
+  // Every user figure counts dating members. Staff accounts are operational: including them would make
+  // "accounts" and "completed profiles" disagree by however many operators there happen to be (§22.2).
+  const member = { accountType: "MEMBER" as const };
 
   const [total, nonDeleted, completedProfiles, onboarding, newToday, new7d, new30d, signedIn7d, signedIn30d, paused, suspended, banned, deleted, awaitingPayment, pendingReview, approved30d, rejected30d, openReports, pendingVerifications, plusRows, expiringRows] = await Promise.all([
-    db.user.count(),
-    db.user.count({ where: notDeleted }),
-    db.user.count({ where: { ...notDeleted, onboardingCompletedAt: { not: null } } }),
-    db.user.count({ where: { status: "ONBOARDING" } }),
-    db.user.count({ where: { createdAt: { gte: dayStart } } }),
-    db.user.count({ where: { createdAt: { gte: d7 } } }),
-    db.user.count({ where: { createdAt: { gte: d30 } } }),
-    db.user.count({ where: { ...notDeleted, lastActiveAt: { gte: d7 } } }),
-    db.user.count({ where: { ...notDeleted, lastActiveAt: { gte: d30 } } }),
+    db.user.count({ where: member }),
+    db.user.count({ where: { ...member, ...notDeleted } }),
+    db.user.count({ where: { ...member, ...notDeleted, onboardingCompletedAt: { not: null } } }),
+    db.user.count({ where: { ...member, status: "ONBOARDING" } }),
+    db.user.count({ where: { ...member, createdAt: { gte: dayStart } } }),
+    db.user.count({ where: { ...member, createdAt: { gte: d7 } } }),
+    db.user.count({ where: { ...member, createdAt: { gte: d30 } } }),
+    db.user.count({ where: { ...member, ...notDeleted, lastActiveAt: { gte: d7 } } }),
+    db.user.count({ where: { ...member, ...notDeleted, lastActiveAt: { gte: d30 } } }),
     db.privacySettings.count({ where: { pausedAt: { not: null }, user: notDeleted } }),
-    db.user.count({ where: { status: "SUSPENDED" } }),
-    db.user.count({ where: { status: "BANNED" } }),
-    db.user.count({ where: { status: "DELETED" } }),
+    db.user.count({ where: { ...member, status: "SUSPENDED" } }),
+    db.user.count({ where: { ...member, status: "BANNED" } }),
+    db.user.count({ where: { ...member, status: "DELETED" } }),
     db.subscriptionOrder.count({ where: { status: "AWAITING_PAYMENT", expiresAt: { gt: now } } }),
     db.subscriptionOrder.count({ where: { status: "SUBMITTED" } }),
     db.subscriptionOrder.count({ where: { status: "APPROVED", decidedAt: { gte: d30 } } }),

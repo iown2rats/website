@@ -239,7 +239,12 @@ export async function changeUnverifiedEmail(userId: string, newEmail: string, de
 export interface EmailSignInOutcome {
   userId: string;
   emailVerified: boolean;
-  destination: "verify-email" | "onboarding" | "app";
+  /**
+   * "admin" is where an operational account goes (docs/ARCHITECTURE.md §22.1, §13). Staff can hold a session from
+   * this form — it is the same identity table and the same password — but they are routed to the portal, never
+   * into onboarding and never into the dating app, and no Profile is created for them on the way.
+   */
+  destination: "verify-email" | "onboarding" | "app" | "admin";
 }
 
 /**
@@ -256,7 +261,7 @@ export async function signInWithEmail(input: { email: string; password: string }
 
   const identity = await db.authIdentity.findUnique({
     where: { provider_providerSubject: { provider: PROVIDER, providerSubject: input.email } },
-    select: { id: true, userId: true, passwordHash: true, emailVerified: true, releasedAt: true, user: { select: { status: true, onboardingCompletedAt: true } } },
+    select: { id: true, userId: true, passwordHash: true, emailVerified: true, releasedAt: true, user: { select: { accountType: true, status: true, onboardingCompletedAt: true } } },
   });
   const check = await verifyPassword(input.password, identity?.passwordHash ?? null);
   if (!identity || !check.ok || identity.releasedAt !== null) {
@@ -274,7 +279,7 @@ export async function signInWithEmail(input: { email: string; password: string }
     db.authIdentity.update({ where: { id: identity.id }, data: { lastLoginAt: now } }),
     db.user.update({ where: { id: identity.userId }, data: { lastActiveAt: now } }),
   ]);
-  const destination = !identity.emailVerified ? "verify-email" : user.onboardingCompletedAt ? "app" : "onboarding";
+  const destination = user.accountType === "STAFF" ? "admin" : !identity.emailVerified ? "verify-email" : user.onboardingCompletedAt ? "app" : "onboarding";
   return { ok: true, value: { userId: identity.userId, emailVerified: identity.emailVerified, destination } };
 }
 
@@ -295,9 +300,11 @@ export async function requestPasswordReset(email: string, deps: EmailAuthDeps): 
 
   const identity = await db.authIdentity.findUnique({
     where: { provider_providerSubject: { provider: PROVIDER, providerSubject: email } },
-    select: { id: true, email: true, passwordHash: true, releasedAt: true, user: { select: { status: true } } },
+    select: { id: true, email: true, passwordHash: true, releasedAt: true, user: { select: { accountType: true, status: true } } },
   });
   if (!identity || !identity.passwordHash || identity.releasedAt !== null || identity.user.status === "DELETED" || identity.user.status === "BANNED") return { ok: true };
+  // Staff use the portal's own "forgot password". Answering identically keeps both flows non-enumerating.
+  if (identity.user.accountType === "STAFF") return { ok: true };
 
   const { token } = await issueAuthToken(db, { identityId: identity.id, purpose: "PASSWORD_RESET" }, now);
   await deliver(provider, identity.email ?? email, passwordResetEmail(resetUrl(token), TOKEN_TTL_MS.PASSWORD_RESET / 60_000));
@@ -316,8 +323,14 @@ export async function resetPassword(input: { token: string; password: string }, 
   if (weak) return fail("WEAK_PASSWORD", weak.message, "password");
   const consumed = await consumeAuthToken(db, input.token, "PASSWORD_RESET", now);
   if (!consumed) return fail("INVALID_TOKEN", "That reset link has expired or has already been used. Ask for a new one.");
-  const identity = await db.authIdentity.findUnique({ where: { id: consumed.identityId }, select: { id: true, userId: true, provider: true, user: { select: { status: true } } } });
+  const identity = await db.authIdentity.findUnique({ where: { id: consumed.identityId }, select: { id: true, userId: true, provider: true, user: { select: { accountType: true, status: true } } } });
   if (!identity || identity.provider !== PROVIDER || identity.user.status === "DELETED") {
+    return fail("INVALID_TOKEN", "That reset link has expired or has already been used. Ask for a new one.");
+  }
+  // A staff credential is reset through the portal, not here. Both flows write the same kind of token, so each one
+  // checks the account domain: this keeps a member reset from touching an operational password, and it is also why
+  // a reset can never confer staff access — it changes a password and nothing else (§27).
+  if (identity.user.accountType === "STAFF") {
     return fail("INVALID_TOKEN", "That reset link has expired or has already been used. Ask for a new one.");
   }
   const passwordHash = await hashPassword(input.password);

@@ -95,6 +95,61 @@ export async function createIdentity(db: Db, userId: string, o: { subject?: stri
   return { subject, email };
 }
 
+export interface TestStaff {
+  userId: string;
+  email: string;
+  role: "ADMIN" | "MODERATOR";
+  grantId: string;
+  password: string;
+}
+
+/**
+ * A live STAFF account: an operational User row with no member-domain rows at all, an ACTIVE StaffGrant and an
+ * EMAIL identity carrying a real scrypt verifier. Deliberately does NOT go through `createUser`, because the whole
+ * point of the split is that a staff account is not a member account — it has no Profile, no PrivacySettings, no
+ * DiscoveryPreferences and no Verification (docs/ARCHITECTURE.md §22.1).
+ */
+export async function createStaff(
+  db: Db,
+  o: { role?: "ADMIN" | "MODERATOR"; email?: string; password?: string; now?: Date; status?: "PENDING" | "ACTIVE" | "REVOKED" } = {},
+): Promise<TestStaff> {
+  seq += 1;
+  const role = o.role ?? "ADMIN";
+  const now = o.now ?? new Date();
+  const email = (o.email ?? `staff${seq}@example.com`).trim().toLowerCase();
+  const password = o.password ?? "correct-horse-battery";
+  const { hashPassword } = await import("@/server/auth/password");
+  const user = await db.user.create({
+    data: { accountType: "STAFF", role, status: "ACTIVE", onboardingStage: "NAME", lastActiveAt: now, createdAt: now },
+    select: { id: true },
+  });
+  await db.authIdentity.create({
+    data: {
+      userId: user.id,
+      provider: "EMAIL",
+      providerSubject: email,
+      email,
+      emailVerified: true,
+      passwordHash: await hashPassword(password),
+      passwordUpdatedAt: now,
+      createdAt: now,
+    },
+  });
+  const grant = await db.staffGrant.create({
+    data: {
+      email,
+      role,
+      reason: "test fixture",
+      status: o.status ?? "ACTIVE",
+      claimedByUserId: (o.status ?? "ACTIVE") === "PENDING" ? null : user.id,
+      claimedAt: (o.status ?? "ACTIVE") === "PENDING" ? null : now,
+      createdAt: now,
+    },
+    select: { id: true },
+  });
+  return { userId: user.id, email, role, grantId: grant.id, password };
+}
+
 /** Grants Plus via an EntitlementOverride covering [from, to). */
 export async function grantPlus(db: Db, userId: string, from: Date, to: Date): Promise<void> {
   await db.entitlementOverride.create({ data: { userId, tier: "PLUS", reason: "test", startsAt: from, endsAt: to } });

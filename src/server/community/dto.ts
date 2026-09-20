@@ -91,11 +91,18 @@ export function isMediaDisplayable(moderation: string): boolean {
   return (displayableCommunityMediaStates() as readonly string[]).includes(moderation);
 }
 
-/** Loads authors for a set of user ids in one query, preserving privacy rules. */
+/**
+ * Loads authors for a set of user ids in one query, preserving privacy rules.
+ *
+ * Operational accounts are filtered out here as well as in the post and comment predicates (§22.6): a staff
+ * account must never be rendered as a Community member, and this is the function that renders one. An author that
+ * is dropped leaves its post or comment without an author entry, which the callers already treat as "not
+ * displayable".
+ */
 export async function loadAuthors(db: DbLike, storage: StorageProvider, viewerId: string, userIds: string[]): Promise<Map<string, CommunityAuthorDto>> {
   const unique = [...new Set(userIds)];
   if (unique.length === 0) return new Map();
-  const rows = await db.user.findMany({ where: { id: { in: unique } }, select: authorSelect() });
+  const rows = await db.user.findMany({ where: { id: { in: unique }, accountType: "MEMBER" }, select: authorSelect() });
   const out = new Map<string, CommunityAuthorDto>();
   await Promise.all(rows.map(async (r) => out.set(r.id, await toAuthorDto(storage, viewerId, r))));
   return out;

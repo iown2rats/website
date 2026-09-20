@@ -58,13 +58,19 @@ export async function getDiscoverAside(actor: Actor, deps: { db?: Db; storage?: 
   const now = deps.now ?? new Date();
   const [matches, notifications] = await Promise.all([
     db.match.findMany({
-      where: { status: "ACTIVE", OR: [{ userAId: actor.userId }, { userBId: actor.userId }] },
+      where: {
+        status: "ACTIVE",
+        OR: [{ userAId: actor.userId }, { userBId: actor.userId }],
+        userA: { accountType: "MEMBER" },
+        userB: { accountType: "MEMBER" },
+      },
       orderBy: { createdAt: "desc" },
       take: 6,
       select: { userAId: true, userBId: true, conversation: { select: { id: true } }, userA: { select: { profile: { select: { displayName: true } } } }, userB: { select: { profile: { select: { displayName: true } } } } },
     }),
     db.notification.findMany({
-      where: { userId: actor.userId, type: { in: ["LIKE_RECEIVED", "NEW_MATCH", "MESSAGE"] }, actorId: { not: null } },
+      // An operational account is never named as the actor behind activity (§22.5).
+      where: { userId: actor.userId, type: { in: ["LIKE_RECEIVED", "NEW_MATCH", "MESSAGE"] }, actorId: { not: null }, actor: { accountType: "MEMBER" } },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { type: true, createdAt: true, actorId: true, actor: { select: { profile: { select: { displayName: true } } } } },

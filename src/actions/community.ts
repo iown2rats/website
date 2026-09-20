@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { isDomainError } from "@/lib/errors";
-import { requireActor } from "@/server/auth/current-user";
+import { requireMember } from "@/server/auth/current-user";
 import { addComment, deleteComment, listComments, type CommentsPage } from "@/server/community/comments";
 import type { CommunityCommentDto, CommunityPostDto } from "@/server/community/dto";
 import { getFeed, getPost, type FeedPage, type FeedTab } from "@/server/community/feed";
@@ -38,7 +38,7 @@ function failure(e: unknown): CommunityFailure {
 
 export async function loadFeed(input: unknown): Promise<({ ok: true } & FeedPage) | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const parsed = feedSchema.parse(input ?? {});
     return { ok: true, ...(await getFeed(actor, { tab: parsed.tab as FeedTab, cursor: parsed.cursor ?? null })) };
   } catch (e) {
@@ -48,7 +48,7 @@ export async function loadFeed(input: unknown): Promise<({ ok: true } & FeedPage
 
 export async function reactToPost(input: unknown): Promise<{ ok: true; liked: boolean; likeCount: number } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const parsed = reactSchema.parse(input);
     return { ok: true, ...(await setReaction(actor, parsed.postId, parsed.liked)) };
   } catch (e) {
@@ -58,7 +58,7 @@ export async function reactToPost(input: unknown): Promise<{ ok: true; liked: bo
 
 export async function loadPost(input: unknown): Promise<{ ok: true; post: CommunityPostDto } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const postId = idSchema.parse((input as { postId?: unknown })?.postId);
     return { ok: true, post: await getPost(actor, postId) };
   } catch (e) {
@@ -68,7 +68,7 @@ export async function loadPost(input: unknown): Promise<{ ok: true; post: Commun
 
 export async function loadComments(input: unknown): Promise<({ ok: true } & CommentsPage) | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const parsed = commentsSchema.parse(input);
     return { ok: true, ...(await listComments(actor, parsed.postId, { cursor: parsed.cursor ?? null })) };
   } catch (e) {
@@ -78,7 +78,7 @@ export async function loadComments(input: unknown): Promise<({ ok: true } & Comm
 
 export async function postComment(input: unknown): Promise<{ ok: true; comment: CommunityCommentDto } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const parsed = commentSchema.parse(input);
     return { ok: true, comment: await addComment(actor, parsed.postId, parsed.body) };
   } catch (e) {
@@ -88,7 +88,7 @@ export async function postComment(input: unknown): Promise<{ ok: true; comment: 
 
 export async function removeComment(input: unknown): Promise<{ ok: true } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await deleteComment(actor, idSchema.parse((input as { commentId?: unknown })?.commentId));
     return { ok: true };
   } catch (e) {
@@ -98,7 +98,7 @@ export async function removeComment(input: unknown): Promise<{ ok: true } | Comm
 
 export async function removePost(input: unknown): Promise<{ ok: true } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await deletePost(actor, idSchema.parse((input as { postId?: unknown })?.postId));
     return { ok: true };
   } catch (e) {
@@ -108,7 +108,7 @@ export async function removePost(input: unknown): Promise<{ ok: true } | Communi
 
 export async function reportCommunityPost(input: unknown): Promise<{ ok: true } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await reportPost(actor, input);
     return { ok: true };
   } catch (e) {
@@ -118,7 +118,7 @@ export async function reportCommunityPost(input: unknown): Promise<{ ok: true } 
 
 export async function reportCommunityComment(input: unknown): Promise<{ ok: true } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await reportComment(actor, input);
     return { ok: true };
   } catch (e) {
@@ -128,7 +128,7 @@ export async function reportCommunityComment(input: unknown): Promise<{ ok: true
 
 export async function blockAuthorOfPost(input: unknown): Promise<{ ok: true } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await blockPostAuthor(actor, idSchema.parse((input as { postId?: unknown })?.postId));
     return { ok: true };
   } catch (e) {
@@ -138,7 +138,7 @@ export async function blockAuthorOfPost(input: unknown): Promise<{ ok: true } | 
 
 export async function blockAuthorOfComment(input: unknown): Promise<{ ok: true } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await blockCommentAuthor(actor, idSchema.parse((input as { commentId?: unknown })?.commentId));
     return { ok: true };
   } catch (e) {
@@ -148,7 +148,7 @@ export async function blockAuthorOfComment(input: unknown): Promise<{ ok: true }
 
 export async function loadCommunityProfile(input: unknown): Promise<{ ok: true; profile: DiscoveryCardDto } | CommunityFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     const handle = z.string().min(1).max(64).parse((input as { handle?: unknown })?.handle);
     return { ok: true, profile: await getCommunityProfile(actor, handle) };
   } catch (e) {

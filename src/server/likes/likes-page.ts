@@ -37,7 +37,14 @@ export async function getLikesPage(actor: Actor, deps: { db?: Db; storage?: Stor
 
 async function listMatches(actor: Actor, db: Db, storage: StorageProvider): Promise<LikesMatchDto[]> {
   const rows = await db.match.findMany({
-    where: { status: "ACTIVE", OR: [{ userAId: actor.userId }, { userBId: actor.userId }] },
+    // Both sides must be dating members. A match with an operational account cannot be created in the first
+    // place, and conversion refuses to run while one exists, so this only ever fires on malformed data (§22.5).
+    where: {
+      status: "ACTIVE",
+      OR: [{ userAId: actor.userId }, { userBId: actor.userId }],
+      userA: { accountType: "MEMBER" },
+      userB: { accountType: "MEMBER" },
+    },
     orderBy: { createdAt: "desc" },
     take: 60,
     select: {

@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { adminChangeRole, adminSetAccountStatus } from "@/actions/admin";
+import { adminConvertToStaff, adminSetAccountStatus } from "@/actions/admin";
 import type { AdminRole } from "@/server/admin/authz";
-import type { Role } from "@/server/admin/bootstrap";
+import type { StaffRole } from "@/server/staff/rules";
 import type { AccountAction, AccountStatus } from "@/server/admin/users";
 import { Button } from "@/components/ui/button";
 import { Field, Select } from "@/components/ui/field";
@@ -19,15 +19,16 @@ export function UserActions({ userId, status, role, actorRole, isSelf }: { userI
   const router = useRouter();
   const toast = useToast();
   const [action, setAction] = useState<AccountAction | null>(null);
-  const [roleOpen, setRoleOpen] = useState(false);
-  const [nextRole, setNextRole] = useState<Role>(role as Role);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [staffRole, setStaffRole] = useState<StaffRole>("MODERATOR");
   const [busy, setBusy] = useState(false);
 
+  // A staff account never appears in this list, so `role` here is a member's column value.
   const protectedTarget = isSelf || role === "ADMIN" || (role === "MODERATOR" && actorRole !== "ADMIN");
   const canSuspend = !protectedTarget && (status === "ACTIVE" || status === "ONBOARDING");
   const canUnsuspend = !protectedTarget && status === "SUSPENDED";
   const canBan = !protectedTarget && status !== "BANNED" && status !== "DELETED";
-  const canChangeRole = actorRole === "ADMIN" && !isSelf && status !== "DELETED";
+  const canConvert = actorRole === "ADMIN" && !isSelf && status !== "DELETED";
 
   const run = async (reason: string) => {
     if (!action) return;
@@ -40,13 +41,13 @@ export function UserActions({ userId, status, role, actorRole, isSelf }: { userI
     router.refresh();
   };
 
-  const changeRole = async (reason: string) => {
+  const convert = async (reason: string) => {
     setBusy(true);
-    const r = await adminChangeRole(userId, { role: nextRole, reason }).catch(() => null);
+    const r = await adminConvertToStaff(userId, { role: staffRole, reason }).catch(() => null);
     setBusy(false);
-    setRoleOpen(false);
+    setConvertOpen(false);
     if (!r || !r.ok) return toast.show(r && !r.ok ? r.message : "That didn't go through.");
-    toast.show(`Role is now ${r.data.role}`);
+    toast.show(`Converted to staff. A set-password link was sent to ${r.data.email}.`);
     router.refresh();
   };
 
@@ -61,17 +62,25 @@ export function UserActions({ userId, status, role, actorRole, isSelf }: { userI
       {canSuspend ? <Button size="sm" variant="destructive" onClick={() => setAction("SUSPEND")}>Suspend</Button> : null}
       {canUnsuspend ? <Button size="sm" variant="ocean" onClick={() => setAction("UNSUSPEND")}>Unsuspend</Button> : null}
       {canBan ? <Button size="sm" variant="destructive" onClick={() => setAction("BAN")}>Ban</Button> : null}
-      {canChangeRole ? <Button size="sm" variant="secondary" onClick={() => setRoleOpen(true)}>Change role</Button> : null}
+      {canConvert ? <Button size="sm" variant="secondary" onClick={() => setConvertOpen(true)}>Convert to staff</Button> : null}
       {protectedTarget && !isSelf ? <p className="self-center text-caption text-text-secondary">Admins and moderators are protected. Change the role first.</p> : null}
       {isSelf ? <p className="self-center text-caption text-text-secondary">This is your own account.</p> : null}
       {action ? <ReasonDialog open onClose={() => setAction(null)} onConfirm={run} title={copy[action].title} description={copy[action].description} confirmLabel={copy[action].label} confirmVariant={copy[action].variant} loading={busy} /> : null}
-      <ReasonDialog open={roleOpen} onClose={() => setRoleOpen(false)} onConfirm={changeRole} title="Change role" description="Administrators can do everything here, including payments, plans and roles. Moderators see users, reports and verifications only." confirmLabel="Save role" loading={busy}>
-        <Field label="New role">
+      <ReasonDialog
+        open={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        onConfirm={convert}
+        title="Convert to a staff account?"
+        description="This removes their dating profile, photos and Community posts, and emails them a link to choose an admin password. It is refused if they have likes, matches, chats, reports or payments. It cannot be undone from here."
+        confirmLabel="Convert to staff"
+        confirmVariant="destructive"
+        loading={busy}
+      >
+        <Field label="Staff role">
           {(p) => (
-            <Select {...p} value={nextRole} onChange={(e) => setNextRole(e.target.value as Role)}>
-              <option value="USER">USER</option>
-              <option value="MODERATOR">MODERATOR</option>
-              <option value="ADMIN">ADMIN</option>
+            <Select {...p} value={staffRole} onChange={(e) => setStaffRole(e.target.value as StaffRole)}>
+              <option value="MODERATOR">Moderator</option>
+              <option value="ADMIN">Administrator</option>
             </Select>
           )}
         </Field>

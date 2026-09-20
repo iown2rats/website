@@ -43,3 +43,31 @@ export function passwordResetEmail(url: string, expiresInMinutes: number): Omit<
     html: shell(heading, body, { label: "Reset password", url }, footer),
   };
 }
+
+/**
+ * Staff invitation, and the same template in "set your password" mode for an administrator who already has an
+ * account. Operational in tone: no dating language, no marketing, one action.
+ */
+export function staffInviteEmail(url: string, expiresInHours: number, setup: boolean): Omit<EmailMessage, "to"> {
+  const heading = setup ? `Set your ${BRAND} admin password` : `You've been invited to the ${BRAND} Admin Portal`;
+  const body = setup
+    ? `Choose a password for your ${BRAND} Admin Portal account. You'll use it with this email address to sign in at the portal.`
+    : `Someone at ${BRAND} has given this address access to the Admin Portal. Choose a password to finish setting up the account.`;
+  const footer = `This link works once and expires in ${expiresInHours} hours. If you weren't expecting it, ignore this email — nothing is set up until the link is used, and no ${BRAND} dating profile is created either way.`;
+  return {
+    subject: setup ? `Set your admin password · ${BRAND}` : `Your ${BRAND} Admin Portal invitation`,
+    text: `${heading}\n\n${body}\n\n${url}\n\n${footer}`,
+    html: shell(heading, body, { label: setup ? "Set password" : "Set up account", url }, footer),
+  };
+}
+
+export function staffPasswordResetEmail(url: string, expiresInMinutes: number): Omit<EmailMessage, "to"> {
+  const heading = "Reset your admin password";
+  const body = `Choose a new password for your ${BRAND} Admin Portal account.`;
+  const footer = `This link works once and expires in ${expiresInMinutes} minutes. If you didn't ask to reset your password, ignore this email — your password stays as it is.`;
+  return {
+    subject: `Reset your admin password · ${BRAND}`,
+    text: `${heading}\n\n${body}\n\n${url}\n\n${footer}`,
+    html: shell(heading, body, { label: "Reset password", url }, footer),
+  };
+}

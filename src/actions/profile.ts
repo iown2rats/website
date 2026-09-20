@@ -1,7 +1,7 @@
 "use server";
 
 import { isDomainError } from "@/lib/errors";
-import { requireActor } from "@/server/auth/current-user";
+import { requireMember } from "@/server/auth/current-user";
 import { getEditProfileData, updateAbout, updateInfo, type EditProfileData } from "@/server/profiles/edit";
 
 /*
@@ -22,7 +22,7 @@ function failure(e: unknown): ProfileActionFailure {
 
 export async function saveInfo(input: unknown): Promise<{ ok: true; profile: EditProfileData } | ProfileActionFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await updateInfo(actor, input);
     return { ok: true, profile: await getEditProfileData(actor) };
   } catch (e) {
@@ -32,7 +32,7 @@ export async function saveInfo(input: unknown): Promise<{ ok: true; profile: Edi
 
 export async function saveAboutSection(input: unknown): Promise<{ ok: true; profile: EditProfileData } | ProfileActionFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     await updateAbout(actor, input);
     return { ok: true, profile: await getEditProfileData(actor) };
   } catch (e) {
@@ -42,7 +42,7 @@ export async function saveAboutSection(input: unknown): Promise<{ ok: true; prof
 
 export async function reloadEditProfile(): Promise<{ ok: true; profile: EditProfileData } | ProfileActionFailure> {
   try {
-    const actor = await requireActor();
+    const actor = await requireMember();
     return { ok: true, profile: await getEditProfileData(actor) };
   } catch (e) {
     return failure(e);

@@ -41,11 +41,18 @@ export interface VisibleProfile {
 
 const ACTIVE_NOW_MS = 15 * 60_000;
 
-/** Hydrates DTOs for ids that have ALREADY passed the visibility predicate, preserving input order. */
+/**
+ * Hydrates DTOs for ids that have ALREADY passed the visibility predicate, preserving input order.
+ *
+ * The `accountType` filter is the last line of defence (docs/ARCHITECTURE.md §22.5): every caller is supposed to
+ * hand over ids the predicate already cleared, but this is the one function that turns an id into something a
+ * member actually sees. Filtering here means an operational account cannot be rendered as a dating profile even
+ * if an id reaches this point some other way — the row is simply dropped from the result.
+ */
 export async function buildVisibleProfiles(db: DbLike, _viewerId: string, userIds: string[], now: Date): Promise<VisibleProfile[]> {
   if (userIds.length === 0) return [];
   const users = await db.user.findMany({
-    where: { id: { in: userIds } },
+    where: { id: { in: userIds }, accountType: "MEMBER" },
     select: {
       id: true,
       dateOfBirth: true,

@@ -22,6 +22,20 @@ export const AUDIT_ACTIONS = {
   paymentMethodUpdated: "payment_method.updated",
   planCreated: "plan.created",
   planUpdated: "plan.updated",
+  // Staff account lifecycle (docs/ARCHITECTURE.md §22.2). Raw invitation and reset tokens, password hashes and
+  // verifiers never appear in these payloads: sanitizeAuditData drops such keys, and no caller supplies one.
+  staffInvited: "staff.invited",
+  staffInviteResent: "staff.invite.resent",
+  staffInviteCancelled: "staff.invite.cancelled",
+  staffInviteRejected: "staff.invite.rejected",
+  staffClaimed: "staff.claimed",
+  staffActivated: "staff.activated",
+  staffRoleChanged: "staff.role.changed",
+  staffRevoked: "staff.revoked",
+  staffPasswordSet: "staff.password.set",
+  staffPasswordReset: "staff.password.reset",
+  staffConverted: "staff.converted",
+  staffChangeRejected: "staff.change.rejected",
   // Existing (user-initiated) actions written elsewhere, listed so the admin log can label them.
   accountDeleted: "account.deleted",
   accountRecreated: "account.recreated",

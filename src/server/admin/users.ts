@@ -52,7 +52,10 @@ export async function searchUsers(admin: AdminActor, input: UserSearchInput, dep
   const now = deps.now ?? new Date();
   const page = Math.max(1, input.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 25));
-  const conditions: Prisma.Sql[] = [Prisma.sql`TRUE`];
+  // The user directory is the *member* directory. Staff accounts have no profile, no onboarding and no dating
+  // state, so listing them here would only produce blank rows and skew every filter; they live at /admin/staff
+  // (docs/ARCHITECTURE.md §22.2).
+  const conditions: Prisma.Sql[] = [Prisma.sql`u."accountType" = 'MEMBER'`];
   const q = input.q?.trim();
   if (q) conditions.push(Prisma.sql`(u.id = ${q} OR p.handle ILIKE ${q} OR p."displayName" ILIKE ${"%" + q + "%"})`);
   if (input.status && input.status !== "all") conditions.push(Prisma.sql`u.status = ${input.status}::"UserStatus"`);

@@ -7,6 +7,7 @@ import { BoostAlreadyActiveError, BoostLimitReachedError, EntitlementRequiredErr
 import type { Actor } from "@/server/actor";
 import { getEntitlements } from "@/server/entitlements";
 import { consumeLocked, lockUsage } from "@/server/usage/usage-window";
+import { assertMemberAccount } from "@/server/members/guard";
 
 export interface ActivatedBoost {
   id: string;
@@ -19,6 +20,7 @@ export interface ActivatedBoost {
 export async function activateBoost(actor: Actor, options: { now?: Date; db?: Db } = {}): Promise<ActivatedBoost> {
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
+  await assertMemberAccount(db, actor.userId);
 
   return db.$transaction(async (tx) => {
     const locked = await lockUsage(tx, actor.userId, "BOOSTS", now);

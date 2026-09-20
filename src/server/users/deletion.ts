@@ -13,6 +13,7 @@ import { InvalidStateError } from "@/lib/errors";
 import type { StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
 import { consumeRecentAuthentication } from "@/server/auth/recent-auth";
+import { StaffInMemberDomainError } from "@/server/members/guard";
 
 export type DeleteAccountResult = { ok: true } | { ok: false; code: "REAUTH_REQUIRED" };
 
@@ -26,8 +27,11 @@ export type DeleteAccountResult = { ok: true } | { ok: false; code: "REAUTH_REQU
 export async function deleteAccount(actor: Actor, input: { sessionId: string }, deps: { db?: Db; storage: StorageProvider; now?: Date }): Promise<DeleteAccountResult> {
   const db = deps.db ?? getDb();
   const now = deps.now ?? new Date();
-  const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { id: true, status: true } });
+  const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { id: true, accountType: true, status: true } });
   if (user.status === "DELETED") throw new InvalidStateError("This account is already deleted");
+  // Member deletion anonymises a dating profile and its graph. An operational account has none of that, and
+  // removing one is a revocation decided in the admin portal, not self-service (§16, §22).
+  if (user.accountType !== "MEMBER") throw new StaffInMemberDomainError();
 
   const fresh = await consumeRecentAuthentication(db, input.sessionId, now);
   if (!fresh) return { ok: false, code: "REAUTH_REQUIRED" };

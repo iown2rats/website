@@ -19,6 +19,9 @@ import { telegramSignInAvailable } from "@/server/auth/telegram-availability";
  */
 export default async function WelcomePage() {
   const state = await getAuthState();
+  // An operational account never sees the dating welcome screen; it goes to the portal (§13, §22.1). This is the
+  // one member route with no shared layout guard above it, so the check has to be here.
+  if (state.kind === "staff") redirect(ROUTES.staffHome);
   if (state.kind === "active") redirect(ROUTES.home);
   if (state.kind === "unverified") redirect(ROUTES.verifyEmail);
   if (state.kind === "onboarding") redirect(ROUTES.onboarding);

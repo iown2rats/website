@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { isDomainError } from "@/lib/errors";
-import { requireActor } from "@/server/auth/current-user";
+import { requireMember } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
 import {
   completeOnboarding,
@@ -36,7 +36,7 @@ function goNext(stage: OnboardingStageKey): never {
 }
 
 export async function submitName(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await saveName(actor, { name: formData.get("name") });
   } catch (e) {
@@ -46,7 +46,7 @@ export async function submitName(_prev: StageFormState, formData: FormData): Pro
 }
 
 export async function submitDob(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await saveDateOfBirth(actor, { day: formData.get("day"), month: formData.get("month"), year: formData.get("year") });
   } catch (e) {
@@ -56,7 +56,7 @@ export async function submitDob(_prev: StageFormState, formData: FormData): Prom
 }
 
 export async function submitGender(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await saveGender(actor, { gender: formData.get("gender") });
   } catch (e) {
@@ -66,7 +66,7 @@ export async function submitGender(_prev: StageFormState, formData: FormData): P
 }
 
 export async function submitMeet(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await saveInterestedIn(actor, { interestedIn: formData.get("interestedIn") });
   } catch (e) {
@@ -76,7 +76,7 @@ export async function submitMeet(_prev: StageFormState, formData: FormData): Pro
 }
 
 export async function submitIntent(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await saveIntent(actor, { intent: formData.get("intent") });
   } catch (e) {
@@ -86,7 +86,7 @@ export async function submitIntent(_prev: StageFormState, formData: FormData): P
 }
 
 export async function submitLocation(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await saveLocation(actor, { locationId: formData.get("locationId") });
   } catch (e) {
@@ -96,7 +96,7 @@ export async function submitLocation(_prev: StageFormState, formData: FormData):
 }
 
 export async function submitPhotos(): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await confirmPhotos(actor);
   } catch (e) {
@@ -106,7 +106,7 @@ export async function submitPhotos(): Promise<StageFormState> {
 }
 
 export async function submitAbout(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   let prompts: unknown = [];
   try {
     prompts = JSON.parse(String(formData.get("prompts") ?? "[]"));
@@ -122,7 +122,7 @@ export async function submitAbout(_prev: StageFormState, formData: FormData): Pr
 }
 
 export async function submitPrivacy(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await savePrivacy(actor, {
       hideLocation: formData.get("hideLocation") === "on",
@@ -136,7 +136,7 @@ export async function submitPrivacy(_prev: StageFormState, formData: FormData): 
 }
 
 export async function submitComplete(): Promise<StageFormState> {
-  const actor = await requireActor();
+  const actor = await requireMember();
   try {
     await completeOnboarding(actor);
   } catch (e) {

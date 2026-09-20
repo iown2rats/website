@@ -88,10 +88,11 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
               <span className="grid size-12 place-items-center rounded-full bg-aqua-soft text-accent" aria-hidden="true"><LockIcon size={22} /></span>
               <div>
                 <h2 className="text-h4 text-text">{data.count === 1 ? "1 person likes you" : `${data.count} people like you`}</h2>
-                <p className="mt-1 text-body-sm text-text-secondary">See who likes you</p>
                 <div className="mt-1.5"><PlusTag size="sm" label="Plus feature" /></div>
               </div>
-              <Button variant="plus" size="md" onClick={() => setLockOpen(true)}>Upgrade to Plus</Button>
+              {/* Named after what is locked, not after upgrading: this opens the explainer, and only the one CTA
+                  inside it leads to Membership. */}
+              <Button variant="plus" size="md" onClick={() => setLockOpen(true)}>See who likes you</Button>
             </div>
           </section>
         )
@@ -134,7 +135,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
 
       {open ? <FullProfile profile={open} onClose={() => setOpen(null)} onPass={() => void act(open, "pass")} onLike={() => void act(open, "like")} /> : null}
       <MatchOverlay open={match != null} name={match?.name ?? ""} theirPhoto={match?.photo ?? null} myPhoto={myPhoto} onSayHello={() => { const id = match?.conversationId; setMatch(null); router.push(id ? `/chats/${id}` : "/chats"); }} onKeepSwiping={() => setMatch(null)} />
-      <PlusLockSheet open={lockOpen} onClose={() => setLockOpen(false)} feature="See who likes you" description="Mellocrush Plus shows the profiles of everyone who liked you, so you can like them back straight away. Free shows how many people like you." />
+      <PlusLockSheet open={lockOpen} onClose={() => setLockOpen(false)} feature="See who likes you" description="Plus shows who liked you, so you can like them back." />
     </>
   );
 }

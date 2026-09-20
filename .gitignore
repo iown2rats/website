@@ -15,3 +15,6 @@ next-env.d.ts
 /tmp/
 screenshots/
 .storage/
+
+# Local rollout backup (contains production data) — never committed
+.rollout-backup/

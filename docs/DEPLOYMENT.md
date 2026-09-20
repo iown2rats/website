@@ -363,3 +363,30 @@ all three markers (verified by breaking a marker deliberately: it refused and de
 
 The whole create → verify → destroy lifecycle was rehearsed against the local database before production, and the
 production matrix came back byte-identical to the rehearsal.
+
+### Purged, 2026-09-20
+
+The cohort is gone. Two deletions, run separately against production and verified after each:
+
+1. **The 20 QA accounts**, through the guarded path. All three markers resolved exactly 20, with zero partial
+   matches — no account carried one marker without the others — and a second guard confirmed none was anything but
+   a plain `USER`. 28 users / 26 profiles → 8 / 6.
+2. **Three of the owner's own test profiles** (`orjmaucu`, `mkkqfqtu`, `8l4zzyiv`), which carried none of the
+   markers and so were out of reach of the script by design. Deleted by explicit id, with the id and the handle
+   both required to match so a mistyped id could not resolve to somebody else, and the same non-`USER` guard.
+   8 / 6 → 5 / 3, one ADMIN intact.
+
+**The cohort was not as isolated as "test accounts" suggests**, which is what the pre-flight check is for: one real
+member had liked a QA profile, QA accounts had liked two real members, seven passes crossed the boundary, and two
+notifications held by real members named QA actors. No matches, conversations, messages, posts or reports crossed,
+so nothing a real member was in the middle of was interrupted.
+
+`Notification.actorId` is `ON DELETE SET NULL`, so those notifications survived with the actor blanked rather than
+disappearing from someone's feed. That leaves one real member holding a `LIKE_RECEIVED` whose liker no longer
+exists; it renders as the anonymous form the feed already produces, but it leads nowhere.
+
+Post-purge: no QA email, handle or `(TEST)` name anywhere; no orphaned profile, like, match or conversation; no
+dangling conversation or post reference on any notification. Survivors are three real members, one ADMIN and one
+incomplete Telegram signup.
+
+The create path still works, so a fresh cohort can be made on demand if pre-launch testing needs one again.

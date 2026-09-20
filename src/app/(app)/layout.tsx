@@ -4,11 +4,13 @@ import { AsideSlot } from "@/components/layout/aside-slot";
 import { NotificationsProvider } from "@/components/layout/notifications-context";
 import { RightAside } from "@/components/layout/right-aside";
 import { relativeTime } from "@/lib/time";
+import { getDb } from "@/lib/db";
 import { requireActiveUser } from "@/server/auth/current-user";
 import { getDiscoverAside } from "@/server/matching/aside";
 import { getNavBadges } from "@/server/notifications/badges";
 import { countUnreadNotifications } from "@/server/notifications/feed";
 import { kickMessageEmailSweep } from "@/server/notifications/message-email";
+import { touchPresence } from "@/server/presence";
 
 /**
  * Authenticated shell: only active users with completed onboarding get here (Phase 5 §21). Badges, the unread
@@ -19,13 +21,12 @@ import { kickMessageEmailSweep } from "@/server/notifications/message-email";
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const actor = await requireActiveUser();
   /*
-   * Every authenticated page render is a chance to drain the unread-message email queue, and this layout wraps all
-   * of them. Hanging it off sending a message alone was not enough: a message becomes eligible ten minutes AFTER
-   * it is sent, and on a small app nothing happens in between to notice. Any member opening any screen now moves
-   * the queue. It is fire-and-forget behind its own one-per-minute gate, so a page render never waits on it and a
-   * busy minute still costs one sweep. A scheduler calling /api/cron/message-emails is still the only thing that
-   * works when nobody opens the app at all (docs/ARCHITECTURE.md §12.16).
+   * This layout wraps every member-facing screen, so it is where "they are here" is recorded (§12.17) and where
+   * the email safety net is driven (§12.16). Presence is awaited — it is one conditional UPDATE that usually
+   * matches nothing, and it must be written before anything decides whether this member is away. The sweep is
+   * not awaited and sits behind its own one-per-minute gate.
    */
+  await touchPresence(getDb(), actor.userId);
   kickMessageEmailSweep();
   const [badges, aside, unread] = await Promise.all([getNavBadges(actor), getDiscoverAside(actor), countUnreadNotifications(actor)]);
   const now = new Date();

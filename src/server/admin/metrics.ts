@@ -2,7 +2,10 @@
  * Dashboard metrics (docs/ARCHITECTURE.md §21.3), every one computed from canonical rows at request time. No
  * counters are stored. "Today" is the Maldives calendar day (UTC+5, no DST); the 7- and 30-day figures are rolling
  * windows. There is no analytics/activity event stream, so nothing here is called "active users": the closest
- * honest figure is accounts that signed in within a window (User.lastActiveAt is set at sign-in).
+ * honest figure is accounts the server actually heard from within a window. User.lastActiveAt used to be stamped
+ * only at sign-in; since presence was added (docs/ARCHITECTURE.md §12.17) it is refreshed, at most once a minute,
+ * on every authenticated request — so these windows now count real use rather than sign-ins, which is what the
+ * labels always implied.
  */
 import { Prisma } from "@/generated/prisma/client";
 import { getDb, type Db } from "@/lib/db";

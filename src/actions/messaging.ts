@@ -9,7 +9,8 @@ import { listConversations, type ChatsListDto } from "@/server/conversations/lis
 import { getConversationForActor, listMessages, markConversationRead, pollConversation, sendMessage, type MessageDto, type MessagePageDto, type PollDto } from "@/server/conversations/messages";
 import { getMatchProfile } from "@/server/conversations/profile";
 import { unmatchConversation } from "@/server/conversations/unmatch";
-import { kickMessageEmailSweep } from "@/server/notifications/message-email";
+import { kickAwayRecipientEmail } from "@/server/notifications/message-email";
+import { touchPresence } from "@/server/presence";
 import type { DiscoveryCardDto } from "@/server/discovery/dto";
 import { blockUser } from "@/server/safety/block";
 import { reportConversationPartner } from "@/server/safety/report";
@@ -59,12 +60,11 @@ export async function sendChatMessage(input: unknown): Promise<{ ok: true; messa
     const parsed = sendSchema.parse(input);
     const sent = await sendMessage(actor, parsed.conversationId, parsed.body);
     /*
-     * Ordinary traffic is the scheduler. Messaging is the busiest authenticated path in the app, so hanging the
-     * sweep off it keeps unread-message mail moving without a cron — and its own global one-per-minute gate means
-     * a busy hour costs one sweep per minute, not one per message. It is never awaited: the mailer must not be
-     * able to slow down or fail a send. /api/cron/message-emails exists for when a real scheduler is attached.
+     * If the recipient is not in the app, mail them now. Waiting to find out what is already known — that nobody
+     * is there — only delays it. Never awaited: the mailer must not be able to slow down or fail a send.
      */
-    kickMessageEmailSweep();
+    const conversation = await getConversationForActor(getDb(), actor, parsed.conversationId);
+    kickAwayRecipientEmail({ recipientId: conversation.otherUserId, conversationId: parsed.conversationId });
     return { ok: true, message: { id: sent.id, fromMe: true, kind: "TEXT", body: sent.body, at: sent.createdAt.toISOString() }, serverNow: new Date().toISOString() };
   } catch (e) {
     return failure(e);
@@ -85,6 +85,12 @@ export async function pollChatMessages(input: unknown): Promise<({ ok: true } & 
   try {
     const actor = await requireMember();
     const parsed = pollSchema.parse(input);
+    /*
+     * Sitting in a conversation is the one way to use the app without rendering a page: the screen polls every few
+     * seconds instead. Without this, somebody reading one chat would go "away" after five minutes and be emailed
+     * about a message in another — exactly what presence exists to prevent.
+     */
+    await touchPresence(getDb(), actor.userId);
     return { ok: true, ...(await pollConversation(actor, parsed.conversationId, { afterId: parsed.afterId ?? null })) };
   } catch (e) {
     return failure(e);

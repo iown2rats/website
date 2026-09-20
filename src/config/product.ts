@@ -156,6 +156,20 @@ export const PLACEHOLDER_PRICING = true;
  * without pulling the database layer into its bundle.
  */
 /**
+ * Presence: what "using the app right now" means (docs/ARCHITECTURE.md §12.17).
+ *
+ * `activeWithinMs` is deliberately longer than `touchEveryMs`. Presence is refreshed at most once a minute, so a
+ * window equal to it would flicker: a member who loaded a page 61 seconds ago would read as away. Five minutes
+ * covers reading a long chat, composing a reply, or glancing at another app and coming back.
+ */
+export const PRESENCE = {
+  /** Treated as being in the app if the server heard from them this recently. */
+  activeWithinMs: 5 * 60_000,
+  /** Upper bound on presence writes per member. */
+  touchEveryMs: 60_000,
+} as const;
+
+/**
  * "Someone messaged you while you were away" email (docs/ARCHITECTURE.md §12.13).
  *
  * The trigger is "still unread after a while", not "user looks offline". The only activity signals available are

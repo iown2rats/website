@@ -608,30 +608,63 @@ is not silently opted out.
 
 ### 12.16 "Someone messaged you while you were away"
 
-An email goes when a message is **still unread after a delay** — never on a guess about whether somebody is online.
-Mellocrush has no reliable liveness signal: `User.lastActiveAt` is written at sign-in, and `Session.lastSeenAt` is
-refreshed at most hourly on purpose so that browsing is not a database write per request. Neither can answer "is
-she looking at the app right now", and guessing wrong means emailing a person mid-conversation. Unread-after-a-delay
-needs no guess and is self-correcting: open the chat, the notification is marked read, the email never goes.
+**The rule is presence, not timing.** A member who is in the app gets no email; a member who is away gets one
+immediately. Waiting to find out what is already known — that nobody is there — only delays the mail, and mailing
+someone mid-conversation is the thing to avoid.
+
+Two paths, one delivery:
+
+- `notifyAwayRecipient` runs the instant a message is sent. Recipient away → email now.
+- `sweepUnreadMessageEmails` is the safety net for the one case the first path cannot see coming: the recipient
+  **was** present when the message landed, so nothing was sent, and then they left without reading it. It sends
+  only when the message is still unread **and** they are away by then, so it can never mail somebody who is still
+  reading.
 
 **There is no queue table and no migration.** The unread `MESSAGE` notification *is* the queue — one per
 conversation, already cleared when the chat is opened, already suppressed when the recipient has message
-notifications off. Throttling rides on `RateLimitBucket`, the same durable fixed-window counter used elsewhere,
-keyed per recipient and conversation, so a burst of twenty messages is one email.
+notifications off. Both paths share one per-recipient, per-conversation throttle on `RateLimitBucket`, so a burst
+is one email however it was triggered, and the sweep cannot re-send what the send path already sent.
 
 **The email never carries the message.** An inbox is read over shoulders, synced to laptops and screenshotted by
 people other than its owner; what two matches say to each other is theirs. It carries who wrote and a way back.
 
-**What drives it.** Ordinary traffic: `sendChatMessage` kicks the sweep fire-and-forget, and the sweep's own
-global one-per-minute gate means a busy hour costs one sweep per minute rather than one per message. It is never
-awaited, so the mailer cannot slow down or fail a send. `/api/cron/message-emails` exists for a real scheduler and
-is authorised by `CRON_SECRET` as an `Authorization: Bearer` header — the shape Vercel Cron sends. With the secret
-unset the route refuses everything: an endpoint that triggers outbound email must never stand open, and failing
-closed costs only punctuality, since traffic still drives the sweep.
+**What drives the safety net.** Every authenticated page render, since the app layout wraps all of them, behind a
+global one-per-minute gate and never awaited. `/api/cron/message-emails` exists for a real scheduler and is
+authorised by `CRON_SECRET` as an `Authorization: Bearer` header — the shape Vercel Cron sends. With the secret
+unset the route refuses everything: an endpoint that triggers outbound email must never stand open. The main path
+needs none of this, because it fires on the send itself.
 
 `emailDeliveryConfigured()` is deliberately distinct from `emailAuthConfigured()`: the latter asks whether email
-sign-in is offered, and `EMAIL_AUTH=off` says nothing about whether the mailer works. A notification still needs
-sending when sign-in happens to be Google-only.
+sign-in is offered, and `EMAIL_AUTH=off` says nothing about whether the mailer works.
+
+### 12.17 Presence
+
+`User.lastActiveAt` now means what its name says: the last time this member's browser asked the server for
+anything. It used to be stamped only at sign-in.
+
+The app had no usable liveness signal before this. `Session.lastSeenAt` is refreshed at most hourly on purpose, so
+that browsing is not a database write per request, and a sign-in timestamp cannot tell somebody mid-conversation
+from somebody who left this morning.
+
+The write is conditional, so the common case costs one indexed `UPDATE` that matches no rows:
+
+```sql
+UPDATE "User" SET "lastActiveAt" = now() WHERE id = $1 AND ("lastActiveAt" IS NULL OR "lastActiveAt" < $2)
+```
+
+At one write per member per minute, an hour of clicking costs sixty touched rows rather than several hundred —
+the reason sessions were kept coarse, without the coarseness.
+
+It is touched in two places, and both are needed. The **app layout** covers every member-facing screen. The
+**conversation poll** covers the one way to use the app without rendering a page: the chat screen polls every few
+seconds, and without it somebody reading one conversation would read as away after five minutes and be emailed
+about another.
+
+`activeWithinMs` (5 min) is deliberately longer than `touchEveryMs` (1 min). A window equal to the refresh
+interval would flicker — a member who loaded a page 61 seconds ago would read as away.
+
+**This changes the admin dashboard.** Its 7- and 30-day figures used to count accounts that signed in during the
+window; they now count accounts that actually used the app in it, which is what those labels always implied.
 
 ## 13. Notifications
 

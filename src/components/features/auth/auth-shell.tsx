@@ -81,7 +81,7 @@ export function AuthHeading({ id, title, subtitle, compact = false }: { id: stri
   return (
     <>
       <div className="flex justify-center">
-        <Wordmark tone="light" height={compact ? 26 : 30} priority />
+        <Wordmark tone="white" height={compact ? 26 : 30} priority />
       </div>
       {title ? (
         <h1 id={id} className="mt-2.5 text-h4 font-medium leading-tight tracking-[-0.01em] text-white">

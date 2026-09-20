@@ -34,6 +34,22 @@ function typeScale(): Map<string, number> {
   return steps;
 }
 
+/** How many `{` blocks enclose `index` — 0 means top level, so outside every `@layer` and every at-rule. */
+function braceDepthAt(css: string, index: number): number {
+  let depth = 0;
+  let inComment = false;
+  for (let i = 0; i < index; i++) {
+    if (inComment) {
+      if (css[i] === "*" && css[i + 1] === "/") inComment = false;
+      continue;
+    }
+    if (css[i] === "/" && css[i + 1] === "*") inComment = true;
+    else if (css[i] === "{") depth++;
+    else if (css[i] === "}") depth--;
+  }
+  return depth;
+}
+
 /** The attribute text of every editable element in a file, paired with its line number. */
 function editableTags(source: string): { tag: string; line: number }[] {
   const found: { tag: string; line: number }[] = [];
@@ -74,9 +90,14 @@ describe("the iOS field floor", () => {
   it("enforces the floor outside @layer, so no utility class can undercut it", () => {
     // Tailwind utilities live in `@layer utilities`; unlayered CSS beats every layer. A rule inside a layer would
     // lose to a stray `text-body` on an <input>, which is exactly how this shipped broken the first time.
-    const afterLayers = GLOBALS.slice(GLOBALS.lastIndexOf("@layer"));
-    const floor = afterLayers.match(/input,\s*\n\s*textarea,\s*\n\s*select\s*\{([^}]*)\}/);
-    expect(floor, "the unlayered input/textarea/select floor is gone").not.toBeNull();
+    //
+    // Checked by brace depth rather than by position in the file: "after the last @layer" would pass for a floor
+    // sitting INSIDE a trailing layer, and fail for a correct floor that simply has a layer written below it.
+    // globals.css has two such rules: `font: inherit` inside @layer base, and the floor itself at top level.
+    const rules = [...GLOBALS.matchAll(/input,\s*\n\s*textarea,\s*\n\s*select\s*\{([^}]*)\}/g)];
+    const unlayered = rules.filter((m) => braceDepthAt(GLOBALS, m.index) === 0);
+    expect(unlayered.length, "the unlayered input/textarea/select floor is gone or duplicated").toBe(1);
+    const [floor] = unlayered;
     expect(floor![1]).toContain("var(--text-field)");
   });
 

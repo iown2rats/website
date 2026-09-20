@@ -359,7 +359,7 @@ A visual-system update only. Every card, panel, sheet, dialog, bottom nav, filte
 
 ## 24. Mellocrush rebrand (2026-09-18)
 
-Branding only: routes, screens, behaviour, styling and data are unchanged. The public name is **Mellocrush** (the wordmark is always lowercase `mellocrush`). The canonical artwork lives in `public/brand/`: `mellocrush-logo.png` (the supplied wordmark trimmed to its artwork, 1977×326, cocoa #472B30 lettering, linked coral #E88B86 "oo", gold #C9A04A four-point star), a 480 px rendition for headers, and `mellocrush-mark.png` (the linked "oo" plus star, cut from the same artwork) for icon-only places. `src/components/brand/logo.tsx` renders them: `Wordmark` at a given height with the artwork's own aspect ratio (never recreated with text, never re-kerned) and `BrandMark` for compact slots. The old wave logo component was deleted. Wordmark sites: welcome (on a small warm-white glass tile over the photograph), Discover header (the mark alone below 390 px while a Boost runs), desktop sidebar, admin sidebar, sign-in error and deleted-account pages; the admin phone header uses the mark. Metadata: title "Mellocrush" (template "%s · Mellocrush"), application name, Open Graph and Twitter titles, a web manifest (name and short name Mellocrush, icons on the warm page colour), favicon and Apple touch icon from the mark. Copy: every "Thundi" became "Mellocrush" and "Thundi Plus" became "Mellocrush Plus" in the UI, server messages, tests and docs. Left as they were on purpose because they are identifiers or data, not branding: cookie names, the appearance localStorage key, environment variables, database and bucket names, the hosted Vercel and Supabase project names, demo sign-in addresses, the dev OIDC issuer, and the `THU-` payment reference format.
+Branding only: routes, screens, behaviour, styling and data are unchanged. (**The artwork described here is superseded by §34** — the final logo. The naming, metadata and copy decisions below still stand.) The public name is **Mellocrush** (the wordmark is always lowercase `mellocrush`). The canonical artwork lives in `public/brand/`: `mellocrush-logo.png` (the supplied wordmark trimmed to its artwork, 1977×326, cocoa #472B30 lettering, linked coral #E88B86 "oo", gold #C9A04A four-point star), a 480 px rendition for headers, and `mellocrush-mark.png` (the linked "oo" plus star, cut from the same artwork) for icon-only places. `src/components/brand/logo.tsx` renders them: `Wordmark` at a given height with the artwork's own aspect ratio (never recreated with text, never re-kerned) and `BrandMark` for compact slots. The old wave logo component was deleted. Wordmark sites: welcome (on a small warm-white glass tile over the photograph), Discover header (the mark alone below 390 px while a Boost runs), desktop sidebar, admin sidebar, sign-in error and deleted-account pages; the admin phone header uses the mark. Metadata: title "Mellocrush" (template "%s · Mellocrush"), application name, Open Graph and Twitter titles, a web manifest (name and short name Mellocrush, icons on the warm page colour), favicon and Apple touch icon from the mark. Copy: every "Thundi" became "Mellocrush" and "Thundi Plus" became "Mellocrush Plus" in the UI, server messages, tests and docs. Left as they were on purpose because they are identifiers or data, not branding: cookie names, the appearance localStorage key, environment variables, database and bucket names, the hosted Vercel and Supabase project names, demo sign-in addresses, the dev OIDC issuer, and the `THU-` payment reference format.
 
 ## 25. Continue with Telegram (2026-09-18)
 
@@ -375,9 +375,9 @@ Card. Max width 400 px (440 px from `md`), radius 28 px, `background: rgba(255,2
 It sits 15 dvh from the top on phones (plus the safe-area inset) and 11 vh on wide screens, so the couple on the sand
 is never covered. The photograph keeps its own colour; the card alone provides the contrast for the white type.
 
-Contents, in order: the wordmark in white at 38 px tall (`Wordmark tone="light"`, the supplied artwork with its cocoa
-lettering recoloured to white in `public/brand/mellocrush-logo-white*.png`; the coral "oo" and the gold star are
-untouched, and the proportions are the artwork's own); the tagline "Real people. Brighter days." in 13 px uppercase
+Contents, in order: the wordmark in white at 38 px tall (`Wordmark tone="white"`, from
+`public/brand/mellocrush-logo-white-480.png`; see §34 for the final artwork, of which white lettering is the supplied
+form, and whose proportions are never altered); the tagline "Real people. Brighter days." in 13 px uppercase
 with 0.22 em tracking at 70 % white; the two sign-in pills; a rule with "or"; and the legal line linking to
 `/legal/terms` and `/legal/privacy`.
 
@@ -722,3 +722,45 @@ is empty margin.
 There is no code fix, and there should not be one: overriding a zoom the user or their browser chose is the same
 mistake as `user-scalable=no`, just later in the stack. The check is per-device — a private tab carries no saved
 zoom, so if the app is clean there and not in a normal tab, the saved zoom is the cause.
+
+## 34. The final logo (2026-09-20)
+
+The owner supplied the finished Mellocrush logo as two flattened images, and they replace every brand asset shipped
+before: `brand-source/mellocrush-wordmark.png` (lowercase `mellocrush`, white lettering, an interlocking coral
+`#EE5358` "oo" and a gold `#FDA748` heart, on the brand navy `#0B1A2B`) and `brand-source/mellocrush-mark.png` (the
+interlocking "oo" with the heart, on white). §24's cocoa lettering, pale coral and four-point star are gone, and so
+is the star everywhere it was described — the heart replaces it.
+
+Everything in `public/brand/` and the two icon files in `src/app/` are now **derived** from those two images by
+`scripts/build-brand-assets.py`, never hand-edited, so a size can never drift from the artwork. Regenerate with
+`pip install Pillow numpy && python3 scripts/build-brand-assets.py`.
+
+**Cutting the background out.** Both images arrive flattened onto a solid colour, so the first job is a real alpha
+channel. Thresholding leaves a rim of half-background pixels around every curve — a dark halo on the sand page, a
+light one on black. The script instead reads each pixel as the composite it is, `C = a·F + (1−a)·B`: coverage `a`
+ramps across a narrow distance band from the background colour, and the foreground colour `F` is then solved for and
+stored un-premultiplied. The curves are clean over any background, which is the whole point of a transparent logo.
+
+**Two lettering colours, because a raster cannot follow `--text`.** The supplied lettering is white, which is right
+over navy or a photograph and invisible on `#FFFBF1`. `mellocrush-logo*.png` recolours *only* the near-neutral
+lettering to the artwork's own navy `#0B1A2B`; `mellocrush-logo-white*.png` keeps it white. The coral "oo" and the
+gold heart are never touched in either. The recolour is weighted by how neutral a pixel is rather than switched on a
+threshold, so the blends where the white letters run into the coral stay smooth instead of showing a seam.
+
+**Picking one.** `<Wordmark>` defaults to `tone="auto"`, which renders both files and lets `.wordmark-ink` /
+`.wordmark-white` in `globals.css` choose on `:root[data-theme="dark"]`. It has to be CSS: appearance is a per-viewer
+localStorage choice applied to `<html>` by the inline script in `layout.tsx`, so the server cannot know it and
+guessing would flash the wrong colour. Those rules sit inside `@layer base` on purpose — the Discover header hides
+the wordmark below 390 px with `max-[389px]:hidden`, and an unlayered rule would silently beat that utility. Fixed
+tones stay available: the welcome card passes `tone="white"` because it is over a night photograph whatever the
+appearance setting says. This also fixes a standing bug: the old cocoa wordmark was rendered unchanged on dark mode's
+`#000000` background, where it was very nearly invisible.
+
+**Sizes.** Wordmark 1492×284 (aspect 5.2535, replacing 1977×326), with 480 px renditions of both tones for the app —
+every wordmark slot renders 21–38 px tall, so 480 px covers 3× DPR — and a 960 px white rendition for larger use. The
+mark is a 512 px transparent square. App icons (`mellocrush-app-icon-{192,512}.png`, `src/app/icon.png`,
+`src/app/apple-icon.png`) are the mark flattened onto the warm page colour `#FFFBF1`, opaque rather than transparent
+because iOS composites a transparent icon onto black.
+
+Verified in the browser at 390 px light, 390 px dark and 1440 px: the welcome card, the Discover header, the desktop
+sidebar and the app icon, with the navy lettering on sand, the white lettering on black, and no halo on either.

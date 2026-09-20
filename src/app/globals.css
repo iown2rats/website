@@ -298,6 +298,33 @@
 }
 
 /*
+ * The wordmark is artwork, not text, so it cannot follow `--text` the way the rest of the interface does. Two files
+ * ship — navy lettering and white lettering — and <Wordmark tone="auto"> renders both, letting this rule choose.
+ *
+ * CSS rather than a prop because appearance is a per-viewer localStorage choice applied to <html> by the inline
+ * script in layout.tsx, before paint and after the server has already rendered: a server component cannot know which
+ * one this viewer wants, and guessing would flash the wrong colour. Both files are ~35 KB and come from cache on
+ * every later page.
+ *
+ * Inside @layer base on purpose, so a utility still wins: the compact header hides the wordmark below 390px with
+ * `max-[389px]:hidden`, and an unlayered rule here would quietly override it.
+ */
+@layer base {
+  .wordmark-ink {
+    display: block;
+  }
+  .wordmark-white {
+    display: none;
+  }
+  :root[data-theme="dark"] .wordmark-ink {
+    display: none;
+  }
+  :root[data-theme="dark"] .wordmark-white {
+    display: block;
+  }
+}
+
+/*
  * The iOS field floor (docs/DESIGN_SYSTEM.md §33).
  *
  * iOS Safari zooms the page whenever a focused editable control computes below 16px, and modern iOS does not undo

@@ -19,7 +19,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:responsive": "node scripts/responsive-audit.mjs --focus --keyboard",
+    "test:responsive:mobile": "node scripts/responsive-audit.mjs --widths=320,360,375,390,393,414,430 --focus --keyboard"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

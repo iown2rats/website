@@ -41,7 +41,7 @@ export function LocationForm({ locations, initialId }: { locations: LocationOpti
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search island or atoll"
           autoComplete="off"
-          className="min-w-0 flex-1 border-0 bg-transparent text-body-lg text-text outline-none placeholder:text-text-muted"
+          className="min-w-0 flex-1 border-0 bg-transparent text-field text-text outline-none placeholder:text-text-muted"
         />
       </div>
       <div role="listbox" aria-label="Locations" className="flex shrink-0 flex-col overflow-hidden rounded-2xl glass-card [&>*+*]:border-t [&>*+*]:border-border">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { StatusBadge, type TagVariant } from "@/components/ui/badge";
+import { Scroller } from "@/components/ui/scroller";
 
 /*
  * Operational building blocks for /admin (docs/DESIGN_SYSTEM.md §18). Same tokens as the app (surfaces, borders,
@@ -75,7 +76,7 @@ export function KeyValueList({ items, className }: { items: { label: string; val
 /** Filter pills rendered as links, so filters survive refresh and work without JavaScript. */
 export function FilterLinks({ items, current, label = "Filter" }: { items: { value: string; label: string; href: string; count?: number }[]; current: string; label?: string }) {
   return (
-    <nav aria-label={label} className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+    <Scroller as="nav" aria-label={label} className="gap-2 pb-1">
       {items.map((it) => {
         const active = it.value === current;
         return (
@@ -85,7 +86,7 @@ export function FilterLinks({ items, current, label = "Filter" }: { items: { val
           </Link>
         );
       })}
-    </nav>
+    </Scroller>
   );
 }
 

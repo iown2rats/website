@@ -2,6 +2,7 @@
 
 import { useId, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Scroller } from "./scroller";
 
 /*
  * Two tab patterns from the prototype:
@@ -54,11 +55,15 @@ export function SegmentedControl<T extends string>({ items, value, onChange, lab
 }
 
 export function PillTabs<T extends string>({ items, value, onChange, label, className, scrollable = false }: TabsProps<T> & { scrollable?: boolean }) {
+  const Row = scrollable ? Scroller : "div";
   return (
-    <div
+    <Row
       role="tablist"
       aria-label={label}
-      className={cn("flex gap-2", scrollable && "overflow-x-auto -mx-4 px-4 pb-0.5 [scrollbar-width:none]", className)}
+      // Scrollable pills bleed to the screen edges so the first and last chip sit against them; Scroller derives
+      // the negative margin and the inner padding from this one value (docs/DESIGN_SYSTEM.md §33).
+      {...(scrollable ? { bleed: "1rem" } : {})}
+      className={cn("flex gap-2", scrollable && "pb-0.5", className)}
     >
       {items.map((item) => {
         const active = item.value === value;
@@ -80,7 +85,7 @@ export function PillTabs<T extends string>({ items, value, onChange, label, clas
           </button>
         );
       })}
-    </div>
+    </Row>
   );
 }
 

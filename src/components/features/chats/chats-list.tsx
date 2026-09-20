@@ -12,6 +12,7 @@ import { ChatIcon, HeartIcon, SearchIcon, VerifiedBadge } from "@/components/ui/
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { SectionLabel } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
+import { Scroller } from "@/components/ui/scroller";
 import { AppScreen, ScrollArea } from "@/components/layout/page";
 import { TabHeader } from "@/components/layout/screen-header";
 import type { ChatsListDto, ConversationListItemDto } from "@/server/conversations/list";
@@ -74,14 +75,14 @@ export function ChatsList({ initial, hasEverMatched }: { initial: ChatsListDto; 
         {newMatches.length > 0 ? (
           <section>
             <SectionLabel className="mb-2">New matches</SectionLabel>
-            <div className="-mx-0.5 flex gap-2.5 overflow-x-auto px-0.5 pb-1 [scrollbar-width:none]">
+            <Scroller bleed="2px" className="gap-2.5 pb-1">
               {newMatches.map((m) => (
                 <Link key={m.id} href={`/chats/${m.id}`} className="flex w-15 shrink-0 flex-col items-center gap-1 text-micro text-text" aria-label={`Open chat with ${m.other.name}`}>
                   <Avatar name={m.other.name} photo={{ url: m.other.photo?.url ?? null, key: m.other.photo?.demoKey ?? null, blurhash: m.other.photo?.blurhash ?? null }} size={56} ring />
                   <span className="max-w-full truncate">{m.other.name}</span>
                 </Link>
               ))}
-            </div>
+            </Scroller>
           </section>
         ) : null}
         {conversations.length > 0 ? (

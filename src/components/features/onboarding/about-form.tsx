@@ -78,7 +78,7 @@ export function AboutForm({ interests, prompts, initialBio, initialInterestIds, 
                   autoFocus
                   onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))}
                   placeholder="Your answer"
-                  className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-3.5 py-3.5 text-body leading-normal text-text outline-none"
+                  className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-3.5 py-3.5 text-field leading-normal text-text outline-none"
                 />
               ) : null}
             </div>

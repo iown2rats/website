@@ -25,7 +25,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: { searchP
       <FilterLinks current={filter} items={FILTERS.map((f) => ({ value: f, label: f === "expiring" ? "Expiring (7 days)" : f[0]!.toUpperCase() + f.slice(1), href: base(f) }))} />
       <form method="get" action="/admin/subscriptions" className="flex gap-2">
         <input type="hidden" name="filter" value={filter} />
-        <Input name="q" defaultValue={sp.q ?? ""} placeholder="Name, handle, user id or payment reference" className="h-11 flex-1 text-body-sm" />
+        <Input name="q" defaultValue={sp.q ?? ""} placeholder="Name, handle, user id or payment reference" className="h-11 flex-1" />
         <Button type="submit" variant="ocean" size="sm" className="h-11">Search</Button>
       </form>
       <RowList empty="No subscriptions here.">

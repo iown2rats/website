@@ -36,12 +36,12 @@ export function PaymentMethodForm({ method, onDone }: { method?: PaymentMethodAd
         router.refresh();
       }}
     >
-      <Field label="Label (internal)" hint="e.g. Main MVR account">{(p) => <Input {...p} value={d.label} onChange={(e) => set("label", e.target.value)} maxLength={60} required className="h-11 text-body-sm" />}</Field>
-      <Field label="Bank">{(p) => <Input {...p} value={d.bankName} onChange={(e) => set("bankName", e.target.value)} maxLength={60} required className="h-11 text-body-sm" />}</Field>
-      <Field label="Account holder name">{(p) => <Input {...p} value={d.accountHolder} onChange={(e) => set("accountHolder", e.target.value)} maxLength={80} required className="h-11 text-body-sm" />}</Field>
-      <Field label="Account number">{(p) => <Input {...p} value={d.accountNumber} onChange={(e) => set("accountNumber", e.target.value)} inputMode="numeric" maxLength={40} required className="h-11 font-mono text-body-sm" />}</Field>
+      <Field label="Label (internal)" hint="e.g. Main MVR account">{(p) => <Input {...p} value={d.label} onChange={(e) => set("label", e.target.value)} maxLength={60} required className="h-11" />}</Field>
+      <Field label="Bank">{(p) => <Input {...p} value={d.bankName} onChange={(e) => set("bankName", e.target.value)} maxLength={60} required className="h-11" />}</Field>
+      <Field label="Account holder name">{(p) => <Input {...p} value={d.accountHolder} onChange={(e) => set("accountHolder", e.target.value)} maxLength={80} required className="h-11" />}</Field>
+      <Field label="Account number">{(p) => <Input {...p} value={d.accountNumber} onChange={(e) => set("accountNumber", e.target.value)} inputMode="numeric" maxLength={40} required className="h-11 font-mono" />}</Field>
       <Field label="Instructions shown to customers (optional)" className="desktop:col-span-2">{(p) => <Textarea {...p} value={d.instructions} onChange={(e) => set("instructions", e.target.value)} maxLength={500} rows={3} placeholder="e.g. Use the payment reference as the transfer remark." />}</Field>
-      <Field label="Sort order" hint="Lower shows first. The lowest enabled method is used at checkout.">{(p) => <Input {...p} type="number" min={0} max={1000} value={d.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value))} className="h-11 text-body-sm" />}</Field>
+      <Field label="Sort order" hint="Lower shows first. The lowest enabled method is used at checkout.">{(p) => <Input {...p} type="number" min={0} max={1000} value={d.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value))} className="h-11" />}</Field>
       <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
         <div>
           <div className="text-body-sm font-medium text-text" id={`enabled-${method?.id ?? "new"}`}>Enabled</div>

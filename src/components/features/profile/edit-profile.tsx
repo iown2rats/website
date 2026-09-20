@@ -101,7 +101,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
   const dob = profile.dob ? `${String(profile.dob.day).padStart(2, "0")} · ${String(profile.dob.month).padStart(2, "0")} · ${profile.dob.year}` : "";
 
   const rowClass = "flex h-12 items-center justify-between gap-4 px-3.5 text-body";
-  const valueInput = "min-w-0 flex-1 border-0 bg-transparent text-right text-body font-medium text-text outline-none placeholder:font-medium placeholder:text-text-muted";
+  const valueInput = "min-w-0 flex-1 border-0 bg-transparent text-right text-field font-medium text-text outline-none placeholder:font-medium placeholder:text-text-muted";
 
   return (
     <PageOverlay
@@ -207,7 +207,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
                     <span className="text-micro text-primary-ink">{has ? "Answered" : canOpen ? "Add" : ""}</span>
                   </button>
                   {isOpen ? (
-                    <textarea aria-label={p.text} value={answer} maxLength={200} rows={2} autoFocus onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} placeholder="Your answer" className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-3.5 py-3.5 text-body leading-normal text-text outline-none placeholder:text-text-muted" />
+                    <textarea aria-label={p.text} value={answer} maxLength={200} rows={2} autoFocus onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} placeholder="Your answer" className="block w-full resize-none border-0 border-t border-border bg-surface-muted px-3.5 py-3.5 text-field leading-normal text-text outline-none placeholder:text-text-muted" />
                   ) : null}
                 </div>
               );

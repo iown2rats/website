@@ -189,6 +189,30 @@ export const BoltIcon = (p: IconProps) => (
     <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
   </Base>
 );
+export const PollIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M4 19V5M4 8h11M4 13h7M4 18h14" />
+  </Base>
+);
+/** Confessions: said out loud, not signed. A speech bubble with the tail left open. */
+export const WhisperIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M21 11.5a8 8 0 01-11.6 7.2L4 20.5l1.8-4.6A8 8 0 0113.5 3.5" />
+    <path d="M17 3.5v5M19.5 6h-5" />
+  </Base>
+);
+export const QuestionIcon = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.7-1.5 1.2-1.5 2.2M12 17h.01" />
+  </Base>
+);
+export const FlameIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M12 3s4.5 3.6 4.5 7.5a4.5 4.5 0 01-9 0C7.5 8.9 9 7.5 9 7.5s.3 1.8 1.5 2.3C10.2 7 12 3 12 3z" />
+    <path d="M7 14a5 5 0 1010 0c0-.9-.2-1.8-.6-2.6" />
+  </Base>
+);
 export const BellIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M18 9a6 6 0 10-12 0c0 4.2-1.2 5.6-1.8 6.3a.8.8 0 00.6 1.3h14.4a.8.8 0 00.6-1.3C19.2 14.6 18 13.2 18 9z" />

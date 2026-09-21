@@ -232,6 +232,21 @@ enum PostKind {
   TEXT
   QUESTION
   PHOTO
+  POLL
+  /// Shown without an author. The author FK is still set — anonymity is a PRESENTATION rule, never a gap in the
+  /// record (src/server/community/dto.ts), so moderation, reports and admin keep working exactly as before.
+  CONFESSION
+}
+
+/// The topic chips above the feed. A fixed list rather than free-text tags: tags on a small community fragment it,
+/// and a chip row that fits on a 320px screen cannot hold an open vocabulary anyway.
+enum PostTopic {
+  DATING
+  ADVICE
+  CONFESSIONS
+  QUESTIONS
+  POLLS
+  RANDOM
 }
 
 enum ContactHashSource {
@@ -308,6 +323,9 @@ model User {
   posts                 CommunityPost[]
   comments              CommunityComment[]
   postLikes             CommunityLike[]
+  pollVotes             CommunityPollVote[]
+  following             CommunityFollow[]         @relation("CommunityFollower")
+  followers             CommunityFollow[]         @relation("CommunityFollowing")
   notifications         Notification[]            @relation("NotificationUser")
   notificationsActed    Notification[]            @relation("NotificationActor")
   pushSubscriptions     PushSubscription[]
@@ -1063,6 +1081,10 @@ model CommunityPost {
   id              String          @id @default(cuid(2))
   authorId        String
   kind            PostKind        @default(TEXT)
+  /// Which chip this post sits under. Null means it predates topics, or the author chose none.
+  topic           PostTopic?
+  /// Hide the author from other members. NEVER clears authorId: see PostKind.CONFESSION.
+  isAnonymous     Boolean         @default(false)
   body            String
   photoKey        String?
   photoBlurhash   String?
@@ -1073,14 +1095,70 @@ model CommunityPost {
   createdAt       DateTime        @default(now())
   deletedAt       DateTime?
 
-  author        User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  author        User                  @relation(fields: [authorId], references: [id], onDelete: Restrict)
   comments      CommunityComment[]
   likes         CommunityLike[]
   reports       Report[]
   notifications Notification[]
+  pollOptions   CommunityPollOption[]
+  pollVotes     CommunityPollVote[]
 
   @@index([deletedAt, createdAt(sort: Desc)])
   @@index([authorId])
+  /// The topic chips filter on this, newest first, over live posts only.
+  @@index([topic, deletedAt, createdAt(sort: Desc)])
+}
+
+/// One answer on a poll. `voteCount` is denormalised for the same reason CommunityPost.likeCount is: the feed
+/// renders percentages for every option of every visible poll, and counting rows per option per render does not
+/// survive a page of them.
+model CommunityPollOption {
+  id        String   @id @default(cuid(2))
+  postId    String
+  label     String
+  position  Int
+  voteCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  post  CommunityPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  votes CommunityPollVote[]
+
+  @@unique([postId, position])
+  @@index([postId])
+}
+
+/// One member's vote. The composite primary key is the rule: one vote per person per poll, enforced by the
+/// database rather than by a check the application has to remember to make. Changing a vote updates this row.
+model CommunityPollVote {
+  postId    String
+  userId    String
+  optionId  String
+  createdAt DateTime @default(now())
+
+  post   CommunityPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  option CommunityPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([optionId])
+}
+
+/// A one-directional, PRIVATE follow (owner decision, 2026-09-21). It feeds the Following tab and nothing else:
+/// the person followed is never notified, never sees who follows them, and no follower count is exposed anywhere.
+/// On a dating app a visible follow is a way to tell someone they are being watched, which is the behaviour the
+/// Community Guidelines call stalking. Blocking in either direction removes the row.
+model CommunityFollow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("CommunityFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("CommunityFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  /// "Whose posts go in my Following tab?"
+  @@index([followerId, createdAt(sort: Desc)])
+  @@index([followingId])
 }
 
 model CommunityComment {

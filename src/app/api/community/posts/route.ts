@@ -5,9 +5,13 @@ import { createPost, postKindSchema } from "@/server/community/posts";
 import { IMAGE_RULES } from "@/server/media/process-image";
 
 /**
- * POST /api/community/posts — creates a Community post (text, question or photo) for the signed-in user.
- * Multipart so the browser can report upload progress for photo posts. Same-origin only (Sec-Fetch-Site) in
- * addition to the SameSite cookie; the author is always the session user.
+ * POST /api/community/posts — creates a Community post (text, question, photo, poll or confession) for the
+ * signed-in user. Multipart so the browser can report upload progress for photo posts. Same-origin only
+ * (Sec-Fetch-Site) in addition to the SameSite cookie; the author is always the session user.
+ *
+ * Note what this route does NOT accept: there is no "anonymous" field. A confession is anonymous because of its
+ * kind, decided in createPost, so a crafted request cannot post anonymously as anything else — and cannot strip
+ * the anonymity off a confession either.
  */
 export async function POST(request: NextRequest) {
   const site = request.headers.get("sec-fetch-site");
@@ -26,11 +30,14 @@ export async function POST(request: NextRequest) {
   const kind = postKindSchema.safeParse(form.get("kind"));
   if (!kind.success) return NextResponse.json({ error: "Choose a post type." }, { status: 422 });
   const body = String(form.get("body") ?? "");
+  const topic = form.get("topic") == null ? null : String(form.get("topic"));
+  // Repeated fields rather than an embedded JSON blob: one less parser between the browser and validation.
+  const options = form.getAll("option").map((v) => String(v));
   const entry = form.get("photo");
   const file = entry instanceof File && entry.size > 0 ? entry : null;
   try {
     const photo = file ? { bytes: new Uint8Array(await file.arrayBuffer()), size: file.size } : null;
-    const post = await createPost({ userId: state.user.id }, { kind: kind.data, body, photo });
+    const post = await createPost({ userId: state.user.id }, { kind: kind.data, body, topic, photo, pollOptions: options.length > 0 ? options : undefined });
     return NextResponse.json({ post }, { status: 201 });
   } catch (e) {
     if (isDomainError(e)) return NextResponse.json({ error: e.message }, { status: e.code === "VALIDATION" ? 422 : 409 });

@@ -90,7 +90,7 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
     if (!body || sending) return;
     setSending(true);
     const tempId = `tmp-${crypto.randomUUID()}`;
-    const optimistic: LocalComment = { id: tempId, body, createdAt: serverNow, author: { handle: "", name: "You", verified: false, location: null, photo: null, isMe: true }, isMine: true, pending: true };
+    const optimistic: LocalComment = { id: tempId, body, createdAt: serverNow, author: { handle: "", name: "You", verified: false, location: null, photo: null, isMe: true, followed: false }, isMine: true, pending: true };
     setComments((cur) => [...cur, optimistic]);
     setDraft("");
     const r = await call(() => postComment({ postId: post.id, body }));
@@ -112,8 +112,12 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
     setPost((cur) => cur && { ...cur, commentCount: Math.max(0, cur.commentCount - 1) });
   };
   const onBlocked = (t: ContentTarget) => {
-    if (t.kind === "post" || t.authorHandle === post.author.handle) { router.replace("/community"); return; }
-    setComments((cur) => cur.filter((c) => c.author.handle !== t.authorHandle));
+    if (t.kind === "post") { router.replace("/community"); return; }
+    // An anonymous post has no handle, so "" must not be treated as a match against the post's author: it would
+    // sweep out every anonymous comment author at once and imply they were all the same person.
+    if (t.authorHandle && t.authorHandle === post.author.handle) { router.replace("/community"); return; }
+    if (t.authorHandle) setComments((cur) => cur.filter((c) => c.author.handle !== t.authorHandle));
+    else router.refresh();
   };
 
   // Header count: what this viewer can actually see once the thread is fully loaded (blocked authors' comments are
@@ -137,8 +141,10 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
           now={serverNow}
           onToggleLike={(p) => void toggleLike(p)}
           onOpenAuthor={(a) => void profile.open(a)}
-          onOpenMenu={(p) => setMenuTarget({ kind: "post", id: p.id, authorName: p.author.name, authorHandle: p.author.handle, isMine: p.isMine })}
+          onOpenMenu={(p) => setMenuTarget({ kind: "post", id: p.id, authorName: p.isAnonymous ? "this person" : p.author.name, authorHandle: p.author.handle, isMine: p.isMine })}
           onComments={() => composer.current?.focus()}
+          onPollVoted={(_, poll) => setPost((cur) => cur && { ...cur, poll })}
+          onFollowChanged={(_, following) => setPost((cur) => cur && { ...cur, author: { ...cur.author, followed: following } })}
         />
 
         <section aria-label="Comments" className="flex flex-col gap-1">

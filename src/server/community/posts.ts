@@ -1,7 +1,16 @@
 /**
- * Community posts: create (text, question, photo) and soft-delete by the author. Photo posts go through the shared
- * image pipeline into user-scoped keys `community-photos/<userId>/<postId>/full.webp` with their own moderation state.
- * Nothing here touches likes, matches or conversations.
+ * Community posts: create (text, question, photo, poll, confession) and soft-delete by the author. Photo posts go
+ * through the shared image pipeline into user-scoped keys `community-photos/<userId>/<postId>/full.webp` with their
+ * own moderation state. Nothing here touches likes, matches or conversations.
+ *
+ * Two rules are enforced here rather than trusted from the payload:
+ *
+ *   - `isAnonymous` is DERIVED from the kind, never read from the request. A confession is anonymous, everything
+ *     else is not, and there is no way to ask for an anonymous photo post or a named confession. A client cannot
+ *     set the flag at all, so there is no path by which it drifts away from what the UI promised the author.
+ *   - the author id is the session user for every kind, confessions included. Anonymity lives in the DTO
+ *     (src/server/community/dto.ts); the row always names who wrote it, so reports, blocks and the admin queues
+ *     work on a confession exactly as they work on any other post.
  */
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -14,19 +23,25 @@ import type { Actor } from "@/server/actor";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { processImage } from "@/server/media/process-image";
 import { buildPostDtos } from "./feed";
-import type { CommunityPostDto } from "./dto";
+import type { CommunityPostDto, CommunityPostKind } from "./dto";
+import { parsePollOptions } from "./polls";
+import { parseTopic, suggestedTopic, type TopicKey } from "./topics";
 
 export const postBodySchema = z
   .string()
   .transform((s) => s.replace(/\r\n?/g, "\n").replace(/\p{Cc}/gu, (c) => (c === "\n" || c === "\t" ? c : "")).trim())
   .pipe(z.string().min(1, "Write something first").max(COMMUNITY.postMaxLength, `Posts can be up to ${COMMUNITY.postMaxLength} characters`));
 
-export const postKindSchema = z.enum(["TEXT", "QUESTION", "PHOTO"]);
+export const postKindSchema = z.enum(["TEXT", "QUESTION", "PHOTO", "POLL", "CONFESSION"]);
 
 export interface CreatePostInput {
-  kind: "TEXT" | "QUESTION" | "PHOTO";
+  kind: CommunityPostKind;
   body: string;
+  /** Chip the author picked. Ignored when not one of the six; the kind then supplies a sensible default. */
+  topic?: string | null;
   photo?: { bytes: Uint8Array; size: number } | null;
+  /** POLL only: 2-4 distinct labels. Rejected for every other kind. */
+  pollOptions?: unknown;
 }
 
 export async function createPost(actor: Actor, input: CreatePostInput, deps: { db?: Db; storage?: StorageProvider; now?: Date } = {}): Promise<CommunityPostDto> {
@@ -39,6 +54,13 @@ export async function createPost(actor: Actor, input: CreatePostInput, deps: { d
   const body = parsed.data;
   if (kind === "PHOTO" && !input.photo) throw new ValidationError("Add a photo to your photo post");
   if (kind !== "PHOTO" && input.photo) throw new ValidationError("Only photo posts can include a photo");
+  const hasOptions = input.pollOptions != null;
+  if (kind === "POLL" && !hasOptions) throw new ValidationError("Add some options to your poll.");
+  if (kind !== "POLL" && hasOptions) throw new ValidationError("Only polls can have options.");
+  const pollOptions = kind === "POLL" ? parsePollOptions(input.pollOptions) : [];
+  const topic: TopicKey | null = parseTopic(input.topic) ?? suggestedTopic(kind);
+  // Derived, never taken from the request: see the note at the top of this file.
+  const isAnonymous = kind === "CONFESSION";
 
   const user = await db.user.findUnique({ where: { id: actor.userId }, select: { accountType: true, status: true, privacy: { select: { invisibleMode: true } } } });
   if (!user || user.status !== "ACTIVE") throw new InvalidStateError("Your account can't post right now");
@@ -60,11 +82,17 @@ export async function createPost(actor: Actor, input: CreatePostInput, deps: { d
     photoBlurhash = processed.blurhash;
     await storage.put(photoKey, processed.full, "image/webp");
   }
-  const post = await db.communityPost.create({
-    data: { id: postId, authorId: actor.userId, kind, body, photoKey, photoBlurhash, photoModeration: photoKey ? "PENDING" : "APPROVED", createdAt: now },
-    select: { id: true },
+  // The post and its options land together, so a poll is never briefly visible with nothing to vote on.
+  await db.$transaction(async (tx) => {
+    await tx.communityPost.create({
+      data: { id: postId, authorId: actor.userId, kind, topic, isAnonymous, body, photoKey, photoBlurhash, photoModeration: photoKey ? "PENDING" : "APPROVED", createdAt: now },
+      select: { id: true },
+    });
+    if (pollOptions.length > 0) {
+      await tx.communityPollOption.createMany({ data: pollOptions.map((label, position) => ({ postId, label, position, createdAt: now })) });
+    }
   });
-  const [dto] = await buildPostDtos(db, storage, actor, [post.id]);
+  const [dto] = await buildPostDtos(db, storage, actor, [postId]);
   if (!dto) throw new NotFoundError("Post");
   return dto;
 }

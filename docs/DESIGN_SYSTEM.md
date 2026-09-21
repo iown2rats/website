@@ -885,3 +885,23 @@ never drop below the threshold that makes iOS Safari zoom and stay zoomed.
 
 The form column is 344px (364px from `md`), centred at every breakpoint. Removing the card removed its padding, so
 the column is narrower than the old 380/400px card while the controls inside it are the same width as before.
+
+## 38. Community, made social (2026-09-21)
+
+The brief was "make it feel active, social and engaging" without redesigning it. Nothing on the screen moved: the header and bell, the For You / Following / New pills, the post card, the bottom nav, the coral FAB and the cream surface are all as they were. What was added sits inside that shape.
+
+**The topic row** is under the tabs and is deliberately *not* a second PillTabs. No track, no outline, no fill until a chip is chosen, and the chosen chip is aqua rather than coral — two coral pills stacked one above the other read as one control that has lost track of which row you are in. It scrolls sideways inside `Scroller` (§33's one sanctioned exception: the page never scrolls sideways, a chip row may), and a chip selected from elsewhere — the compose sheet pre-selecting "Polls", the "Busy this week" module — is scrolled into view, deferred one frame because a sheet's `<dialog>` is still `display:none` while its children's effects run.
+
+**"What's happening?"** is a row, not a card: the viewer's avatar, a line of prompt text, four shortcut chips and a hairline. Anything with a `glass-card` behind it would have been the loudest thing on the screen and would have pushed the first real post below the fold at 320 px.
+
+**The FAB opens a menu first.** Five kinds do not fit across a 320 px sheet as pills, and the choice is better made before the form than on it, so the + button opens a compact `BottomSheet` of five 56 px rows (Post, Question, Poll, Photo, Confession — icon, label, one line of hint) and the compose sheet then carries only that kind, titled after it, with "Change type" to go back. `post-kinds.tsx` is the single source for the wording, so the confession's privacy promise cannot say one thing in the menu and another on the form.
+
+**Polls** show their results before and after voting. Hiding them until you vote turns a question into a toll gate and makes people tap an option they do not mean, which corrupts the number they wanted to see. The bar is decoration drawn behind the label; the percentage beside it and the per-option vote count in the accessible name are what is actually announced.
+
+**Anonymous confessions** get a whisper glyph in place of the avatar, "Anonymous" as plain text rather than a button, no verified seal, no island, and no follow control. That is presentation reinforcing a server rule, not implementing it (ARCHITECTURE §14.14).
+
+**Nothing is fabricated.** "12 people joined this conversation", "Popular in Malé", "🔥 Popular today", "people posting lately" and "busy this week" are all counted from rows, and each has a floor below which it is absent rather than padded. A short or empty feed is filled with those modules plus static conversation-starter prompts and a create CTA — never a blank screen ending in "You're all caught up."
+
+**Follow is "Follow / Following" and nothing else.** No counts, anywhere. The brief rules out public follower-count obsession and the product rules out telling someone they are being watched.
+
+Verified at 320 / 360 / 390 / 430 / 768 / 820 / 1024 / 1280 / 1440 / 1920: no horizontal page scroll at any width, nothing overflowing outside a declared scroller, every field at or above the 16 px floor, and the create and poll sheets fitting inside a 320 × 568 viewport with nothing to scroll.

@@ -112,7 +112,12 @@ describe("community DTO privacy", () => {
     for (const forbidden of [open.userId, shy.userId, me.userId, open.phoneE164, "phone", "dateOfBirth", "age", "storageKey", "thumbKey", "test/", "contactHash", "subscription", "provider", "snapshot", "moderation", "authorId", "tokenHash"]) {
       expect(json, forbidden).not.toContain(forbidden);
     }
-    expect(Object.keys(feed.posts[0]!).sort()).toEqual(["author", "body", "commentCount", "createdAt", "id", "isMine", "kind", "likeCount", "likedByMe", "photo", "photoUnderReview"]);
+    // An exact key list, not a subset: a new field on the post DTO has to be added here deliberately, which is
+    // the moment to ask whether it is safe to hand to every other member.
+    expect(Object.keys(feed.posts[0]!).sort()).toEqual([
+      "author", "body", "commentCount", "context", "createdAt", "id", "isAnonymous", "isMine", "kind", "likeCount", "likedByMe", "photo", "photoUnderReview", "poll", "topic",
+    ]);
+    expect(Object.keys(feed.posts[0]!.author).sort()).toEqual(["followed", "handle", "isMe", "location", "name", "photo", "verified"]);
   });
 });
 

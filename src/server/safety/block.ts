@@ -5,6 +5,7 @@
 import { getDb, type Db } from "@/lib/db";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { sortPair, type Actor } from "@/server/actor";
+import { dropFollowsBetween } from "@/server/community/follows";
 import { lockPair } from "@/server/locks";
 
 export interface BlockResult {
@@ -41,6 +42,10 @@ export async function blockUser(actor: Actor, targetUserId: string, options: { n
     await tx.like.deleteMany({
       where: { OR: [{ fromUserId: actor.userId, toUserId: targetUserId }, { fromUserId: targetUserId, toUserId: actor.userId }] },
     });
+    // A block is a clean break in Community too: any follow between the pair goes, in both directions. The feed
+    // would hide the posts anyway (it applies the block predicate to Following like every other tab), but leaving
+    // the row behind means the relationship silently resumes if the block is ever lifted.
+    await dropFollowsBetween(tx, actor.userId, targetUserId);
     return { created: !existing, closedMatchId };
   });
 }

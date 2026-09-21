@@ -1,15 +1,20 @@
 "use server";
 
 import { z } from "zod";
-import { isDomainError } from "@/lib/errors";
+import { getDb } from "@/lib/db";
+import { isDomainError, NotFoundError } from "@/lib/errors";
 import { requireMember } from "@/server/auth/current-user";
 import { addComment, deleteComment, listComments, type CommentsPage } from "@/server/community/comments";
+import { getCommunityDiscover, type CommunityDiscoverDto } from "@/server/community/discover";
 import type { CommunityCommentDto, CommunityPostDto } from "@/server/community/dto";
 import { getFeed, getPost, type FeedPage, type FeedTab } from "@/server/community/feed";
+import { followMember, unfollowMember } from "@/server/community/follows";
+import { votePoll, type PollDto } from "@/server/community/polls";
 import { deletePost } from "@/server/community/posts";
 import { getCommunityProfile } from "@/server/community/profile";
 import { setReaction } from "@/server/community/reactions";
 import { blockCommentAuthor, blockPostAuthor, reportComment, reportPost } from "@/server/community/reports";
+import { TOPICS, type TopicKey } from "@/server/community/topics";
 import type { DiscoveryCardDto } from "@/server/discovery/dto";
 
 /*
@@ -19,7 +24,14 @@ import type { DiscoveryCardDto } from "@/server/discovery/dto";
  */
 
 const idSchema = z.string().min(1).max(64).regex(/^[a-z0-9_-]+$/i);
-const feedSchema = z.object({ tab: z.enum(["FOR_YOU", "NEW"]).default("FOR_YOU"), cursor: z.string().max(200).nullable().optional() });
+const topicSchema = z.enum(TOPICS.map((t) => t.key) as [TopicKey, ...TopicKey[]]);
+const feedSchema = z.object({
+  tab: z.enum(["FOR_YOU", "FOLLOWING", "NEW"]).default("FOR_YOU"),
+  topic: topicSchema.nullable().optional(),
+  cursor: z.string().max(200).nullable().optional(),
+});
+const handleSchema = z.string().min(1).max(64);
+const voteSchema = z.object({ postId: idSchema, optionId: idSchema });
 const commentsSchema = z.object({ postId: idSchema, cursor: z.string().max(200).nullable().optional() });
 const reactSchema = z.object({ postId: idSchema, liked: z.boolean() });
 const commentSchema = z.object({ postId: idSchema, body: z.string().max(4000) });
@@ -40,7 +52,7 @@ export async function loadFeed(input: unknown): Promise<({ ok: true } & FeedPage
   try {
     const actor = await requireMember();
     const parsed = feedSchema.parse(input ?? {});
-    return { ok: true, ...(await getFeed(actor, { tab: parsed.tab as FeedTab, cursor: parsed.cursor ?? null })) };
+    return { ok: true, ...(await getFeed(actor, { tab: parsed.tab as FeedTab, topic: parsed.topic ?? null, cursor: parsed.cursor ?? null })) };
   } catch (e) {
     return failure(e);
   }
@@ -151,6 +163,46 @@ export async function loadCommunityProfile(input: unknown): Promise<{ ok: true; 
     const actor = await requireMember();
     const handle = z.string().min(1).max(64).parse((input as { handle?: unknown })?.handle);
     return { ok: true, profile: await getCommunityProfile(actor, handle) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/**
+ * The modules beside the feed. Separate from loadFeed so a thin or empty feed can fill the space without the
+ * common case paying for three extra aggregate queries on every page of scrolling.
+ */
+export async function loadCommunityDiscover(): Promise<({ ok: true } & CommunityDiscoverDto) | CommunityFailure> {
+  try {
+    const actor = await requireMember();
+    return { ok: true, ...(await getCommunityDiscover(actor)) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/**
+ * Follow / unfollow, by handle so the client never needs a user id. Private: the person followed is not notified
+ * and cannot discover it, and the result says only what the VIEWER's own state now is.
+ */
+export async function setFollow(input: unknown): Promise<{ ok: true; following: boolean } | CommunityFailure> {
+  try {
+    const actor = await requireMember();
+    const parsed = z.object({ handle: handleSchema, following: z.boolean() }).parse(input);
+    const target = await getDb().profile.findUnique({ where: { handle: parsed.handle }, select: { userId: true } });
+    if (!target) throw new NotFoundError("Member");
+    const r = parsed.following ? await followMember(actor, target.userId) : await unfollowMember(actor, target.userId);
+    return { ok: true, following: r.following };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+export async function voteOnPoll(input: unknown): Promise<{ ok: true; poll: PollDto } | CommunityFailure> {
+  try {
+    const actor = await requireMember();
+    const parsed = voteSchema.parse(input);
+    return { ok: true, poll: await votePoll(actor, parsed) };
   } catch (e) {
     return failure(e);
   }

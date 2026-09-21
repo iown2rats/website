@@ -5,40 +5,48 @@ import { COMMUNITY } from "@/config/product";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { DialogTitle, ResponsiveDialog } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/field";
-import { CloseIcon, ImageIcon, PinIcon } from "@/components/ui/icons";
-import type { CommunityPostDto } from "@/server/community/dto";
+import { Input, Textarea } from "@/components/ui/field";
+import { CloseIcon, ImageIcon, PinIcon, PlusIcon, WhisperIcon } from "@/components/ui/icons";
+import type { CommunityPostDto, CommunityPostKind } from "@/server/community/dto";
+import { POLL_RULES } from "@/server/community/rules";
+import { suggestedTopic, type TopicKey } from "@/server/community/topics";
+import { CONFESSION_NOTICE, postKind } from "./post-kinds";
+import { TopicChips } from "./topic-chips";
 
 /*
- * Prototype "New post" sheet: 22/800 title, three 44 px radius-14 kind pills (Text / Photo / Question; selected =
- * aqua-soft + primary border), 4-row textarea (radius 18) whose placeholder follows the kind, a 13 px footer
- * "Posting as Malé · Community posts don't create matches", and a 52 px ocean Post button. Photo posts upload
- * through POST /api/community/posts (multipart, progress via XHR); the server validates, re-encodes and holds the
- * photo under the active moderation policy.
+ * The compose form. The KIND is chosen before this opens (create-menu.tsx, or one of the quick-post shortcuts),
+ * so the sheet no longer carries a row of kind pills — five of them do not fit across a 320 px screen, and the
+ * choice has already been made by the time you get here. "Change type" hands the decision back to the menu.
+ *
+ * Photo posts still upload through POST /api/community/posts (multipart, progress via XHR); the server validates,
+ * re-encodes and holds the photo under the active moderation policy. Polls and confessions go through the same
+ * endpoint, which carries no "anonymous" field at all: a confession is anonymous because of its kind, decided on
+ * the server, so nothing a client sends can make a confession signed or make anything else anonymous.
  */
-
-const KINDS = [
-  { value: "TEXT", label: "Text", placeholder: "What's on your mind?" },
-  { value: "PHOTO", label: "Photo", placeholder: "Add a caption…" },
-  { value: "QUESTION", label: "Question", placeholder: "Ask the community something…" },
-] as const;
-type Kind = (typeof KINDS)[number]["value"];
 
 const ACCEPT = "image/jpeg,image/png,image/webp";
 const MAX_BYTES = 8 * 1024 * 1024;
+const EMPTY_OPTIONS = ["", ""];
 
 export interface ComposeSheetProps {
   open: boolean;
+  kind: CommunityPostKind;
   onClose: () => void;
+  /** Reopens the kind menu without losing the sheet's place in the flow. */
+  onChangeKind?: () => void;
   /** Viewer's island label, or null when their location is hidden / unknown. */
   island: string | null;
   onPosted: (post: CommunityPostDto) => void;
 }
 
-export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetProps) {
+export function ComposeSheet({ open, kind, onClose, onChangeKind, island, onPosted }: ComposeSheetProps) {
   const titleId = useId();
-  const [kind, setKind] = useState<Kind>("TEXT");
   const [body, setBody] = useState("");
+  // `undefined` = the author has not touched the chips, so the kind's own suggestion stands. Deriving it rather
+  // than seeding it from an effect keeps "which topic is selected" a single source of truth and avoids a render
+  // pass where the sheet is open with the wrong chip lit.
+  const [topic, setTopic] = useState<TopicKey | null | undefined>(undefined);
+  const [options, setOptions] = useState<string[]>(EMPTY_OPTIONS);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,13 +54,18 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const spec = postKind(kind);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   useEffect(() => () => xhrRef.current?.abort(), []);
+  // A fresh kind starts on its own chip: a poll under Polls, a confession under Confessions. The author can still
+  // move it, including to "All", which is why `null` and `undefined` mean different things above.
+  const chosenTopic = topic === undefined ? suggestedTopic(kind) : topic;
 
   const reset = () => {
-    setKind("TEXT");
     setBody("");
+    setTopic(undefined);
+    setOptions(EMPTY_OPTIONS);
     setFile(null);
     setPreview(null);
     setError(null);
@@ -74,9 +87,18 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
     setPreview(URL.createObjectURL(f));
   };
 
-  const placeholder = KINDS.find((k) => k.value === kind)!.placeholder;
+  const setOption = (index: number, value: string) => setOptions((prev) => prev.map((o, i) => (i === index ? value : o)));
+  const addOption = () => setOptions((prev) => (prev.length < POLL_RULES.maxOptions ? [...prev, ""] : prev));
+  const removeOption = (index: number) => setOptions((prev) => (prev.length > POLL_RULES.minOptions ? prev.filter((_, i) => i !== index) : prev));
+
+  const filledOptions = options.map((o) => o.trim()).filter((o) => o.length > 0);
   const trimmed = body.trim();
-  const canPost = !busy && trimmed.length > 0 && trimmed.length <= COMMUNITY.postMaxLength && (kind !== "PHOTO" || file !== null);
+  const canPost =
+    !busy &&
+    trimmed.length > 0 &&
+    trimmed.length <= COMMUNITY.postMaxLength &&
+    (kind !== "PHOTO" || file !== null) &&
+    (kind !== "POLL" || (filledOptions.length >= POLL_RULES.minOptions && new Set(filledOptions.map((o) => o.toLowerCase())).size === filledOptions.length));
 
   const submit = () => {
     if (!canPost) return;
@@ -85,7 +107,9 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
     const form = new FormData();
     form.set("kind", kind);
     form.set("body", body);
+    if (chosenTopic) form.set("topic", chosenTopic);
     if (kind === "PHOTO" && file) form.set("photo", file, file.name);
+    if (kind === "POLL") for (const option of filledOptions) form.append("option", option);
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
     xhr.open("POST", "/api/community/posts");
@@ -114,23 +138,21 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
 
   return (
     <ResponsiveDialog open={open} onClose={close} labelledBy={titleId} dismissible={!busy}>
-      <DialogTitle id={titleId}>New post</DialogTitle>
-
-      <div className="flex gap-2" role="radiogroup" aria-label="Post type">
-        {KINDS.map((k) => (
-          <button
-            key={k.value}
-            type="button"
-            role="radio"
-            aria-checked={kind === k.value}
-            disabled={busy}
-            onClick={() => { setKind(k.value); setError(null); }}
-            className={cn("h-11 flex-1 rounded-[14px] text-body-sm font-medium text-text", kind === k.value ? "bg-primary text-on-primary" : "bg-surface-muted")}
-          >
-            {k.label}
+      <div className="flex items-baseline justify-between gap-3">
+        <DialogTitle id={titleId}>New {spec.label.toLowerCase()}</DialogTitle>
+        {onChangeKind ? (
+          <button type="button" disabled={busy} onClick={onChangeKind} className="shrink-0 border-0 bg-transparent p-0 text-caption font-medium text-primary-ink underline decoration-primary/40 underline-offset-[3px] disabled:opacity-60">
+            Change type
           </button>
-        ))}
+        ) : null}
       </div>
+
+      {kind === "CONFESSION" ? (
+        <p className="flex items-start gap-2.5 rounded-xl bg-surface-muted p-3 text-caption text-text-secondary">
+          <WhisperIcon size={16} className="mt-0.5 shrink-0 text-primary-ink" />
+          <span>{CONFESSION_NOTICE}</span>
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${titleId}-body`} className="sr-only">Post text</label>
@@ -140,7 +162,7 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
           value={body}
           disabled={busy}
           maxLength={COMMUNITY.postMaxLength}
-          placeholder={placeholder}
+          placeholder={spec.placeholder}
           onChange={(e) => { setBody(e.target.value); setError(null); }}
           className="bg-surface-muted"
         />
@@ -148,6 +170,36 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
           <p className="text-right text-micro tabular-nums text-text-secondary" aria-live="polite">{body.length}/{COMMUNITY.postMaxLength}</p>
         ) : null}
       </div>
+
+      {kind === "POLL" ? (
+        <div className="flex flex-col gap-2">
+          {options.map((option, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <label htmlFor={`${titleId}-option-${index}`} className="sr-only">{`Option ${index + 1}`}</label>
+              <Input
+                id={`${titleId}-option-${index}`}
+                value={option}
+                disabled={busy}
+                maxLength={POLL_RULES.optionMaxLength}
+                placeholder={`Option ${index + 1}`}
+                onChange={(e) => { setOption(index, e.target.value); setError(null); }}
+                className="min-w-0 flex-1 bg-surface-muted"
+              />
+              {options.length > POLL_RULES.minOptions ? (
+                <button type="button" disabled={busy} onClick={() => removeOption(index)} aria-label={`Remove option ${index + 1}`} className="grid size-9 shrink-0 place-items-center rounded-full border-0 bg-transparent text-text-secondary hover:bg-surface-muted">
+                  <CloseIcon size={17} />
+                </button>
+              ) : null}
+            </div>
+          ))}
+          {options.length < POLL_RULES.maxOptions ? (
+            <button type="button" disabled={busy} onClick={addOption} className="flex h-9 items-center gap-1.5 self-start rounded-full border-0 bg-surface-muted px-3 text-caption font-medium text-text">
+              <PlusIcon size={15} />
+              Add option
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {kind === "PHOTO" ? (
         <div className="flex flex-col gap-2">
@@ -175,14 +227,21 @@ export function ComposeSheet({ open, onClose, island, onPosted }: ComposeSheetPr
         </div>
       ) : null}
 
+      <div className="flex flex-col gap-1.5">
+        <span className="text-caption-sm text-text-secondary">Topic (optional)</span>
+        <TopicChips value={chosenTopic} onChange={setTopic} disabled={busy} />
+      </div>
+
       {error ? <p role="alert" className="-mt-1 text-caption font-medium text-danger">{error}</p> : null}
 
       <p className="flex items-center gap-2.5 text-caption text-text-secondary">
         <PinIcon size={16} className="shrink-0" />
-        <span>{island ? `Posting as ${island}` : "Posting to Community"} · Community posts don&apos;t create matches</span>
+        <span>
+          {kind === "CONFESSION" ? "Posting anonymously" : island ? `Posting as ${island}` : "Posting to Community"} · Community posts don&apos;t create matches
+        </span>
       </p>
 
-      <Button variant="ocean" onClick={submit} disabled={!canPost} loading={busy} fullWidth>
+      <Button variant="ocean" onClick={submit} disabled={!canPost} loading={busy} fullWidth className={cn(busy && "pointer-events-none")}>
         {busy && progress != null ? `Uploading ${progress}%` : "Post"}
       </Button>
     </ResponsiveDialog>

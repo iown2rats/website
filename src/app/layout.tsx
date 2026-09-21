@@ -40,20 +40,63 @@ export const viewport: Viewport = {
  * THEME: applies the stored appearance so there is no flash. Per-viewer convenience only.
  *
  * NATIVE: marks the document when it is being rendered inside the Android shell's WebView, which the stylesheet
- * uses to drop `backdrop-filter` (docs/ARCHITECTURE.md §28). The blurs are a genuine hazard there and only there:
- * the signed-out screen alone stacks five of them over a full-bleed cover photograph, and each one forces a
- * composited layer that has to snapshot the whole photograph behind it. Android's WebView renderer does not
- * survive that on every device — it paints once and is killed — while Chrome on the same phone, with its own
- * process and GPU path, is untroubled. It is set here rather than from the user agent on the server because the
- * attribute must exist before the first style is applied, and a browser never sets it at all.
+ * uses to drop `backdrop-filter` (docs/ARCHITECTURE.md §28). NOTE: the reasoning that introduced that rule — a
+ * renderer killed by stacked blurs — was DISPROVEN by on-device telemetry, which showed no renderer death of any
+ * kind. The rule is harmless and stays only until the real fault is fixed, at which point it should go.
  */
 const themeInit = `(function(){try{var t=localStorage.getItem('thundi.theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');var m=document.querySelector('meta[name="theme-color"]');if(m){m.setAttribute('content','#000000');}}}catch(e){}try{if(navigator.userAgent.indexOf('MelloCrushAndroid')!==-1){document.documentElement.setAttribute('data-native','android');}}catch(e){}})();`;
+
+/*
+ * TEMPORARY. Finds out what is navigating the Android shell in a loop, and comes out again the moment it has.
+ *
+ * On-device telemetry established what the fault is NOT: no renderer crash, no network, HTTP or SSL error, no
+ * uncaught exception, no hang. The WebView loads https://www.mellocrush.com/, paints, and is then sent to
+ * `https://www.mellocrush.com/?` roughly once a second, for ever. The trailing `?` says a URL was built through
+ * a URL or searchParams API and serialised with an empty query, which means JavaScript did it. This records
+ * which JavaScript, with a stack.
+ *
+ * It lives here rather than in the app because an inline script in <head> runs before Next's own bundles, so a
+ * navigation issued during startup cannot happen before the probe is watching — and because a page-side probe
+ * needs no new APK and no reinstall.
+ *
+ * Inert off the shell: the first line returns for every browser, so the website is untouched. Reports go to
+ * /__diag/js/… paths that do not exist; the point is the request line in the server log. Capped per page load
+ * so a loop cannot turn into a flood.
+ */
+const nativeNavigationProbe = `(function(){try{
+if(navigator.userAgent.indexOf('MelloCrushAndroid')===-1)return;
+var sent=0,MAX=24;
+function send(tag,text){try{
+if(sent>=MAX)return;
+text=String(text).slice(0,900);
+var b=btoa(unescape(encodeURIComponent(text))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+var n=Math.ceil(b.length/148)||1;
+for(var i=0;i<n&&sent<MAX;i++){sent++;
+var u='/__diag/js/'+tag+'/'+i+'of'+n+'/'+b.substr(i*148,148);
+if(navigator.sendBeacon){navigator.sendBeacon(u);}else{(new Image()).src=u;}}
+}catch(e){}}
+function stack(){try{throw new Error('probe');}catch(e){return (e.stack||'nostack').replace(/\\n/g,' | ');}}
+try{var n0=performance.getEntriesByType('navigation')[0];
+send('nav',(n0?n0.type:'unknown')+' href='+location.href+' ref='+(document.referrer||'none'));}catch(e){}
+function leaving(ev){send('leave',ev.type+' :: '+stack());}
+addEventListener('beforeunload',leaving,true);
+addEventListener('pagehide',leaving,true);
+['pushState','replaceState'].forEach(function(m){var o=history[m];history[m]=function(){
+send('hist',m+' -> '+arguments[2]+' :: '+stack());return o.apply(history,arguments);};});
+try{['assign','replace','reload'].forEach(function(m){var o=location[m].bind(location);
+Object.defineProperty(location,m,{configurable:true,value:function(){
+send('loc',m+'('+arguments[0]+') :: '+stack());return o.apply(null,arguments);}});});
+}catch(e){send('loc','override-failed '+e);}
+addEventListener('error',function(e){send('err',(e.message||'')+' @ '+(e.filename||'')+':'+(e.lineno||''));},true);
+addEventListener('unhandledrejection',function(e){send('rej',String((e.reason&&e.reason.stack)||e.reason));});
+}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={jakarta.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <script dangerouslySetInnerHTML={{ __html: nativeNavigationProbe }} />
       </head>
       <body>
         <ToastProvider>{children}</ToastProvider>

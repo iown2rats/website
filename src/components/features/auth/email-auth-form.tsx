@@ -83,11 +83,11 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
             disabled={pending}
             error={fieldError("confirmPassword")}
           />
-          <p className="auth-legible px-4 text-left text-caption-sm text-white/80">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
+          <p className="auth-legible px-4 text-caption-sm text-white/80">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
         </>
       ) : null}
       {state.error && !state.error.field ? (
-        <p role="alert" className="auth-legible px-4 text-left text-caption-sm font-medium text-[#ffc9c9]">
+        <p role="alert" className="auth-legible px-4 text-caption-sm font-medium text-[#ffc9c9]">
           {state.error.message}
         </p>
       ) : null}

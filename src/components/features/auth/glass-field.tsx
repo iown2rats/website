@@ -42,7 +42,9 @@ export function GlassField({ label, error, id: providedId, ...rest }: GlassField
       </label>
       <input id={id} aria-describedby={errorId} aria-invalid={error ? true : undefined} className={base} {...rest} />
       {error ? (
-        <p id={errorId} role="alert" className="px-4 text-caption-sm font-medium text-[#ffc9c9]">
+        // `text-left` on the wrapper is for the input's own value and placeholder; the message under it rejoins the
+        // column's centre axis, where every other line of type on this screen sits (DESIGN_SYSTEM §39).
+        <p id={errorId} role="alert" className="px-4 text-center text-caption-sm font-medium text-[#ffc9c9]">
           {error}
         </p>
       ) : null}
@@ -73,7 +75,9 @@ export function GlassPasswordField({ label, error, id: providedId, ...rest }: Gl
         </button>
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="px-4 text-caption-sm font-medium text-[#ffc9c9]">
+        // `text-left` on the wrapper is for the input's own value and placeholder; the message under it rejoins the
+        // column's centre axis, where every other line of type on this screen sits (DESIGN_SYSTEM §39).
+        <p id={errorId} role="alert" className="px-4 text-center text-caption-sm font-medium text-[#ffc9c9]">
           {error}
         </p>
       ) : null}

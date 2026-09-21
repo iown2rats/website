@@ -905,3 +905,41 @@ The brief was "make it feel active, social and engaging" without redesigning it.
 **Follow is "Follow / Following" and nothing else.** No counts, anywhere. The brief rules out public follower-count obsession and the product rules out telling someone they are being watched.
 
 Verified at 320 / 360 / 390 / 430 / 768 / 820 / 1024 / 1280 / 1440 / 1920: no horizontal page scroll at any width, nothing overflowing outside a declared scroller, every field at or above the 16 px floor, and the create and poll sheets fitting inside a 320 × 568 viewport with nothing to scroll.
+
+## 39. The auth screen is centred on both axes (2026-09-21)
+
+§37 removed the card and centred the 344/364 px column horizontally, but left it hanging from the top of the screen:
+`padding-top: 6dvh` on mobile, `8vh` from `md`, and whatever was left over collected at the bottom. On a 390 × 844
+phone that put roughly a third of the screen below the legal line — the stack read as pinned to the top of the
+photograph rather than placed on it, and on a desktop viewport the gap was larger still.
+
+The column is now centred **vertically as well as horizontally**, on every auth screen (welcome, register, verify
+your email, forgot password, reset password — they all share `AuthShell`). The paddings became symmetric
+`4dvh` plus the safe-area inset, and they are now minimum gutters rather than the layout: they only bite once the
+screen is full.
+
+### `justify-center-safe`, not `justify-center`
+
+Plain centring has a failure mode that is invisible until it bites someone: when the content is taller than the
+viewport, a centred flex container overflows **in both directions**, and the part that goes off the top edge cannot
+be scrolled back to. On this screen that is the wordmark and the provider buttons, on a 320 × 568 phone, or on any
+phone with the software keyboard up.
+
+`justify-content: safe center` is the fix and it is one word: the browser centres while the content fits and falls
+back to start-aligned the moment it does not. Verified at 320 / 360 / 390 / 768 / 1280 and in landscape — the
+320 × 568 case start-aligns and scrolls, everything taller centres.
+
+### Everything but the field's own text is on the centre axis
+
+The supporting captions used to be `text-left` while every other line on the screen — wordmark, tagline, the "or"
+rule, the button labels, "Already have an account?", the legal line — was centred. The password hint ("At least 10
+characters. Length beats punctuation."), the form-level error and the per-field errors are all centred now.
+
+The inputs keep their `text-left` wrapper, because that is what holds the placeholder and the value, and centred
+type inside a pill field would be wrong. That wrapper is the only left-aligned thing left in the column.
+
+### What did not change
+
+Nothing about the depth system (§37): `auth-scrim`, `auth-recessed`, `auth-flat` and `auth-raised` are untouched, as
+are the cover, the `<picture>` art direction, the per-device preloads, the 16 px field floor and every piece of
+authentication behind the screen.

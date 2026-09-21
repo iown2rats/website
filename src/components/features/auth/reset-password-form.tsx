@@ -60,9 +60,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
         disabled={busy}
         error={error?.field === "confirmPassword" ? error.message : undefined}
       />
-      <p className="px-4 text-left text-caption-sm text-white/70">At least {PASSWORD_RULES.minLength} characters.</p>
+      <p className="px-4 text-caption-sm text-white/70">At least {PASSWORD_RULES.minLength} characters.</p>
       {error && !error.field ? (
-        <p role="alert" className="px-4 text-left text-caption-sm font-medium text-[#ffc9c9]">
+        <p role="alert" className="px-4 text-caption-sm font-medium text-[#ffc9c9]">
           {error.message}
         </p>
       ) : null}

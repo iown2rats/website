@@ -98,9 +98,14 @@ export function AuthShell({ children, below, cover, priority = false, labelledBy
       {/* The page, darkened. Full bleed and edgeless on purpose: a cover is whatever an admin uploaded, and this has
           to carry white type over a white sail or a midday lagoon without ever reading as a panel behind the form. */}
       <div aria-hidden="true" className="absolute inset-0 z-[1] auth-scrim" />
+      {/* The column is centred on BOTH axes: the stack sits in the middle of the screen rather than hanging from
+          the top with the photograph left to fill the bottom third. `justify-center-safe` is what makes that safe —
+          on a short viewport (or with the keyboard up) centring would push the wordmark off the top edge where a
+          person could never reach it, and `safe` falls back to top-aligned the moment the content stops fitting.
+          The paddings are therefore minimum gutters, not the layout: they only bite once the screen is full. */}
       <div
-        className="relative z-[2] flex flex-1 flex-col items-center px-5 md:pt-[8vh]"
-        style={{ paddingTop: "calc(6dvh + var(--safe-top))", paddingBottom: "calc(24px + var(--safe-bottom))" }}
+        className="relative z-[2] flex flex-1 flex-col items-center justify-center-safe px-5"
+        style={{ paddingTop: "calc(4dvh + var(--safe-top))", paddingBottom: "calc(4dvh + var(--safe-bottom))" }}
       >
         {/* Still a section with a name, so the form is one landmark to a screen reader. It just has no walls. */}
         <section aria-labelledby={labelledBy} className={cn("flex w-full max-w-[344px] flex-col items-center text-center md:max-w-[364px]", className)}>

@@ -22,6 +22,12 @@ import { liveCoverId } from "./active-cover";
 import { coverAssetUrl, coverView, type CoverRow } from "./cover";
 import { describeUploadWarnings, isWelcomeCoverVariant, variantSpec, type UploadWarning, type WelcomeCoverVariantKey } from "./variants";
 
+/**
+ * The one prefix cover artwork is ever written to. The public route checks the same prefix before serving bytes, so
+ * a row that names anything else is refused there rather than trusted (src/app/api/welcome-cover/[assetId]/route.ts).
+ */
+export const COVER_KEY_PREFIX = "welcome-covers/";
+
 export const COVER_RULES = {
   maxBytes: 8 * 1024 * 1024,
   /** Quality is a touch above the profile-photo default: this is a full-bleed image nobody scrolls past. */
@@ -212,7 +218,7 @@ export async function uploadCoverAsset(admin: AdminActor, input: UploadCoverInpu
     data: { variant: input.variant, storageKey: "pending", width: processed.width, height: processed.height, bytes: processed.full.byteLength, blurhash: processed.blurhash, createdById: admin.userId },
     select: { id: true },
   });
-  const storageKey = `welcome-covers/${asset.id}.webp`;
+  const storageKey = `${COVER_KEY_PREFIX}${asset.id}.webp`;
   try {
     await deps.storage.put(storageKey, processed.full, "image/webp");
   } catch (e) {

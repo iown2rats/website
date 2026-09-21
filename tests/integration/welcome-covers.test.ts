@@ -11,6 +11,7 @@ import { AUDIT_ACTIONS } from "@/server/admin/audit";
 import { hasPermission, type AdminActor } from "@/server/admin/authz";
 import {
   archiveWelcomeCover,
+  COVER_KEY_PREFIX,
   createWelcomeCover,
   describeCoverState,
   listWelcomeCovers,
@@ -291,6 +292,30 @@ describe("removing artwork", () => {
   it("refuses a cover that no longer exists", async () => {
     const a = await admin();
     await expect(removeCoverAsset(a, { coverId: "nope", variant: "MOBILE" }, deps)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("the public asset route cannot be aimed at the private bucket", () => {
+  // Found on 2026-09-21: the two cover tables shipped without row-level security while every other table had it,
+  // and anon/authenticated hold full grants on everything. Anyone with the project's publishable key could have
+  // inserted a WelcomeCoverAsset row naming a profile photo, a receipt or a verification selfie, then fetched the
+  // bytes through the public /api/welcome-cover route. RLS is back on; this pins the second line of defence.
+  it("writes every upload under the cover prefix and nowhere else", async () => {
+    const { coverId } = await coverWith({ MOBILE: [1080, 1920], TABLET: [1536, 2048], DESKTOP: [2560, 1440] });
+    expect(coverId).toBeTruthy();
+    const keys = (await db.welcomeCoverAsset.findMany({ select: { storageKey: true } })).map((a) => a.storageKey);
+    expect(keys).toHaveLength(3);
+    for (const key of keys) expect(key.startsWith(COVER_KEY_PREFIX), key).toBe(true);
+  });
+
+  it("names a prefix that no other domain writes to", () => {
+    expect(COVER_KEY_PREFIX).toBe("welcome-covers/");
+    // The buckets that hold things a stranger must never read. If cover keys ever shared a prefix with one of
+    // these, the route's prefix check would stop refusing the thing it exists to refuse.
+    for (const privatePrefix of ["profile-photos/", "receipts/", "verification/", "community/"]) {
+      expect(privatePrefix.startsWith(COVER_KEY_PREFIX)).toBe(false);
+      expect(COVER_KEY_PREFIX.startsWith(privatePrefix)).toBe(false);
+    }
   });
 });
 

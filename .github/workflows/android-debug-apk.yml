@@ -63,13 +63,20 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew --no-daemon assembleDebug
 
+      # Everything needed to identify the file you are about to install, printed in the run log so it can be
+      # checked against the phone afterwards. The checksum matters most: a debug APK is signed with a keystore
+      # the runner generates for itself, so two runs of the same commit produce different bytes, and this is the
+      # only way to know which build a given file is.
       - name: Report APK details
         working-directory: mobile/android
         run: |
           set -euo pipefail
           APK=app/build/outputs/apk/debug/app-debug.apk
           ls -lh "$APK"
-          "$ANDROID_HOME"/build-tools/*/aapt2 dump badging "$APK" 2>/dev/null | head -5 || true
+          sha256sum "$APK"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/nonexistent}}"
+          AAPT=$(ls -1 "$SDK"/build-tools/*/aapt2 2>/dev/null | tail -1 || true)
+          if [ -n "$AAPT" ]; then "$AAPT" dump badging "$APK" | head -3; fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

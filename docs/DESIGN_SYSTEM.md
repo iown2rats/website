@@ -833,3 +833,55 @@ email and password, Continue, Forgot password, Create account, the legal line.
 - Verified at 320, 360, 390, 430, 667×375 (landscape phone), 768, 820, 1024×768 and 1180×820 (landscape tablets),
   1280, 1440 and 1920: each width loads its own variant, the image covers the viewport, and `scrollWidth <=
   clientWidth` holds everywhere.
+
+## 37. The auth screen: recessed controls, no card (2026-09-21)
+
+The shared Sign In / Sign Up screen no longer has a frosted card. The controls sit directly on the admin-managed
+cover photograph (docs/ARCHITECTURE.md §26–27), and depth does the work the container used to do.
+
+### The one idea
+
+    the cover photograph
+      → the controls read as part of the page
+      → Email and Password are PRESSED IN
+      → the coral primary is RAISED
+
+That opposition is the design. Four utilities in `globals.css` carry it, every one of them a box-shadow:
+
+| Utility | Used by | Depth |
+|---|---|---|
+| `auth-scrim` | the page | none — a full-bleed darkening, no radius, no edge |
+| `auth-recessed` | Email, Password, Confirm password | shadow inside the top edge, light hairline inside the bottom, **no border** |
+| `auth-flat` | Continue with Google / Telegram | a 1px inner hairline and a 1px drop — deliberately much shallower |
+| `auth-raised` | the coral primary | a soft outer shadow, the mirror of the fields' inner one |
+
+The provider buttons sit between the two extremes on purpose. If they had the fields' depth the screen would read as
+one undifferentiated stack; at almost no depth, the eye sorts the controls into "type into these", "tap one of
+these" and "this is the action".
+
+No border on the fields at all. An outline flattens an inset shadow into a drawn rectangle, which is what makes
+cheap neumorphism look like a sticker. The invalid state is a coral ring drawn as a shadow, so it stacks with the
+recess rather than replacing it.
+
+### Readability over an unknown photograph
+
+A cover is whatever an admin uploaded — it could be a midday lagoon or a white sail. `auth-scrim` is a full-page
+treatment, darker at the edges than the middle, so the type carries on a bright cover while the photograph still
+survives in the centre. It is explicitly **not** a panel: full bleed, no radius, no border, no shadow. Small white
+type gets `auth-legible`, a single soft text-shadow, for the same reason.
+
+The scrim is a fixed gradient rather than something computed per image. A genuinely adaptive version would need the
+cover's luminance plumbed into the DTO; this one is tuned to work at both ends instead, which is cheaper and has no
+failure mode.
+
+### What did not change
+
+The background system is untouched: `AuthBackdrop`, the `<picture>` art direction, the per-device preloads and the
+three admin-managed Mobile / Tablet / Desktop variants all work exactly as before. So does every piece of
+authentication — providers, validation, routes, the password toggle, mode switching, the legal links.
+
+Fields are `text-field` (16px) and the structural floor in `globals.css` still applies, so a focused control can
+never drop below the threshold that makes iOS Safari zoom and stay zoomed.
+
+The form column is 344px (364px from `md`), centred at every breakpoint. Removing the card removed its padding, so
+the column is narrower than the old 380/400px card while the controls inside it are the same width as before.

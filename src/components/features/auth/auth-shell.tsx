@@ -6,9 +6,13 @@ import { ROUTES } from "@/server/auth/route-access";
 import type { WelcomeCoverView } from "@/server/welcome/cover";
 
 /*
- * The shell every signed-out auth screen shares (DESIGN_SYSTEM §26/§27): the night-beach photograph and one centred
- * frosted-glass card. The welcome screen, registration, "verify your email", "forgot password" and "reset password"
- * all render inside it, so the whole flow looks like one place.
+ * The shell every signed-out auth screen shares (DESIGN_SYSTEM §26/§37): the admin-managed cover photograph, and
+ * the controls sitting directly on it. The welcome screen, registration, "verify your email", "forgot password" and
+ * "reset password" all render inside it, so the whole flow looks like one place.
+ *
+ * There is no card. The form is grouped semantically — one <section> with an accessible name — but nothing is
+ * drawn around it, so the photograph runs edge to edge behind the controls and the depth of each control is what
+ * separates it from the image (glass-field.tsx).
  */
 const HERO_SIZES = "100vw";
 
@@ -91,20 +95,18 @@ export function AuthShell({ children, below, cover, priority = false, labelledBy
   return (
     <main className="relative flex min-h-dvh flex-col overflow-hidden bg-[#050d14] text-white">
       <AuthBackdrop cover={cover} priority={priority} />
+      {/* The page, darkened. Full bleed and edgeless on purpose: a cover is whatever an admin uploaded, and this has
+          to carry white type over a white sail or a midday lagoon without ever reading as a panel behind the form. */}
+      <div aria-hidden="true" className="absolute inset-0 z-[1] auth-scrim" />
       <div
-        className="relative z-[1] flex flex-1 flex-col items-center px-5 md:pt-[8vh]"
+        className="relative z-[2] flex flex-1 flex-col items-center px-5 md:pt-[8vh]"
         style={{ paddingTop: "calc(6dvh + var(--safe-top))", paddingBottom: "calc(24px + var(--safe-bottom))" }}
       >
-        <section
-          aria-labelledby={labelledBy}
-          className={cn(
-            "flex w-full max-w-[380px] flex-col items-center rounded-[26px] border border-white/20 bg-white/12 px-3.5 pb-4 pt-5.5 text-center shadow-[0_24px_64px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150 md:max-w-[400px] md:px-6",
-            className,
-          )}
-        >
+        {/* Still a section with a name, so the form is one landmark to a screen reader. It just has no walls. */}
+        <section aria-labelledby={labelledBy} className={cn("flex w-full max-w-[344px] flex-col items-center text-center md:max-w-[364px]", className)}>
           {children}
         </section>
-        {below ? <div className="mt-4 w-full max-w-[400px] text-center md:max-w-[420px]">{below}</div> : null}
+        {below ? <div className="mt-5 w-full max-w-[344px] text-center md:max-w-[364px]">{below}</div> : null}
       </div>
     </main>
   );
@@ -118,7 +120,7 @@ export function AuthHeading({ id, title, subtitle, compact = false }: { id: stri
         <Wordmark tone="white" height={compact ? 26 : 30} priority />
       </div>
       {title ? (
-        <h1 id={id} className="mt-2.5 text-h4 font-medium leading-tight tracking-[-0.01em] text-white">
+        <h1 id={id} className="auth-legible mt-2.5 text-h4 font-medium leading-tight tracking-[-0.01em] text-white">
           {title}
         </h1>
       ) : (
@@ -126,19 +128,19 @@ export function AuthHeading({ id, title, subtitle, compact = false }: { id: stri
           Mellocrush
         </h1>
       )}
-      {subtitle ? <p className="mt-1.5 text-body-sm leading-relaxed text-white/75">{subtitle}</p> : null}
+      {subtitle ? <p className="auth-legible mt-1.5 text-body-sm leading-relaxed text-white/85">{subtitle}</p> : null}
     </>
   );
 }
 
 /** "Closer than you think" — the welcome screen's tagline, in the supplied treatment. */
 export function AuthTagline() {
-  return <p className="mt-2 text-tiny font-medium uppercase tracking-[0.18em] text-white/70">Closer than you think</p>;
+  return <p className="auth-legible mt-2 text-tiny font-medium uppercase tracking-[0.18em] text-white/80">Closer than you think</p>;
 }
 
 export function AuthLegalLine() {
   return (
-    <p className="mt-3 text-tiny leading-relaxed text-white/75">
+    <p className="auth-legible mt-4 text-tiny leading-relaxed text-white/80">
       By continuing, you agree to our
       <br />
       <Link href={ROUTES.terms} className="font-medium text-white underline decoration-white/70 underline-offset-[3px]">
@@ -155,7 +157,7 @@ export function AuthLegalLine() {
 
 export function AuthBackLink({ href = ROUTES.welcome, children = "Back to sign in" }: { href?: string; children?: ReactNode }) {
   return (
-    <Link href={href} className="inline-flex h-10 items-center justify-center text-body font-medium text-white/85 underline decoration-white/40 underline-offset-[3px]">
+    <Link href={href} className="auth-legible inline-flex h-10 items-center justify-center text-body font-medium text-white/90 underline decoration-white/45 underline-offset-[3px]">
       {children}
     </Link>
   );
@@ -166,7 +168,7 @@ export function AuthDivider({ label = "or" }: { label?: string }) {
   return (
     <div className="mt-4 flex w-full items-center gap-3" aria-hidden="true">
       <span className="h-px flex-1 bg-white/30" />
-      <span className="text-tiny font-medium uppercase tracking-[0.16em] text-white/75">{label}</span>
+      <span className="auth-legible text-tiny font-medium uppercase tracking-[0.16em] text-white/80">{label}</span>
       <span className="h-px flex-1 bg-white/30" />
     </div>
   );

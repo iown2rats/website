@@ -5,19 +5,31 @@ import { EyeIcon, EyeOffIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 /*
- * Inputs for the glass auth card (DESIGN_SYSTEM §27). They match the Google and Telegram buttons: the same width,
- * the same 52 px pill, white type on a translucent surface with a white hairline, and the same focus ring as the
- * rest of the app. The member app's own fields (warm surface, 16 px radius) are unchanged.
+ * The auth screen's controls (DESIGN_SYSTEM §37). There is no card behind them any more; they sit on the cover
+ * photograph, and depth is what tells them apart:
+ *
+ *   Email and Password are PRESSED IN   — `auth-recessed`, shadow inside the top edge, light inside the bottom
+ *   the coral primary is RAISED         — `auth-raised`, a soft shadow beneath it
+ *
+ * That opposition is the whole design, so the two must never be given the same treatment. The provider buttons sit
+ * between them at almost no depth (`auth-flat`, in google-button.tsx).
+ *
+ * The pill, the height and the focus ring are unchanged, and so is the type: `text-field` is 16px, and the
+ * structural floor in globals.css keeps it there whatever anyone does to the scale later — below 16px iOS Safari
+ * zooms on focus and never zooms back. The member app's own fields (warm surface, 16px radius) are untouched.
  */
 export interface GlassFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "className"> {
   label: string;
   error?: string;
 }
 
+// No border at all: an outline would flatten the inset shadow into a drawn rectangle, which is the thing that
+// makes cheap neumorphism look like a sticker. Invalid state is a coral ring instead, drawn as a shadow so it
+// stacks with the recess rather than replacing it.
 const base =
-  "h-11 w-full rounded-full border border-white/25 bg-white/10 px-3.5 text-field text-white placeholder:text-white/55 " +
-  "outline-none focus-visible:border-white/60 focus-visible:outline-2 focus-visible:outline-white/80 " +
-  "aria-[invalid=true]:border-[#ffb3b3] disabled:opacity-60";
+  "auth-recessed h-12 w-full rounded-full border-0 px-4.5 text-field text-white placeholder:text-white/60 " +
+  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/85 " +
+  "aria-[invalid=true]:shadow-[inset_0_2px_4px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.16),0_0_0_1.5px_#ff9a9a] disabled:opacity-60";
 
 export function GlassField({ label, error, id: providedId, ...rest }: GlassFieldProps) {
   const generatedId = useId();
@@ -55,7 +67,7 @@ export function GlassPasswordField({ label, error, id: providedId, ...rest }: Gl
           type="button"
           onClick={() => setShown((v) => !v)}
           aria-pressed={shown}
-          className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-white/75 hover:text-white focus-visible:outline-2 focus-visible:outline-white/80"
+          className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-white/80 hover:text-white focus-visible:outline-2 focus-visible:outline-white/85"
         >
           {shown ? <EyeOffIcon size={18} title="Hide password" /> : <EyeIcon size={18} title="Show password" />}
         </button>
@@ -69,14 +81,18 @@ export function GlassPasswordField({ label, error, id: providedId, ...rest }: Gl
   );
 }
 
-/** The card's primary action: a coral pill matching the height and radius of the provider buttons. */
+/**
+ * The primary action: the MelloCrush coral, sitting slightly PROUD of the surface. Its soft outer shadow is the
+ * mirror image of the fields' inner one — the fields go in, this comes out — which is what makes the screen read
+ * as a surface with things pressed into and resting on it rather than a stack of translucent rectangles.
+ */
 export function GlassSubmit({ children, loading = false, ...rest }: { children: ReactNode; loading?: boolean } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className">) {
   return (
     <button
       type="submit"
       disabled={loading || rest.disabled}
       aria-busy={loading || undefined}
-      className="pressable flex h-11 w-full items-center justify-center rounded-full bg-primary text-cta-lg font-medium text-on-primary shadow-[0_8px_24px_rgba(0,0,0,0.25)] disabled:opacity-60"
+      className="auth-raised pressable flex h-12 w-full items-center justify-center rounded-full text-cta-lg font-medium text-on-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/85 disabled:opacity-60"
       {...rest}
     >
       {children}

@@ -43,9 +43,10 @@ export type SignInButtonProvider = "google" | "telegram";
 /**
  * `white`: the shared white surface with the provider's mark, for light backgrounds.
  * `brand`: the provider's own colour (a Telegram-blue pill; Google stays white by its guidelines).
- * `glass`: the translucent surface the auth card's own fields use, so every control on the card reads as one set
- *   rather than two brands competing. Google's guidelines allow its mark on a dark surface, so the four-colour G is
- *   kept — it is the part people recognise, and it is the only colour on the card.
+ * `glass`: the auth screen's own surface (DESIGN_SYSTEM §37). Barely raised — deliberately much shallower than the
+ *   recessed Email and Password fields beneath it, so the eye reads two kinds of control rather than two weights of
+ *   the same one. Google's guidelines allow its mark on a dark surface, so the four-colour G is kept: it is the part
+ *   people recognise, and it is the only colour on the screen besides the coral primary.
  */
 export type SignInButtonAppearance = "white" | "brand" | "glass";
 
@@ -85,7 +86,7 @@ export function ContinueWith({
   const brandBlue = appearance === "brand" && provider === "telegram";
   const glass = appearance === "glass";
   const surface = glass
-    ? "border border-white/25 bg-white/10 text-white hover:bg-white/15"
+    ? "auth-flat border-0 text-white"
     : brandBlue
       ? "bg-[#0AA0F4] text-white"
       : "bg-white text-[#1f1f1f]";
@@ -94,7 +95,7 @@ export function ContinueWith({
   // stylesheet order rather than by the caller's intent.
   const radius = shape === "pill" ? "rounded-full" : "rounded-lg";
   return (
-    <Link href={href} prefetch={false} className={cn("flex items-center justify-center gap-2.5 shadow-sm pressable", heightClass, textClass, radius, surface, className)}>
+    <Link href={href} prefetch={false} className={cn("flex items-center justify-center gap-2.5 pressable", glass ? undefined : "shadow-sm", heightClass, textClass, radius, surface, className)}>
       {mark}
       {label ?? LABELS[provider]}
     </Link>

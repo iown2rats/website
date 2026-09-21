@@ -9,10 +9,11 @@ import { authCardReducer, initialAuthCardState, MODE_COPY, type AuthCardMode } f
 import { GlassField, GlassPasswordField, GlassSubmit } from "./glass-field";
 
 /**
- * The email half of the auth card (DESIGN_SYSTEM §27). One container, two modes: signing in, and creating an
- * account. Switching is local state — the same glass card, the same provider buttons above it, no navigation — so
- * the person never loses their place. Both modes end at the same server actions, which own every rule that matters:
- * a new account is redirected to "Verify your email" and can use nothing until the address is confirmed.
+ * The email half of the auth screen (DESIGN_SYSTEM §37). One form, two modes: signing in, and creating an account.
+ * Switching is local state — the same screen, the same provider buttons above it, no navigation — so the person
+ * never loses their place, and Sign Up therefore inherits the recessed fields rather than restyling them. Both
+ * modes end at the same server actions, which own every rule that matters: a new account is redirected to "Verify
+ * your email" and can use nothing until the address is confirmed.
  */
 export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCardMode }) {
   const [state, dispatch] = useReducer(authCardReducer, initialMode, initialAuthCardState);
@@ -22,11 +23,11 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
 
   if (state.sentTo) {
     return (
-      <div className="mt-4 flex w-full flex-col gap-2 text-body-sm leading-relaxed text-white/85">
+      <div className="auth-legible mt-5 flex w-full flex-col gap-2 text-body-sm leading-relaxed text-white/90">
         <p>
           If <span className="font-medium text-white">{state.sentTo}</span> can be used, a confirmation link is on its way. Open it to finish setting up your account.
         </p>
-        <p className="text-caption-sm text-white/70">The link works once and expires in 24 hours. Check your spam folder if it hasn&apos;t arrived in a few minutes.</p>
+        <p className="text-caption-sm text-white/80">The link works once and expires in 24 hours. Check your spam folder if it hasn&apos;t arrived in a few minutes.</p>
         <button type="button" onClick={() => dispatch({ type: "switchMode", mode: "signin" })} className="h-10 text-caption-sm font-medium text-primary underline decoration-primary/50 underline-offset-[3px]">
           Back to sign in
         </button>
@@ -38,7 +39,7 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
 
   return (
     <form
-      className="mt-4 flex w-full flex-col gap-2"
+      className="mt-4 flex w-full flex-col gap-2.5"
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);
@@ -82,11 +83,11 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
             disabled={pending}
             error={fieldError("confirmPassword")}
           />
-          <p className="px-4 text-left text-caption-sm text-white/70">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
+          <p className="auth-legible px-4 text-left text-caption-sm text-white/80">At least {PASSWORD_RULES.minLength} characters. Length beats punctuation.</p>
         </>
       ) : null}
       {state.error && !state.error.field ? (
-        <p role="alert" className="px-4 text-left text-caption-sm font-medium text-[#ffc9c9]">
+        <p role="alert" className="auth-legible px-4 text-left text-caption-sm font-medium text-[#ffc9c9]">
           {state.error.message}
         </p>
       ) : null}
@@ -94,11 +95,11 @@ export function EmailAuthForm({ initialMode = "signin" }: { initialMode?: AuthCa
       <GlassSubmit loading={pending}>{pending ? copy.busy : copy.submit}</GlassSubmit>
 
       {state.mode === "signin" ? (
-        <Link href={ROUTES.forgotPassword} className="mt-0.5 h-8 text-caption-sm font-medium text-white/75 underline decoration-white/35 underline-offset-[3px]">
+        <Link href={ROUTES.forgotPassword} className="auth-legible mt-1 h-8 text-caption-sm font-medium text-white/85 underline decoration-white/45 underline-offset-[3px]">
           Forgot password?
         </Link>
       ) : null}
-      <p className="mt-0.5 text-caption-sm text-white/75">
+      <p className="auth-legible mt-0.5 text-caption-sm text-white/85">
         {copy.prompt}{" "}
         <button type="button" onClick={() => dispatch({ type: "switchMode", mode: copy.to })} disabled={pending} className="font-medium text-primary underline decoration-primary/50 underline-offset-[3px]">
           {copy.action}

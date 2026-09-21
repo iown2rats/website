@@ -275,6 +275,63 @@
   background: var(--primary);
 }
 
+/*
+ * The signed-out auth screen (docs/DESIGN_SYSTEM.md §37). The controls sit directly on the admin-managed cover
+ * photograph — there is no card — so depth has to do the work a container used to do:
+ *
+ *   auth-scrim     the page, darkened just enough to read on any cover an admin uploads. Full bleed, no radius,
+ *                  no edge: it is a treatment of the page, not a panel behind the form.
+ *   auth-recessed  Email and Password, pressed INTO the surface. Shadow inside the top edge, a hairline of light
+ *                  inside the bottom edge, no outline.
+ *   auth-flat      Google and Telegram, barely raised. Deliberately much shallower than the fields, so the eye
+ *                  reads two different kinds of control rather than two weights of the same one.
+ *   auth-raised    the coral primary, lifted OFF the surface — the exact opposite of the fields.
+ *
+ * Every depth is a box-shadow. Nothing here sets a font size, so the iOS field floor further down still wins.
+ */
+@utility auth-scrim {
+  /* Darker at the edges than the middle, so a bright cover still carries the type while the photograph survives. */
+  background:
+    radial-gradient(125% 85% at 50% 36%, rgba(4, 12, 18, 0.26) 0%, rgba(4, 12, 18, 0.58) 72%, rgba(4, 12, 18, 0.72) 100%),
+    linear-gradient(180deg, rgba(4, 12, 18, 0.42) 0%, rgba(4, 12, 18, 0.18) 34%, rgba(4, 12, 18, 0.62) 100%);
+}
+
+@utility auth-recessed {
+  background: rgba(8, 16, 22, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.55),
+    inset 0 8px 14px -8px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16);
+}
+
+@utility auth-flat {
+  background: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.17),
+    0 1px 2px rgba(0, 0, 0, 0.16);
+  transition: background var(--duration-press);
+  &:hover {
+    background: rgba(255, 255, 255, 0.19);
+  }
+}
+
+@utility auth-raised {
+  background: var(--primary);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(253, 121, 121, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Small white type over an unknown photograph needs a touch of its own separation. */
+@utility auth-legible {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
 @utility pressable {
   transition: transform var(--duration-press);
   &:active {

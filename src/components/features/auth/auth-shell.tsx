@@ -131,9 +131,9 @@ export function AuthHeading({ id, title, subtitle, compact = false }: { id: stri
   );
 }
 
-/** "Real people. Brighter days." — the welcome screen's tagline, in the supplied treatment. */
+/** "Closer than you think" — the welcome screen's tagline, in the supplied treatment. */
 export function AuthTagline() {
-  return <p className="mt-2 text-tiny font-medium uppercase tracking-[0.18em] text-white/70">Real people. Brighter days.</p>;
+  return <p className="mt-2 text-tiny font-medium uppercase tracking-[0.18em] text-white/70">Closer than you think</p>;
 }
 
 export function AuthLegalLine() {

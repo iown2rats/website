@@ -377,7 +377,7 @@ is never covered. The photograph keeps its own colour; the card alone provides t
 
 Contents, in order: the wordmark in white at 38 px tall (`Wordmark tone="white"`, from
 `public/brand/mellocrush-logo-white-480.png`; see §34 for the final artwork, of which white lettering is the supplied
-form, and whose proportions are never altered); the tagline "Real people. Brighter days." in 13 px uppercase
+form, and whose proportions are never altered); the tagline "Closer than you think" in 13 px uppercase
 with 0.22 em tracking at 70 % white; the two sign-in pills; a rule with "or"; and the legal line linking to
 `/legal/terms` and `/legal/privacy`.
 

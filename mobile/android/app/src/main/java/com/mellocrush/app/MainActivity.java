@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.net.http.SslError;
 import android.os.Build;
 import android.view.Gravity;
+import android.view.View;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
@@ -58,7 +59,22 @@ public class MainActivity extends BridgeActivity {
     protected void load() {
         super.load();
         Bridge bridge = getBridge();
-        if (bridge != null) bridge.setWebViewClient(new DiagnosticWebViewClient(bridge));
+        if (bridge == null) return;
+        bridge.setWebViewClient(new DiagnosticWebViewClient(bridge));
+
+        /*
+         * Second attempt onwards, the WebView is rebuilt without hardware acceleration. A renderer that dies
+         * moments after painting is usually dying on the GPU side, and software rendering is the escape hatch
+         * for that: slower and less smooth, but it composites in-process and survives. It is applied only after
+         * a death, so a device that never had the problem never pays for it.
+         */
+        if (rendererDeaths > 0) {
+            WebView webView = bridge.getWebView();
+            if (webView != null) {
+                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+                report("software-layer-attempt-" + rendererDeaths);
+            }
+        }
     }
 
     /**
@@ -106,8 +122,12 @@ public class MainActivity extends BridgeActivity {
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             lastFinished = url;
-            // A page that survives to here is a page that loaded, so the recovery budget is returned.
-            rendererDeaths = 0;
+            /*
+             * The recovery budget is deliberately NOT returned here. This page finishes loading and then dies,
+             * so crediting a finished load would reset the count on every cycle and the app would restart itself
+             * for ever instead of ever reaching the point where it says what is wrong. The budget is per process:
+             * relaunching the app grants it again.
+             */
         }
 
         @Override

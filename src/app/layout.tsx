@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import type { ReactNode } from "react";
+import { NativeAuthListener } from "@/components/features/auth/native-auth-listener";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
@@ -44,6 +45,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <ToastProvider>{children}</ToastProvider>
+        {/* Inert on the website: one user-agent test in an effect. Inside the Android shell it is what hears the
+            browser come back from Google or Telegram, wherever the user happens to be (ARCHITECTURE §4.1c). */}
+        <NativeAuthListener />
       </body>
     </html>
   );

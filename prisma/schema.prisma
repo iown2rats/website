@@ -293,6 +293,7 @@ model User {
   verification          Verification?
   identities            AuthIdentity[]
   sessions              Session[]
+  authHandoffs          AuthHandoff[]
   usageCounters         UsageCounter[]
   boosts                Boost[]
   subscriptions         Subscription[]
@@ -636,6 +637,37 @@ model AuthToken {
   identity AuthIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
 
   @@index([identityId, purpose])
+  @@index([expiresAt])
+}
+
+/// One-time exchange code that moves a completed OAuth sign-in from the system browser into the Android app's
+/// WebView (docs/ARCHITECTURE.md §4.1c).
+///
+/// Google and Telegram both refuse OAuth inside an embedded WebView, so the Android app runs the flow in a Chrome
+/// Custom Tab instead. The Custom Tab has its own cookie jar, so the session it would set there is useless to the
+/// app. This row is the bridge, and it deliberately holds NO secret at rest:
+///
+///   - `codeHash` is SHA-256 of a 256-bit random code that exists only inside one deep link, once.
+///   - `challengeHash` is SHA-256 of a verifier the app generated BEFORE it opened the browser and never sent
+///     anywhere except to the redemption endpoint. A hostile app that registers the same custom scheme and
+///     intercepts the deep link therefore cannot redeem the code.
+///   - there is no session token here. The session is created at redemption, inside the WebView, so it carries
+///     the WebView's own user agent and address rather than the browser's.
+model AuthHandoff {
+  id            String    @id @default(cuid(2))
+  codeHash      Bytes     @unique
+  challengeHash Bytes
+  userId        String
+  /// Where the WebView is sent once the session exists: the same landing the web callback would have chosen.
+  landing       String
+  provider      String
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
   @@index([expiresAt])
 }
 

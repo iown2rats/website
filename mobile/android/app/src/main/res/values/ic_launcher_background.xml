@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MelloCrush page cream. Matches --background in src/styles/tokens.css. -->
+    <color name="ic_launcher_background">#FFFBF1</color>
+</resources>

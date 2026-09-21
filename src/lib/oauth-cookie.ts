@@ -24,6 +24,13 @@ export interface PendingAuth {
   returnTo: string | null;
   /** Session id that requested re-authentication, so the callback can bind the result to it. */
   sessionId: string | null;
+  /**
+   * Set only when the Android shell started this flow (docs/ARCHITECTURE.md §4.1c): the base64url SHA-256 of a
+   * verifier the app generated before it opened the browser. Its presence is what makes the callback hand the
+   * result back over a deep link instead of setting a cookie, and it rides in this signed cookie rather than in
+   * the redirect so nothing between the browser and the callback can introduce or alter it.
+   */
+  handoffChallenge?: string | null;
   createdAt: number;
 }
 

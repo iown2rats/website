@@ -22,6 +22,8 @@ export const ROUTES = {
   verifyEmailToken: "/auth/verify",
   forgotPassword: "/auth/forgot-password",
   resetPassword: "/auth/reset-password",
+  /** Where the Android shell redeems a one-time handoff code for a session (docs/ARCHITECTURE.md §4.1c). */
+  handoff: "/auth/handoff",
   logout: "/auth/logout",
   onboarding: "/onboarding",
   home: "/discover",
@@ -73,6 +75,9 @@ function isAuthFlowEndpoint(pathname: string): boolean {
     pathname === ROUTES.telegramSignIn ||
     pathname === ROUTES.telegramCallback ||
     pathname === ROUTES.verifyEmailToken ||
+    // Reachable in every state for the same reason as the callbacks: the WebView may still be carrying a stale or
+    // half-finished session when the app comes back from the browser, and the endpoint itself decides.
+    pathname === ROUTES.handoff ||
     pathname === ROUTES.logout ||
     pathname === ROUTES.authError
   );

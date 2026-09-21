@@ -1,0 +1,13 @@
+# Capacitor / Android build output. The android/ project itself IS committed — the cloud build needs it, and the
+# owner cannot run `cap add android` from a phone.
+node_modules/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+*.iml
+.DS_Store

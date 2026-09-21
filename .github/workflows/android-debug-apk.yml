@@ -1,0 +1,80 @@
+name: Android debug APK
+
+# Manual only. This builds a private, debug-signed APK for testing on our own devices; nothing here deploys,
+# publishes or touches production. Run it from the GitHub app, then download the artifact from the run page.
+on:
+  workflow_dispatch:
+
+# Read-only: the job checks the repository out and writes nothing back to it.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: assembleDebug
+    runs-on: ubuntu-latest
+    # A cold Gradle build of a Capacitor shell is a few minutes; the cap is a guard against a hung download.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Capacitor 8's Android library compiles against Java 21 (see @capacitor/android's build.gradle), so the
+      # JDK is pinned rather than left to whatever the runner image currently defaults to.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Only for the Capacitor CLI. The website is never installed or built here: the APK carries no web assets,
+      # because the shell loads https://www.mellocrush.com at runtime. That keeps this job away from Prisma,
+      # tesseract.js and the rest of the server tree entirely.
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      # Copies mobile/www and the Capacitor config into the Android project and refreshes the plugin list. The
+      # generated files are gitignored, so this step is what makes the checked-in android/ project buildable.
+      - name: Sync Capacitor Android
+        working-directory: mobile
+        run: npx cap sync android
+
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/android/**/*.gradle*', 'mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # The Android SDK is already on the ubuntu-latest image, so nothing is downloaded or licensed here.
+      # Gradle generates its own debug keystore on first use: this build needs no secrets of any kind, which is
+      # why the workflow can stay `permissions: contents: read`.
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Report APK details
+        working-directory: mobile/android
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          ls -lh "$APK"
+          "$ANDROID_HOME"/build-tools/*/aapt2 dump badging "$APK" 2>/dev/null | head -5 || true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mellocrush-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

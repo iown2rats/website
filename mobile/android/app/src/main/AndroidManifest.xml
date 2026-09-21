@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MelloCrush Android shell (docs/ARCHITECTURE.md §28).
+
+  PERMISSIONS: INTERNET and nothing else, and that is a decision rather than an oversight.
+
+  Reading Capacitor's own BridgeWebChromeClient (node_modules/@capacitor/android):
+
+    - A plain <input type="file"> — profile photos, Community photo posts, payment receipts, the "choose from
+      library" half of the verification selfie — goes to showFilePicker(), which launches
+      FileChooserParams.createIntent(): the SYSTEM picker. It hands back a content:// URI with a temporary read
+      grant. READ_MEDIA_IMAGES would add nothing except a permission dialog and access to every photo on the
+      device, so it is not declared.
+
+    - capture="user" (the verification selfie) is gated on isMediaCaptureSupported(), which returns true when
+      CAMERA is granted OR when CAMERA IS NOT DECLARED AT ALL. Leaving it undeclared therefore sends the user
+      straight to the system camera app, which operates under its own permission. Declaring CAMERA would make
+      Capacitor demand a runtime grant and fail the selfie if refused — strictly worse for the same outcome.
+
+  So: no camera permission, no media permission, no runtime prompts.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:usesCleartextTraffic="false"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              The return leg of the OAuth handoff (docs/ARCHITECTURE.md §4.1c). Google and Telegram refuse to run
+              in an embedded WebView, so sign-in happens in a Chrome Custom Tab and the server sends the finished
+              result back here as com.mellocrush.app://auth/callback?code=…
+
+              A custom scheme is claimable by any app on the device, so this intent filter is NOT treated as proof
+              of anything. The code that arrives is useless without the verifier this app generated before it
+              opened the browser and never sent anywhere, and the server demands both. MainActivity is
+              singleTask, so the link re-enters the running app and Capacitor's App plugin reports it as
+              appUrlOpen rather than starting a second copy.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.mellocrush.app" android:host="auth" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

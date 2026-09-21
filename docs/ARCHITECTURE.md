@@ -212,6 +212,21 @@ onboarding, deletion and re-authentication are the existing ones.
   no marketing, no tracking pixels. Verification URLs are built from `APP_URL`, which is
   `https://www.mellocrush.com` in production.
 
+### 4.1c Android sign-in: the Custom Tab handoff (2026-09-21)
+
+Google refuses OAuth inside an embedded WebView (`disallowed_useragent`) and Telegram is no friendlier, so the shell (§28) runs the flow in a Chrome Custom Tab and carries the result back over a one-time handoff.
+
+The website's path is untouched and is still what runs when no request asks otherwise. The app adds `?client=android&challenge=<base64url SHA-256>` to the same `/auth/<provider>/start` endpoint; the challenge is stored in the existing signed pending-auth cookie, so nothing on the wire can introduce or alter it. State, nonce, PKCE and the provider binding all run exactly as before. Only the last step differs: instead of setting a session cookie in a browser jar the app cannot read, the callback issues a code and redirects to `com.mellocrush.app://auth/callback?code=…`, and the app redeems it at `/auth/handoff?code=&verifier=` inside its own WebView.
+
+What crosses the gap is a 256-bit random code, in one deep link, once, for two minutes — and nothing else:
+
+- **No session token is ever in a URL, and none is stored.** The session does not exist when the code is issued; it is created at redemption, inside the WebView, so it records the WebView's own user agent and address. It is then set as the same HttpOnly, Secure, SameSite=Lax cookie the website uses.
+- **The code is stored only as a SHA-256 digest** (`AuthHandoff.codeHash`), so a database reader cannot redeem one.
+- **The code alone is not enough.** An Android custom scheme is claimable by any installed app, so the deep link may reach a hostile one. Before opening the browser the real app generates a verifier it never sends anywhere, and redemption requires it — an interceptor holds a code it cannot use. PKCE's argument, applied to the second hop.
+- **Replay is impossible**: redemption is a conditional update on `consumedAt IS NULL`, so two racing attempts cannot both win, and a wrong verifier does not burn the code for the real app.
+
+Every failure returns the same nothing. Tested in `tests/integration/android-handoff.test.ts` and `tests/unit/native-deep-link.test.ts`.
+
 ### 4.2 Sessions (as built)
 
 - Opaque 32-byte token (base64url) in cookie `thundi_session`: `HttpOnly; SameSite=Lax; Path=/`, `Secure` in production. The database stores only `sha256(token)` plus user id, created/lastSeen/expires, user agent and the IP /24 prefix.
@@ -1289,3 +1304,17 @@ because they are already linked from screens people may have bookmarked.
 One measure, capped so the article is 640px at every width from 768 up and full-width-minus-gutters below it.
 Verified at 320, 360, 390, 430, 768, 820, 1024, 1280, 1440 and 1920: no horizontal overflow anywhere, and the
 measure never exceeds what is comfortable to read.
+
+## 28. The Android shell (2026-09-21)
+
+A Capacitor 8 wrapper in `mobile/`, isolated from the web app: its own `package.json`, its own lockfile, its own `node_modules`. The website's install, build and deploy never see it.
+
+28.1 Remote, not bundled. The WebView loads `https://www.mellocrush.com` through Capacitor's `server.url`. Bundling local assets would require `output: "export"`, which this application cannot use — 48 of its 57 pages render per request, and it has middleware, sixteen route handlers, fourteen server-action modules and a Postgres database behind them. There is no second backend and no second database; the shell is a window onto the running production app. Because `server.url` is an https origin, the WebView's origin *is* `www.mellocrush.com`, so the existing Secure/SameSite=Lax session cookie, every relative fetch and every server action work unchanged. `X-Frame-Options: DENY` does not apply (it governs framing, not top-level navigation) and there is no CSP to conflict with.
+
+28.2 Navigation is fenced. `allowNavigation` lists `www.mellocrush.com`, `mellocrush.com` and the Supabase storage host that serves signed photo, receipt and selfie URLs. Anything else opens in the system browser rather than living inside the app wearing its chrome. `cleartext: false`, and `android:usesCleartextTraffic="false"` in the manifest.
+
+28.3 Permissions: `INTERNET` only, which is a decision and not an oversight. Reading Capacitor's `BridgeWebChromeClient`: a plain `<input type="file">` goes to `showFilePicker()` → `FileChooserParams.createIntent()`, the system picker, which returns a `content://` URI under a temporary grant — `READ_MEDIA_IMAGES` would add a permission dialog and access to every photo on the device for no gain. And `capture="user"` (the verification selfie) is gated on `isMediaCaptureSupported()`, which returns true when CAMERA is granted **or not declared at all**; leaving it undeclared sends the user to the system camera app under its own permission, while declaring it would make Capacitor demand a runtime grant and fail the selfie if refused. So: no camera permission, no media permission, no runtime prompts.
+
+28.4 The build is entirely cloud-side. `.github/workflows/android-debug-apk.yml`, `workflow_dispatch` only: JDK 21 (Capacitor 8's Android library compiles against 21), Node 22 for the Capacitor CLI alone, `npm ci` in `mobile/`, `cap sync android`, `gradlew assembleDebug`, artifact upload. The website is never installed or built there — the APK carries no web assets — so the job never touches Prisma or tesseract.js. Gradle generates its own debug keystore, so **the workflow needs no secrets** and runs with `permissions: contents: read`.
+
+28.5 Known limits of the first build. Re-authentication (required before account deletion for OAuth accounts) stays on the web path, because it binds to a session living in the WebView's cookie jar that a Custom Tab cannot see; email accounts re-authenticate by password and are unaffected. Restoring a deleted account is likewise a website journey — the pending-identity cookie would be set in the browser, not the app. Email verification links open in Chrome; the account is verified server-side and the member then signs in inside the app.

@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { signInRoute } from "@/server/auth/route-access";
+import { isNativeApp, startNativeSignIn } from "./native-bridge";
 
 /** Google's "G" mark (brand guidelines: four-colour mark on white). */
 export function GoogleMark({ size = 20 }: { size?: number }) {
@@ -53,8 +56,14 @@ export type SignInButtonAppearance = "white" | "brand" | "glass";
 const LABELS: Record<SignInButtonProvider, string> = { google: "Continue with Google", telegram: "Continue with Telegram" };
 
 /**
- * "Continue with <provider>": a plain link to that provider's start endpoint (no JS needed). Surface classes are
- * chosen per appearance (never stacked), so a caller's `className` only adds size, radius and shadow.
+ * "Continue with <provider>": a link to that provider's start endpoint. Surface classes are chosen per appearance
+ * (never stacked), so a caller's `className` only adds size, radius and shadow.
+ *
+ * ANDROID. The markup is identical on every platform and the link still works with JavaScript disabled — that is
+ * the website's path and it is untouched. Inside the shell app the click is intercepted instead, because both
+ * providers refuse to run OAuth in an embedded WebView; `startNativeSignIn` opens a Chrome Custom Tab and returns
+ * true, and only then is the navigation prevented. If it returns false for any reason the ordinary link proceeds,
+ * so the failure mode is the old behaviour rather than a dead button.
  */
 export function ContinueWith({
   provider,
@@ -95,7 +104,23 @@ export function ContinueWith({
   // stylesheet order rather than by the caller's intent.
   const radius = shape === "pill" ? "rounded-full" : "rounded-lg";
   return (
-    <Link href={href} prefetch={false} className={cn("flex items-center justify-center gap-2.5 pressable", glass ? undefined : "shadow-sm", heightClass, textClass, radius, surface, className)}>
+    <Link
+      href={href}
+      prefetch={false}
+      onClick={(event) => {
+        // Re-authentication is not offered in the app (it binds to a session the Custom Tab cannot see), so it
+        // keeps the web path here as well.
+        if (purpose !== "login" || event.defaultPrevented || event.metaKey || event.ctrlKey) return;
+        // Checked synchronously and before anything else: on the website this returns false and the handler is
+        // over, so the link navigates exactly as it always has.
+        if (!isNativeApp()) return;
+        event.preventDefault();
+        void startNativeSignIn(href).then((handled) => {
+          if (!handled) window.location.href = href;
+        });
+      }}
+      className={cn("flex items-center justify-center gap-2.5 pressable", glass ? undefined : "shadow-sm", heightClass, textClass, radius, surface, className)}
+    >
       {mark}
       {label ?? LABELS[provider]}
     </Link>

@@ -1,0 +1,22 @@
+{
+  "name": "mellocrush-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capacitor Android shell for MelloCrush. Isolated from the web app on purpose: the website's install and build never see these dependencies.",
+  "scripts": {
+    "sync": "cap sync android",
+    "build:debug": "cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/browser": "8.0.4",
+    "@capacitor/core": "8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

@@ -92,7 +92,14 @@ export async function completeSignIn(request: NextRequest, provider: OidcSignInP
   const params = request.nextUrl.searchParams;
   const pending = await readPendingAuth();
   await clearPendingAuth();
-  const fail = (reason: string) => NextResponse.redirect(new URL(`${ROUTES.authError}?reason=${reason}&provider=${provider}`, request.url));
+  /*
+   * One failure path, two destinations. On the web this is the error screen as it has always been. For an Android
+   * flow the browser tab is about to be abandoned, so the reason goes back over the deep link and the app shows
+   * the same screen in its own WebView — otherwise a cancelled sign-in would leave a Custom Tab sitting on an
+   * error page in front of an app still waiting for it. The reason codes are identical either way.
+   */
+  const fail = (reason: string) =>
+    pending?.handoffChallenge ? failNative(provider, reason) : NextResponse.redirect(new URL(`${ROUTES.authError}?reason=${reason}&provider=${provider}`, request.url));
 
   if (params.get("error")) return fail(params.get("error") === "access_denied" ? "cancelled" : "provider");
   const code = params.get("code");
@@ -127,7 +134,7 @@ export async function completeSignIn(request: NextRequest, provider: OidcSignInP
     // The "restore your account" screen works from a pending-identity cookie, which would be set in the Custom
     // Tab and therefore useless to the app. Rather than pretend, Android is sent back with a reason and reads it
     // in its own WebView; restoring a deleted account is a website journey for now.
-    if (pending.handoffChallenge) return failNative(provider, "deleted");
+    if (pending.handoffChallenge) return fail("deleted");
     await setPendingIdentity({ provider, subject: claims.subject, email: claims.email, name: claims.name, username: claims.username, createdAt: Date.now() });
     return NextResponse.redirect(new URL(ROUTES.deleted, request.url));
   }

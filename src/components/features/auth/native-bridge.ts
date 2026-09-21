@@ -26,8 +26,26 @@ interface CapacitorBridge {
 
 const bridge = (): CapacitorBridge | undefined => (globalThis as { Capacitor?: CapacitorBridge }).Capacitor;
 
-/** Where the verifier waits while the user is away in the browser. Per-tab, cleared when the WebView is gone. */
+/*
+ * Where the verifier waits while the user is away in the browser.
+ *
+ * localStorage, NOT sessionStorage, and that distinction is the whole reason this comment exists. While the user
+ * is in the Custom Tab, MelloCrush is a backgrounded Android app and the system may reclaim its process at any
+ * time. The deep link still arrives — Capacitor replays it, because BridgeActivity.load() feeds the launching
+ * intent through onNewIntent() and appUrlOpen is notified with retainUntilConsumed, so a listener that registers
+ * afterwards still receives it — but the WebView is a NEW one, and sessionStorage belongs to the WebView that
+ * died. The verifier would be gone and every reclaimed sign-in would end on the error screen.
+ *
+ * The cost of the durable store is bounded: the value is useless without a code that lives two minutes, it is
+ * deleted the moment it is read, and it is discarded on sight once it is older than one OAuth round trip.
+ */
 const VERIFIER_KEY = "mellocrush.handoff.verifier";
+/**
+ * How long a stored verifier stays usable. The pending-auth cookie gives the OAuth round trip ten minutes and the
+ * handoff code two more, so fifteen covers the longest legitimate journey with room for a slow sign-in, and
+ * anything older is the debris of an attempt that was abandoned.
+ */
+const VERIFIER_TTL_MS = 15 * 60_000;
 
 export function isNativeApp(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -53,6 +71,35 @@ async function createHandoffPair(): Promise<{ verifier: string; challenge: strin
   return { verifier, challenge: toBase64Url(digest) };
 }
 
+/** The stored shape. The timestamp is what lets a stale verifier be recognised rather than tried and refused. */
+interface StoredVerifier {
+  verifier: string;
+  issuedAt: number;
+}
+
+/**
+ * Reads and clears the stored verifier, or returns null. Exported for its own test: "does this survive the app
+ * being killed" is not a question a browser test can ask, so the storage contract is tested directly instead.
+ */
+export function takeStoredVerifier(store: Pick<Storage, "getItem" | "removeItem">, now = Date.now()): string | null {
+  let raw: string | null;
+  try {
+    raw = store.getItem(VERIFIER_KEY);
+    store.removeItem(VERIFIER_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredVerifier>;
+    if (typeof parsed.verifier !== "string" || typeof parsed.issuedAt !== "number") return null;
+    if (now - parsed.issuedAt > VERIFIER_TTL_MS || now < parsed.issuedAt) return null;
+    return parsed.verifier;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Starts a provider sign-in from inside the app: mint the pair, keep the verifier, and hand the browser a start
  * URL that asks for the handoff. Returns false when this is not the app, so the caller can let its ordinary link
@@ -62,9 +109,11 @@ export async function startNativeSignIn(startPath: string): Promise<boolean> {
   if (!isNativeApp()) return false;
   const { verifier, challenge } = await createHandoffPair();
   try {
-    sessionStorage.setItem(VERIFIER_KEY, verifier);
+    // Last write wins. A second tap supersedes the first here and at the server, where the new start overwrites
+    // the pending-auth cookie, so the newest attempt is the one that can complete and an abandoned one expires.
+    localStorage.setItem(VERIFIER_KEY, JSON.stringify({ verifier, issuedAt: Date.now() } satisfies StoredVerifier));
   } catch {
-    // Private mode or blocked storage: without somewhere to keep the verifier the handoff cannot be completed,
+    // Blocked or full storage: without somewhere durable to keep the verifier the handoff cannot be completed,
     // and falling through to the WebView would only reach Google's "disallowed_useragent" screen.
     return false;
   }
@@ -80,9 +129,7 @@ export async function startNativeSignIn(startPath: string): Promise<boolean> {
 /** Consumes the stored verifier. One read: a second attempt with the same one is meaningless anyway. */
 function takeVerifier(): string | null {
   try {
-    const value = sessionStorage.getItem(VERIFIER_KEY);
-    sessionStorage.removeItem(VERIFIER_KEY);
-    return value;
+    return takeStoredVerifier(localStorage);
   } catch {
     return null;
   }

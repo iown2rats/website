@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveDeepLink } from "@/components/features/auth/native-bridge";
+import { resolveDeepLink, takeStoredVerifier } from "@/components/features/auth/native-bridge";
 
 /*
  * The deep link is the one value in the Android flow that arrives from outside the app — Android hands it over
@@ -50,5 +50,63 @@ describe("resolveDeepLink", () => {
     // verifier is impossible by design, so say so rather than sending a request that must fail.
     expect(resolveDeepLink("com.mellocrush.app://auth/callback?code=abc", null)).toBe("/auth/error?reason=handoff");
     expect(resolveDeepLink("com.mellocrush.app://auth/callback", VERIFIER)).toBe("/auth/error?reason=handoff");
+  });
+});
+
+/*
+ * Verifier storage. The question these answer cannot be asked of a browser: "does this survive Android reclaiming
+ * the app's process while the user is in the Custom Tab?" It survives because the value is in localStorage rather
+ * than sessionStorage — sessionStorage belongs to the WebView, and a reclaimed app gets a new one.
+ */
+const KEY = "mellocrush.handoff.verifier";
+const T0 = 1_700_000_000_000;
+const TTL = 15 * 60_000;
+
+function fakeStore(initial: Record<string, string> = {}) {
+  const map = new Map(Object.entries(initial));
+  return {
+    map,
+    getItem: (k: string) => map.get(k) ?? null,
+    removeItem: (k: string) => void map.delete(k),
+  };
+}
+
+describe("takeStoredVerifier", () => {
+  it("returns the verifier and clears it, so a second read finds nothing", () => {
+    const store = fakeStore({ [KEY]: JSON.stringify({ verifier: VERIFIER, issuedAt: T0 }) });
+    expect(takeStoredVerifier(store, T0 + 30_000)).toBe(VERIFIER);
+    expect(store.map.has(KEY)).toBe(false);
+    expect(takeStoredVerifier(store, T0 + 30_000)).toBeNull();
+  });
+
+  it("accepts a verifier stored just inside the window and rejects one just outside", () => {
+    const fresh = fakeStore({ [KEY]: JSON.stringify({ verifier: VERIFIER, issuedAt: T0 }) });
+    expect(takeStoredVerifier(fresh, T0 + TTL)).toBe(VERIFIER);
+    const stale = fakeStore({ [KEY]: JSON.stringify({ verifier: VERIFIER, issuedAt: T0 }) });
+    expect(takeStoredVerifier(stale, T0 + TTL + 1)).toBeNull();
+    // …and the stale one is cleared rather than left to be retried.
+    expect(stale.map.has(KEY)).toBe(false);
+  });
+
+  it("rejects a timestamp from the future, in case the device clock moved", () => {
+    const store = fakeStore({ [KEY]: JSON.stringify({ verifier: VERIFIER, issuedAt: T0 + 60_000 }) });
+    expect(takeStoredVerifier(store, T0)).toBeNull();
+  });
+
+  it("survives anything unexpected in the slot", () => {
+    for (const value of ["", "not json", "null", "[]", '{"verifier":123,"issuedAt":1}', `{"verifier":"${VERIFIER}"}`, '{"issuedAt":1}']) {
+      expect(takeStoredVerifier(fakeStore({ [KEY]: value }), T0), value).toBeNull();
+    }
+    expect(takeStoredVerifier(fakeStore(), T0)).toBeNull();
+  });
+
+  it("returns null rather than throwing when storage itself is unavailable", () => {
+    const blocked = {
+      getItem: () => {
+        throw new Error("storage disabled");
+      },
+      removeItem: () => undefined,
+    };
+    expect(takeStoredVerifier(blocked, T0)).toBeNull();
   });
 });

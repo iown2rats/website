@@ -16,13 +16,42 @@ import { NATIVE_APP_ID, NATIVE_CLIENT_PARAM, NATIVE_CLIENT_VALUE, isNativeAndroi
  * already in the WebView because the native plugins are registered there.
  */
 
+/**
+ * What `App.addListener` hands back. Read from the file Capacitor injects into the page — not assumed:
+ *
+ *   @capacitor/android/capacitor/src/main/assets/native-bridge.js:183
+ *     cap.addListener = (pluginName, eventName, callback) => {
+ *       const callbackId = cap.nativeCallback(...);
+ *       return { remove: async () => { ... } };
+ *     };
+ *
+ * The handle comes back SYNCHRONOUSLY. Every other plugin method goes through `cap.nativePromise` (:999) and is
+ * a promise, which is why `Browser.open` below is awaited and this one is not. Capacitor's own code inside that
+ * file relies on both: `cap.Plugins.App.addListener('backButton', …)` with no await at :280, and
+ * `Plugins?.WebView?.getServerBasePath().then(…)` at :296.
+ *
+ * Optional throughout, and widened to a promise as well, because this is a runtime we do not control and an
+ * earlier version of this file asserted a shape it had never checked. That assertion threw on every page load
+ * in the shell and reloaded the app once a second; the types here now describe what was observed, and
+ * `listenForAuthDeepLink` copes at runtime with either form.
+ */
+type NativeListenerHandle = { remove?: () => unknown };
+
 interface CapacitorBridge {
   isNativePlatform?: () => boolean;
   Plugins?: {
-    Browser?: { open: (options: { url: string }) => Promise<void>; close?: () => Promise<void> };
-    App?: { addListener: (event: string, handler: (data: { url: string }) => void) => Promise<{ remove: () => void }> };
+    Browser?: { open?: (options: { url: string }) => unknown; close?: () => unknown };
+    App?: {
+      addListener?: (
+        event: string,
+        handler: (data: { url: string }) => void,
+      ) => NativeListenerHandle | PromiseLike<NativeListenerHandle> | undefined;
+    };
   };
 }
+
+const isThenable = (value: unknown): value is PromiseLike<NativeListenerHandle> =>
+  typeof (value as { then?: unknown } | null | undefined)?.then === "function";
 
 const bridge = (): CapacitorBridge | undefined => (globalThis as { Capacitor?: CapacitorBridge }).Capacitor;
 
@@ -121,8 +150,15 @@ export async function startNativeSignIn(startPath: string): Promise<boolean> {
   url.searchParams.set(NATIVE_CLIENT_PARAM, NATIVE_CLIENT_VALUE);
   url.searchParams.set("challenge", challenge);
   const browser = bridge()?.Plugins?.Browser;
-  if (!browser) return false;
-  await browser.open({ url: url.toString() });
+  if (typeof browser?.open !== "function") return false;
+  try {
+    // A promise here, unlike addListener: ordinary plugin methods go through cap.nativePromise. Awaited so a
+    // rejection is caught rather than escaping as an unhandled rejection.
+    await browser.open({ url: url.toString() });
+  } catch {
+    // The caller treats false as "the app could not take this over", and lets its ordinary link proceed.
+    return false;
+  }
   return true;
 }
 
@@ -163,20 +199,58 @@ export function resolveDeepLink(rawUrl: string, verifier: string | null): string
  * Listens for the deep link that means the browser is done. Closes the Custom Tab, then navigates the WebView to
  * the resolved URL with `location.replace`, so the redemption URL — which carries the verifier — does not become
  * a history entry the back button can return to.
+ *
+ * Nothing in here may throw. This runs from an effect in the ROOT LAYOUT, so it is mounted on every screen, and
+ * an exception escaping it does not break the deep link — it breaks the whole application. That is not
+ * hypothetical: an earlier version called `.then()` on the handle, which the injected Android bridge returns
+ * synchronously, and the resulting TypeError reloaded the app about once a second on every page it reached.
+ * Hence the belt and braces: the registration, the handler and the removal are each wrapped, and the handle is
+ * accepted in either the synchronous or the promised form.
  */
 export function listenForAuthDeepLink(): () => void {
   if (!isNativeApp()) return () => {};
-  let remove: (() => void) | undefined;
-  void bridge()
-    ?.Plugins?.App?.addListener("appUrlOpen", (data) => {
-      const next = resolveDeepLink(data?.url ?? "", takeVerifier());
-      if (!next) return;
-      void bridge()?.Plugins?.Browser?.close?.().catch(() => undefined);
-      window.location.replace(next);
-    })
-    .then((handle) => {
-      remove = handle.remove;
-    })
-    .catch(() => undefined);
-  return () => remove?.();
+
+  let handle: NativeListenerHandle | undefined;
+  try {
+    const registered = bridge()?.Plugins?.App?.addListener?.("appUrlOpen", (data) => {
+      try {
+        const next = resolveDeepLink(data?.url ?? "", takeVerifier());
+        if (!next) return;
+        closeCustomTab();
+        window.location.replace(next);
+      } catch {
+        // A malformed link is not worth taking the screen down for; the user stays where they are.
+      }
+    });
+    if (isThenable(registered)) {
+      void Promise.resolve(registered)
+        .then((resolved) => {
+          handle = resolved;
+        })
+        .catch(() => undefined);
+    } else {
+      handle = registered;
+    }
+  } catch {
+    // No bridge, or a bridge shaped differently from the one this was written against. The app keeps working;
+    // only the deep link is lost, and sign-in still reports its own failure through the error screen.
+    return () => {};
+  }
+
+  return () => {
+    try {
+      handle?.remove?.();
+    } catch {
+      // Removing a listener that is already gone is not worth an exception on unmount.
+    }
+  };
+}
+
+/** Closes the Custom Tab, tolerating a `close` that returns nothing rather than a promise. */
+function closeCustomTab(): void {
+  try {
+    void Promise.resolve(bridge()?.Plugins?.Browser?.close?.()).catch(() => undefined);
+  } catch {
+    // The tab closes itself when the deep link fires; this is a tidy-up, not a requirement.
+  }
 }

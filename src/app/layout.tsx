@@ -34,8 +34,20 @@ export const viewport: Viewport = {
   themeColor: "#FFFBF1",
 };
 
-// Applies the stored appearance before first paint to avoid a theme flash. Per-viewer convenience only.
-const themeInit = `(function(){try{var t=localStorage.getItem('thundi.theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');var m=document.querySelector('meta[name="theme-color"]');if(m){m.setAttribute('content','#000000');}}}catch(e){}})();`;
+/*
+ * Two things that must be settled before the first paint.
+ *
+ * THEME: applies the stored appearance so there is no flash. Per-viewer convenience only.
+ *
+ * NATIVE: marks the document when it is being rendered inside the Android shell's WebView, which the stylesheet
+ * uses to drop `backdrop-filter` (docs/ARCHITECTURE.md §28). The blurs are a genuine hazard there and only there:
+ * the signed-out screen alone stacks five of them over a full-bleed cover photograph, and each one forces a
+ * composited layer that has to snapshot the whole photograph behind it. Android's WebView renderer does not
+ * survive that on every device — it paints once and is killed — while Chrome on the same phone, with its own
+ * process and GPU path, is untroubled. It is set here rather than from the user agent on the server because the
+ * attribute must exist before the first style is applied, and a browser never sets it at all.
+ */
+const themeInit = `(function(){try{var t=localStorage.getItem('thundi.theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');var m=document.querySelector('meta[name="theme-color"]');if(m){m.setAttribute('content','#000000');}}}catch(e){}try{if(navigator.userAgent.indexOf('MelloCrushAndroid')!==-1){document.documentElement.setAttribute('data-native','android');}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

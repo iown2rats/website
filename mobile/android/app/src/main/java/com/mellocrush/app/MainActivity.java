@@ -1,5 +1,6 @@
 package com.mellocrush.app;
 
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.http.SslError;
 import android.os.Build;
@@ -14,32 +15,44 @@ import android.widget.TextView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * The shell's only activity (docs/ARCHITECTURE.md §28).
  *
- * Capacitor does everything; the one thing added here is a legible failure. When the WebView cannot show
- * https://www.mellocrush.com it falls back to Chromium's own "This page couldn't load", which names neither the
- * error nor the address — and on a phone, with no desktop to attach chrome://inspect to, that page is the end of
- * the investigation.
+ * Capacitor does the work. What is added here is everything needed for a failure to be survivable and legible,
+ * because the first device test produced Chromium's "This page couldn't load" with no way to see behind it.
  *
- * Two different failures produce that same blank page and they are told apart here, because they point at
- * completely different causes:
+ * Three failures produce that same blank page and they need different answers:
  *
- *   - a failed navigation, which arrives at onReceivedError with a net error code;
- *   - the renderer process dying, which arrives at onRenderProcessGone instead and never reaches the error
- *     callbacks at all. The page renders, then vanishes.
+ *   - a failed navigation reaches onReceivedError with a net error code;
+ *   - a refused certificate reaches onReceivedSslError;
+ *   - the renderer process dying reaches onRenderProcessGone and NONE of the error callbacks. The page paints,
+ *     then vanishes. That is the one the sign-in screen was hitting, and it is recovered from rather than
+ *     reported, because a rebuilt WebView usually comes back fine.
  */
 public class MainActivity extends BridgeActivity {
 
-    /** The last URL the WebView began and finished loading, so a failure can say how far it got. */
+    /** Where a failure reports itself, as a path, so it is visible in the server's request log. */
+    private static final String DIAGNOSTIC_BASE = "https://www.mellocrush.com/__diag/android/";
+
+    /**
+     * Renderer deaths survived so far. Static so it outlives the activity that recreate() replaces — without it
+     * a page that reliably kills the renderer would restart the app forever instead of ever saying so.
+     */
+    private static int rendererDeaths = 0;
+
+    private static final int MAX_RENDERER_RECOVERIES = 2;
+
     private String lastStarted = "nothing yet";
     private String lastFinished = "nothing yet";
 
     /**
-     * Installed here rather than in onCreate: `load()` is where BridgeActivity builds the bridge and starts the
-     * first navigation, so replacing the client immediately after `super.load()` puts it in place at the earliest
-     * supported moment.
+     * Installed from load() rather than onCreate: load() is where BridgeActivity builds the bridge and starts the
+     * first navigation, so this is the earliest supported moment to replace the client.
      */
     @Override
     protected void load() {
@@ -49,9 +62,30 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * Capacitor's own client, with failures made visible. Everything else — the local server interception that
-     * injects the bridge into the remote page, external-link handling, the plugin callbacks — is inherited
-     * untouched through `super`.
+     * Reports an event by requesting a path that does not exist. The response is discarded and failure is
+     * ignored: this is a debug build talking to its own server about itself, and nothing about the app should
+     * depend on it. No identifiers, no page content — just what went wrong.
+     */
+    private static void report(String event) {
+        new Thread(() -> {
+            try {
+                URL url = new URL(DIAGNOSTIC_BASE + URLEncoder.encode(event, StandardCharsets.UTF_8.name()));
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.getResponseCode();
+                conn.disconnect();
+            } catch (Exception ignored) {
+                // A diagnostic that breaks the app it is diagnosing would be worse than no diagnostic.
+            }
+        })
+            .start();
+    }
+
+    /**
+     * Capacitor's own client, with failures handled. Everything else — the local server interception that injects
+     * the bridge into the remote page, external-link handling, the plugin callbacks — is inherited through super.
      */
     private class DiagnosticWebViewClient extends BridgeWebViewClient {
 
@@ -63,7 +97,7 @@ public class MainActivity extends BridgeActivity {
         }
 
         @Override
-        public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
             super.onPageStarted(view, url, favicon);
             lastStarted = url;
         }
@@ -72,12 +106,15 @@ public class MainActivity extends BridgeActivity {
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             lastFinished = url;
+            // A page that survives to here is a page that loaded, so the recovery budget is returned.
+            rendererDeaths = 0;
         }
 
         @Override
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
             super.onReceivedError(view, request, error);
             if (!request.isForMainFrame()) return;
+            report("net-" + error.getErrorCode());
             show(view, "Navigation failed", "net error " + error.getErrorCode() + " · " + error.getDescription(), request);
         }
 
@@ -85,38 +122,52 @@ public class MainActivity extends BridgeActivity {
         public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
             super.onReceivedHttpError(view, request, errorResponse);
             if (!request.isForMainFrame()) return;
+            report("http-" + errorResponse.getStatusCode());
             show(view, "Server refused", "HTTP " + errorResponse.getStatusCode(), request);
         }
 
         /**
          * Reported, never bypassed: a certificate this device does not trust is exactly the kind of thing worth
-         * seeing, and proceeding anyway would hand the session to whoever presented it. The handler is cancelled
-         * first, as the default implementation would do.
+         * seeing, and proceeding anyway would hand the session to whoever presented it.
          */
         @Override
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
             handler.cancel();
+            report("ssl-" + error.getPrimaryError());
             show(view, "Certificate rejected", "SSL error " + error.getPrimaryError() + " · " + error.getUrl(), null);
         }
 
         /**
-         * The renderer died. This WebView can never paint again, so the dead view is replaced wholesale with a
-         * plain TextView rather than asked to load an error page into itself. Returning true keeps the app alive:
-         * the default is to let Android kill the process, which would look to the user like the app simply
-         * closing, with nothing said.
+         * The renderer died. The WebView is unusable from here, so the activity is rebuilt around a fresh one and
+         * the site reloaded — a single crash then costs a blink rather than the whole session. The budget exists
+         * because a page that kills the renderer every time would otherwise restart the app in a loop forever;
+         * once it is spent the app says what happened and stops.
+         *
+         * Returning true is what keeps the process alive. The default is to let Android kill the app, which to
+         * the user is indistinguishable from it closing on its own.
          */
         @Override
         public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-            String cause = "renderer gone";
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail != null) {
-                cause = detail.didCrash() ? "renderer crashed" : "renderer killed by the system (out of memory)";
+            boolean crashed = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail != null) crashed = detail.didCrash();
+            rendererDeaths++;
+            report((crashed ? "renderer-crashed-" : "renderer-reclaimed-") + rendererDeaths);
+
+            if (rendererDeaths <= MAX_RENDERER_RECOVERIES) {
+                recreate();
+                return true;
             }
+
             TextView message = new TextView(MainActivity.this);
             message.setBackgroundColor(Color.BLACK);
             message.setTextColor(0xFFF4F1EC);
             message.setGravity(Gravity.CENTER);
             message.setPadding(64, 64, 64, 64);
-            message.setText("MelloCrush stopped rendering\n\n" + cause + "\n\nlast started: " + lastStarted + "\nlast finished: " + lastFinished);
+            message.setText(
+                "MelloCrush kept stopping\n\n" +
+                (crashed ? "the page renderer crashed" : "the system reclaimed the page renderer") +
+                " " + rendererDeaths + " times\n\nlast started: " + lastStarted + "\nlast finished: " + lastFinished
+            );
             setContentView(message);
             return true;
         }

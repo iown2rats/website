@@ -16,12 +16,14 @@ import { useTheme } from "@/components/layout/theme-toggle";
 import type { NotificationSettingsDto } from "@/server/notifications/settings";
 import type { PrivacySettingsDto } from "@/server/privacy/settings";
 import { DeleteAccountSheet, type RecentAuthDto } from "./delete-account-sheet";
+import { ROUTES } from "@/server/auth/route-access";
 
 /*
  * Prototype "Settings": groups of 54 px rows (label, 13 px meta, chevron or 44×26 toggle) with uppercase group
  * labels and the footer "Mellocrush 1.0 · Made in the Maldives". On desktop (≥ 900) the page widens to 900 with a
- * 220 px section nav on the left and shows one group at a time. Rows without a real destination (Email, Terms,
- * Privacy Policy, Report a Problem) are shown as "Not yet available" rather than dead links.
+ * 220 px section nav on the left and shows one group at a time. Rows without a real destination (Email, Report a
+ * Problem) are shown as "Not yet available" rather than dead links; the three legal documents are real pages
+ * (docs/ARCHITECTURE.md §27) and link out to them.
  */
 export interface SettingsClientProps {
   /** Masked (+960 •••• 123) when the user has added a phone; null otherwise — phones are optional profile data. */
@@ -164,8 +166,9 @@ export function SettingsClient({ maskedPhone, signIn, verificationStatus, notifi
             <LinkRow href="/settings/safety" height={48} label="Help Center" />
             <LinkRow href="/settings/safety" height={48} label="Contact Support" />
             <ListRow asDiv height={48} label={<span className="text-text-secondary">Report a Problem</span>} meta="Not yet available" />
-            <ListRow asDiv height={48} label={<span className="text-text-secondary">Terms</span>} meta="Not yet available" />
-            <ListRow asDiv height={48} label={<span className="text-text-secondary">Privacy Policy</span>} meta="Not yet available" />
+            <LinkRow href={ROUTES.communityGuidelines} height={48} label="Community Guidelines" />
+            <LinkRow href={ROUTES.terms} height={48} label="Terms & Conditions" />
+            <LinkRow href={ROUTES.privacy} height={48} label="Privacy Policy" />
           </ListGroup>
         </section>
       ) : null}

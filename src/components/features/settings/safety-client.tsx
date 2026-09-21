@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
-import { ChevronDownIcon } from "@/components/ui/icons";
+import Link from "next/link";
+import { ChevronDownIcon, ChevronRightIcon, ShieldIcon } from "@/components/ui/icons";
 import { PageOverlay } from "@/components/layout/page-overlay";
+import { ROUTES } from "@/server/auth/route-access";
 
 /*
  * Prototype "Safety Center": intro line, five numbered accordion cards (radius 22, 40 px aqua tile, chevron rotates)
@@ -39,6 +41,15 @@ export function SafetyClient() {
           );
         })}
       </div>
+      {/* The rules themselves, in full. The accordion above is the short version; this is the document a report is
+          judged against, so it is one tap from the screen people reach when something has gone wrong. */}
+      <Link href={ROUTES.communityGuidelines} className="flex items-center gap-3.5 rounded-[22px] px-3.5 py-3 text-text glass-card">
+        <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-aqua-soft text-ocean" aria-hidden="true">
+          <ShieldIcon size={20} />
+        </span>
+        <span className="flex-1 text-body-lg font-medium">Read the full Community Guidelines</span>
+        <ChevronRightIcon size={16} className="shrink-0 text-text-secondary" aria-hidden="true" />
+      </Link>
       <div className="flex flex-col gap-2.5 rounded-card bg-surface-muted p-4">
         <h2 className="text-body-lg font-medium text-text">Contact support</h2>
         <p className="m-0 text-body-sm leading-relaxed text-text-secondary">A support inbox isn&apos;t connected yet, so messaging from here isn&apos;t available. Use the ··· menus to report anything right away. In an emergency, call 119 (Maldives Police).</p>

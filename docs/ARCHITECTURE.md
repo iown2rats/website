@@ -1225,3 +1225,50 @@ admin screen hides what a moderator cannot use, but hiding is tidiness. Every ch
 path where `X-Frame-Options` is `SAMEORIGIN` rather than `DENY`: it exists to be framed by the admin screen, and an
 iframe is what gives it a real viewport so the breakpoints resolve for the device being previewed rather than for the
 laptop looking at it.
+
+## 27. The public legal documents (2026-09-21)
+
+Three documents, supplied by the operator on 21 September 2026 and reproduced verbatim:
+
+| Route | Document |
+|---|---|
+| `/terms` | Terms & Conditions |
+| `/privacy` | Privacy Policy |
+| `/community-guidelines` | Community Guidelines |
+
+Root-level addresses, because these are what go on an app-store listing, in an email footer and on a regulator's
+form; they should be short and permanent. They live in a `(legal)` route group so the folder can hold a shared
+layout without appearing in the URL. All three are statically rendered — no database, no session, nothing to fetch.
+
+**Nothing on these pages is invented.** No registered address, no company number, no clause the operator did not
+write. The only editorial decision in the code is the heading structure: one `<h1>`, numbered clauses as `<h2>`, and
+no `<h3>` — because the supplied text has two levels and a third would put a structure in the document its author
+did not write.
+
+### Access
+
+A fourth route group, `legal`, allowed for anonymous, onboarding and active sessions. That is additive: no existing
+route changed group, and the two strictest rules above it are untouched — an unconfirmed email account still reaches
+exactly one screen, and a staff account still goes to the portal. The group exists because "public" was not the
+right answer: a signed-in member must be able to read the terms they agreed to, and the Safety Center links to the
+Community Guidelines from inside the app, where a `public` route would have bounced them to Discover.
+
+`LEGAL_PATHS` is an exact-match set rather than a prefix, so a future member route called `/terms-and-matches` can
+never accidentally become public.
+
+### Where they are linked
+
+- The welcome card's "By continuing…" line → `/terms` and `/privacy`, on every signed-out auth screen.
+- Each document's own footer → the other two.
+- Settings → Support: three real rows, replacing the "Not yet available" placeholders that were there.
+- Safety Center → "Read the full Community Guidelines", one tap from the screen people reach when something has
+  gone wrong.
+
+`/legal/terms` and `/legal/privacy` were the placeholder addresses and now `permanentRedirect` to the real ones,
+because they are already linked from screens people may have bookmarked.
+
+### Reading
+
+One measure, capped so the article is 640px at every width from 768 up and full-width-minus-gutters below it.
+Verified at 320, 360, 390, 430, 768, 820, 1024, 1280, 1440 and 1920: no horizontal overflow anywhere, and the
+measure never exceeds what is comfortable to read.

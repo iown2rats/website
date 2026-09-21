@@ -4,7 +4,7 @@
  */
 export type AuthKind = "anonymous" | "onboarding" | "active" | "unverified" | "staff";
 
-export type RouteGroup = "public" | "auth" | "onboarding" | "app" | "system" | "staff";
+export type RouteGroup = "public" | "legal" | "auth" | "onboarding" | "app" | "system" | "staff";
 
 export const ROUTES = {
   welcome: "/",
@@ -28,9 +28,23 @@ export const ROUTES = {
   /** The admin portal (docs/ARCHITECTURE.md §22.1). Staff land here; members never do. */
   staffHome: "/admin",
   staffSignIn: "/admin/login",
+  /** The public legal documents (docs/ARCHITECTURE.md §27). Root-level: these addresses go on listings and forms. */
+  terms: "/terms",
+  privacy: "/privacy",
+  communityGuidelines: "/community-guidelines",
 } as const;
 
+/**
+ * The legal documents, readable by everyone. Kept as a set rather than a prefix so that adding a member route
+ * called, say, /terms-of-a-match could never accidentally become public.
+ */
+const LEGAL_PATHS: ReadonlySet<string> = new Set([ROUTES.terms, ROUTES.privacy, ROUTES.communityGuidelines]);
+
 export function classifyRoute(pathname: string): RouteGroup {
+  // Its own group, because a public document is not the same thing as the signed-out welcome screen: a member who
+  // is already signed in must still be able to read the terms they agreed to, and the safety screens link to the
+  // Community Guidelines from inside the app.
+  if (LEGAL_PATHS.has(pathname)) return "legal";
   if (pathname === "/" || pathname.startsWith("/legal")) return "public";
   if (pathname.startsWith("/auth")) return "auth";
   if (pathname.startsWith("/onboarding")) return "onboarding";
@@ -90,6 +104,11 @@ export function resolveAccess(kind: AuthKind, pathname: string): AccessDecision 
   if (group === "staff") return { allow: true };
   // An operational account has no member app to be sent to. Everything outside the portal goes to the portal.
   if (kind === "staff") return { allow: false, redirectTo: ROUTES.staffHome };
+  // A member who is signed in, or halfway through onboarding, must be able to read the documents they are being
+  // asked to agree to, and the Community Guidelines are linked from the in-app safety surfaces. This adds a group;
+  // it does not loosen any existing one. The two strictest rules are deliberately left above and untouched: an
+  // unconfirmed email account still reaches exactly one screen, and a staff account still goes to the portal.
+  if (group === "legal") return { allow: true };
   switch (kind) {
     case "anonymous":
       return group === "public" || group === "auth" ? { allow: true } : { allow: false, redirectTo: ROUTES.welcome };

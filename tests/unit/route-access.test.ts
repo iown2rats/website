@@ -112,3 +112,42 @@ describe("staff accounts and the admin portal", () => {
     expect(resolveProxyAccess(false, "/discover")).toEqual({ allow: false, redirectTo: "/" });
   });
 });
+
+describe("the public legal documents", () => {
+  const LEGAL = ["/terms", "/privacy", "/community-guidelines"];
+
+  it("is its own group, not the welcome page's", () => {
+    for (const path of LEGAL) expect(classifyRoute(path), path).toBe("legal");
+    // The old addresses still classify as public; they are redirects now, not documents.
+    expect(classifyRoute("/legal/terms")).toBe("public");
+  });
+
+  it("is readable while signed out — nothing about it is behind authentication", () => {
+    for (const path of LEGAL) {
+      expect(resolveAccess("anonymous", path), path).toEqual({ allow: true });
+      expect(resolveProxyAccess(false, path), path).toEqual({ allow: true });
+    }
+  });
+
+  it("is readable by a signed-in member, so the safety screens can link to the Guidelines", () => {
+    for (const path of LEGAL) expect(resolveAccess("active", path), path).toEqual({ allow: true });
+  });
+
+  it("is readable part-way through onboarding, where the terms are being agreed to", () => {
+    for (const path of LEGAL) expect(resolveAccess("onboarding", path), path).toEqual({ allow: true });
+  });
+
+  it("leaves the two strictest rules exactly as they were", () => {
+    // An unconfirmed email account still reaches exactly one screen...
+    for (const path of LEGAL) expect(resolveAccess("unverified", path), path).toEqual({ allow: false, redirectTo: "/auth/verify-email" });
+    // ...and a staff account still goes to the portal, member domain or not.
+    for (const path of LEGAL) expect(resolveAccess("staff", path), path).toEqual({ allow: false, redirectTo: "/admin" });
+  });
+
+  it("matches the legal paths exactly, so a member route with a similar name cannot become public", () => {
+    expect(classifyRoute("/terms-and-matches")).toBe("app");
+    expect(classifyRoute("/privacy-settings")).toBe("app");
+    expect(classifyRoute("/community")).toBe("app");
+    expect(classifyRoute("/community-guidelines/extra")).toBe("app");
+  });
+});

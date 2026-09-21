@@ -141,11 +141,11 @@ export function AuthLegalLine() {
     <p className="mt-3 text-tiny leading-relaxed text-white/75">
       By continuing, you agree to our
       <br />
-      <Link href="/legal/terms" className="font-medium text-white underline decoration-white/70 underline-offset-[3px]">
-        Terms of Service
+      <Link href={ROUTES.terms} className="font-medium text-white underline decoration-white/70 underline-offset-[3px]">
+        Terms &amp; Conditions
       </Link>{" "}
       and{" "}
-      <Link href="/legal/privacy" className="font-medium text-white underline decoration-white/70 underline-offset-[3px]">
+      <Link href={ROUTES.privacy} className="font-medium text-white underline decoration-white/70 underline-offset-[3px]">
         Privacy Policy
       </Link>
       .

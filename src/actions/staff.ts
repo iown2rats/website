@@ -23,7 +23,42 @@ import type { StaffRole } from "@/server/staff/rules";
  * only as arguments here and in the email that carries them; none is ever returned to a caller or logged.
  */
 
-export type StaffResult<T = undefined> = ({ ok: true } & (T extends undefined ? { data?: undefined } : { data: T })) | { ok: false; message: string; field?: "email" | "password" | "reason" | "role" };
+export type StaffResult<T = undefined> =
+  | ({ ok: true } & (T extends undefined ? { data?: undefined } : { data: T }))
+  | {
+      ok: false;
+      message: string;
+      field?: "email" | "password" | "reason" | "role";
+      /** Seconds until a rate-limited form may be submitted again. The form waits; it never retries on its own. */
+      retryAfterSeconds?: number;
+    };
+
+/** Whole seconds until `retryAt`, floored at 1, so a cooldown never renders as "0s". */
+function cooldown(retryAt: Date | undefined, now: Date = new Date()): number | undefined {
+  if (!retryAt) return undefined;
+  return Math.max(1, Math.ceil((retryAt.getTime() - now.getTime()) / 1000));
+}
+
+/**
+ * The unauthenticated portal actions do not get to crash silently.
+ *
+ * `claimStaffInvite` and friends throw on a database fault, and an uncaught throw in a server action reaches the
+ * client as a rejected promise that the form's `.catch()` turns into nothing at all: no message, no spinner, no
+ * clue — so the person clicks again, and again, until the rate limiter finally says something. That is precisely
+ * how one broken index turned into twenty identical failures and a "Too many attempts" (docs/ARCHITECTURE.md
+ * §22.10). The fault code goes to the server log and, deliberately, into the sentence the visitor reads, because
+ * "tell an administrator it said P2002" is a thousand times more useful than "that didn't go through".
+ */
+function portalFailure(where: string, e: unknown): { ok: false; message: string } {
+  const code =
+    typeof e === "object" && e !== null && typeof (e as { code?: unknown }).code === "string"
+      ? (e as { code: string }).code
+      : e instanceof Error
+        ? e.name
+        : "UNKNOWN";
+  console.error(`[staff] ${where} failed`, { code, message: e instanceof Error ? e.message : String(e) });
+  return { ok: false, message: `Something went wrong at our end (${code}). Nothing was changed. Try again, and tell an administrator if it keeps happening.` };
+}
 
 function failure(e: unknown): { ok: false; message: string } {
   if (e instanceof AdminAccessError) return { ok: false, message: "Not authorized" };
@@ -53,24 +88,41 @@ async function sessionMeta() {
 export async function staffSignInAction(raw: { email: string; password: string }): Promise<StaffResult> {
   if (!(await assertSameOrigin())) return { ok: false, message: "That didn't go through. Try again." };
   const db = getDb();
-  const result = await signInStaff({ email: String(raw?.email ?? ""), password: String(raw?.password ?? "") }, { db, clientKey: await clientKey() });
-  if (!result.ok) return { ok: false, message: result.message, field: result.code === "INVALID_CREDENTIALS" ? "password" : undefined };
-  const session = await createSession(db, result.value.userId, await sessionMeta());
-  await setSessionCookie(session.token, session.expiresAt);
+  // `redirect()` throws by design, so it happens after the try block rather than inside it.
+  try {
+    const result = await signInStaff({ email: String(raw?.email ?? ""), password: String(raw?.password ?? "") }, { db, clientKey: await clientKey() });
+    if (!result.ok) {
+      return { ok: false, message: result.message, field: result.code === "INVALID_CREDENTIALS" ? "password" : undefined, retryAfterSeconds: cooldown(result.retryAt) };
+    }
+    const session = await createSession(db, result.value.userId, await sessionMeta());
+    await setSessionCookie(session.token, session.expiresAt);
+  } catch (e) {
+    return portalFailure("sign-in", e);
+  }
   redirect(ROUTES.staffHome);
 }
 
 /** Always reports the same thing, so the portal never confirms whether an address is staff. */
 export async function staffForgotPasswordAction(raw: { email: string }): Promise<StaffResult> {
   if (!(await assertSameOrigin())) return { ok: false, message: "That didn't go through. Try again." };
-  await requestStaffPasswordReset(String(raw?.email ?? ""), { db: getDb(), clientKey: await clientKey() });
+  try {
+    await requestStaffPasswordReset(String(raw?.email ?? ""), { db: getDb(), clientKey: await clientKey() });
+  } catch (e) {
+    return portalFailure("forgot-password", e);
+  }
   return { ok: true };
 }
 
 export async function staffResetPasswordAction(raw: { token: string; password: string }): Promise<StaffResult> {
   if (!(await assertSameOrigin())) return { ok: false, message: "That didn't go through. Try again." };
-  const result = await resetStaffPassword({ token: String(raw?.token ?? ""), password: String(raw?.password ?? "") }, { db: getDb(), clientKey: await clientKey() });
-  if (!result.ok) return { ok: false, message: result.message, field: result.code === "WEAK_PASSWORD" ? "password" : undefined };
+  try {
+    const result = await resetStaffPassword({ token: String(raw?.token ?? ""), password: String(raw?.password ?? "") }, { db: getDb(), clientKey: await clientKey() });
+    if (!result.ok) {
+      return { ok: false, message: result.message, field: result.code === "WEAK_PASSWORD" ? "password" : undefined, retryAfterSeconds: cooldown(result.retryAt) };
+    }
+  } catch (e) {
+    return portalFailure("reset-password", e);
+  }
   return { ok: true };
 }
 
@@ -78,10 +130,16 @@ export async function staffResetPasswordAction(raw: { token: string; password: s
 export async function staffSetPasswordAction(raw: { token: string; password: string }): Promise<StaffResult> {
   if (!(await assertSameOrigin())) return { ok: false, message: "That didn't go through. Try again." };
   const db = getDb();
-  const result = await claimStaffInvite({ token: String(raw?.token ?? ""), password: String(raw?.password ?? "") }, { db, clientKey: await clientKey() });
-  if (!result.ok) return { ok: false, message: result.message, field: result.code === "WEAK_PASSWORD" ? "password" : undefined };
-  const session = await createSession(db, result.userId, await sessionMeta());
-  await setSessionCookie(session.token, session.expiresAt);
+  try {
+    const result = await claimStaffInvite({ token: String(raw?.token ?? ""), password: String(raw?.password ?? "") }, { db, clientKey: await clientKey() });
+    if (!result.ok) {
+      return { ok: false, message: result.message, field: result.code === "WEAK_PASSWORD" ? "password" : undefined, retryAfterSeconds: cooldown(result.retryAt) };
+    }
+    const session = await createSession(db, result.userId, await sessionMeta());
+    await setSessionCookie(session.token, session.expiresAt);
+  } catch (e) {
+    return portalFailure("set-password", e);
+  }
   redirect(ROUTES.staffHome);
 }
 

@@ -1037,6 +1037,42 @@ constant-time compare — but a successful claim now runs the full conversion an
 of setting a role. `scripts/grant-admin.ts` is retired and points at `/admin/staff` and
 `scripts/convert-admin-to-staff.ts`.
 
+### 22.10 Re-inviting somebody who was revoked
+
+A revoked grant reserves nothing. `StaffGrant` has two partial unique indexes, and they must stay symmetrical:
+
+| Index | Column | Predicate |
+| --- | --- | --- |
+| `StaffGrant_email_open_key` | `email` | `status <> 'REVOKED'` |
+| `StaffGrant_claimedBy_open_key` | `claimedByUserId` | `claimedByUserId IS NOT NULL AND status <> 'REVOKED'` |
+
+One live grant per address and one live grant per account; any number of revoked ones, which is what keeps the
+history readable. `claimedByUserId` is therefore **not** unique on its own, so an account's authority is read with
+`findLiveStaffGrant()` (`src/server/staff/live-grant.ts`) and never with `findUnique({ claimedByUserId })` — an
+account can hold one live grant and several old ones, and `findUnique` would be a coin toss between them.
+
+This cost a real administrator an evening. `claimedByUserId` originally carried a plain unique index while `email`
+carried the partial one, so revoking freed the address but not the account. Re-inviting produced a PENDING grant
+that could never be claimed: the claim binds the new grant to the account the person already has, and the revoked
+row still held it. Every attempt died with P2002 on `StaffGrant_claimedByUserId_key`.
+
+**The failure was invisible, and that was the worse half.** `staffSetPasswordAction` had no `try`/`catch`, so the
+throw reached the form's `.catch(() => null)` and became nothing at all — no message, no error state, just a
+spinner that stopped. He clicked twenty times, each one a fresh P2002, until `staff:claim:<ip>` hit its twentieth
+attempt and said "Too many attempts. Try again in a little while." That sentence was the first thing the portal
+ever told him, and it described neither the problem nor anything he could act on.
+
+Three rules came out of it, and they apply to every unauthenticated portal action:
+
+- **An action that throws must still answer.** `portalFailure()` catches, logs, and returns the fault code in the
+  sentence the visitor reads. "Something went wrong at our end (P2002)" is worth a hundred silent spinners.
+  `redirect()` throws by design, so it is called *after* the `try` block rather than caught by it.
+- **The guard is a ref, not state.** `createSubmitLock()` (`src/lib/submit-lock.ts`) is taken and released
+  synchronously, because two submit events in one tick both read a stale `busy`. One click, one request.
+- **A 429 starts a cooldown, never a retry.** The rate limiter's `retryAt` reaches the form as
+  `retryAfterSeconds`; the form counts it down with the submit button disabled and sends nothing meanwhile. The
+  answer to hitting a rate limit is never to raise the limit.
+
 ## 15. Security controls summary
 
 | Threat | Control |

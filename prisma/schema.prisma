@@ -363,7 +363,7 @@ model User {
   contactHashes         ContactHash[]
   auditLogs             AuditLog[]
 
-  staffGrant          StaffGrant?   @relation("StaffGrantHolder")
+  staffGrants         StaffGrant[]  @relation("StaffGrantHolder")
   staffGrantsCreated  StaffGrant[]  @relation("StaffGrantCreator")
   staffGrantsRevoked  StaffGrant[]  @relation("StaffGrantRevoker")
   staffInvitesCreated StaffInvite[] @relation("StaffInviteCreator")
@@ -402,8 +402,12 @@ model StaffGrant {
   status          StaffGrantStatus @default(PENDING)
   createdById     String?
   createdAt       DateTime         @default(now())
-  /// The account that claimed this grant. Unique: one account never holds two grants.
-  claimedByUserId String?          @unique
+  /// The account that claimed this grant. One account never holds two LIVE grants, which is enforced by the
+  /// partial unique index `StaffGrant_claimedBy_open_key` (... WHERE status <> 'REVOKED') rather than by a plain
+  /// unique column. A revoked grant is history and must not reserve the account, exactly as a revoked grant does
+  /// not reserve the address — see `StaffGrant_email_open_key`. Read a live grant with findLiveStaffGrant(), never
+  /// with findUnique({ claimedByUserId }), because an account can hold one live grant and any number of old ones.
+  claimedByUserId String?
   claimedAt       DateTime?
   revokedById     String?
   revokedAt       DateTime?

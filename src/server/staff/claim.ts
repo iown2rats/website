@@ -18,13 +18,20 @@ import { AUDIT_ACTIONS, writeAudit } from "@/server/admin/audit";
 import { hashPassword, validatePassword } from "@/server/auth/password";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { consumeStaffInvite, peekStaffInvite } from "./invites";
+import { findOpenStaffGrant } from "./live-grant";
 import { isStaffRole, STAFF_RULES, type StaffRole } from "./rules";
 
 const EMAIL_PROVIDER = "EMAIL" as const;
 
 export type ClaimResult =
   | { ok: true; userId: string; email: string; role: StaffRole; created: boolean }
-  | { ok: false; code: "INVALID_TOKEN" | "WEAK_PASSWORD" | "RATE_LIMITED" | "MEMBER_ACCOUNT"; message: string };
+  | {
+      ok: false;
+      code: "INVALID_TOKEN" | "WEAK_PASSWORD" | "RATE_LIMITED" | "MEMBER_ACCOUNT" | "ALREADY_STAFF";
+      message: string;
+      /** Only on RATE_LIMITED: when the window resets, so the form can show a real cooldown instead of guessing. */
+      retryAt?: Date;
+    };
 
 const INVALID = {
   ok: false as const,
@@ -77,7 +84,9 @@ export async function claimStaffInvite(input: { token: string; password: string 
 
   if (deps.clientKey) {
     const limit = await consumeRateLimit(db, `staff:claim:${deps.clientKey}`, STAFF_RULES.claimAttemptsPerClientHour, 3_600_000, now);
-    if (!limit.allowed) return { ok: false, code: "RATE_LIMITED", message: "Too many attempts. Try again in a little while." };
+    if (!limit.allowed) {
+      return { ok: false, code: "RATE_LIMITED", message: "Too many attempts. Try again in a little while.", retryAt: limit.retryAt };
+    }
   }
 
   const weak = validatePassword(input?.password ?? "");
@@ -175,6 +184,22 @@ export async function claimStaffInvite(input: { token: string; password: string 
           lastLoginAt: now,
         },
       });
+    }
+
+    /*
+     * One live grant per account. A REVOKED grant does not reserve the account — that is the whole point of the
+     * partial index `StaffGrant_claimedBy_open_key`, and it is what lets a revoked colleague be re-invited and
+     * claim the invitation onto the account they already have. What is still refused is binding a second OPEN
+     * grant to one account, and it is refused here with a sentence rather than left to surface as a unique
+     * violation, because a crash on this path tells the visitor nothing at all.
+     */
+    const alreadyOpen = await findOpenStaffGrant(tx, userId);
+    if (alreadyOpen && alreadyOpen.id !== grant.grantId) {
+      return {
+        ok: false as const,
+        code: "ALREADY_STAFF" as const,
+        message: "That account already has a staff authorisation. Ask an administrator to revoke the old one first.",
+      };
     }
 
     await tx.staffGrant.update({

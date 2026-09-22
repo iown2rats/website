@@ -16,7 +16,7 @@ export default async function AdminSettingsPage() {
   const db = getDb();
   const [identity, grant] = await Promise.all([
     db.authIdentity.findFirst({ where: { userId: admin.userId, provider: "EMAIL", releasedAt: null }, select: { email: true, passwordUpdatedAt: true, lastLoginAt: true } }),
-    db.staffGrant.findUnique({ where: { claimedByUserId: admin.userId }, select: { role: true, claimedAt: true, createdBy: { select: { identities: { where: { releasedAt: null }, select: { email: true }, take: 1 } } } } }),
+    db.staffGrant.findFirst({ where: { claimedByUserId: admin.userId, status: "ACTIVE" }, select: { role: true, claimedAt: true, createdBy: { select: { identities: { where: { releasedAt: null }, select: { email: true }, take: 1 } } } } }),
   ]);
   const fmt = (d: Date | null | undefined) => (d ? d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
   return (

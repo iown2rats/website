@@ -19,6 +19,7 @@ import { AUDIT_ACTIONS, writeAudit } from "@/server/admin/audit";
 import { consumeAuthToken, issueAuthToken, TOKEN_TTL_MS } from "@/server/auth/auth-tokens";
 import { hashPassword, validatePassword, verifyPassword } from "@/server/auth/password";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { findLiveStaffGrant } from "./live-grant";
 import { isPlausibleEmail, isStaffRole, normalizeStaffEmail, STAFF_RULES, type StaffRole } from "./rules";
 
 const EMAIL_PROVIDER = "EMAIL" as const;
@@ -27,7 +28,14 @@ const GENERIC_RATE_LIMIT = "Too many attempts. Try again in a little while.";
 
 export type StaffAuthResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? { value?: undefined } : { value: T }))
-  | { ok: false; code: "INVALID_CREDENTIALS" | "RATE_LIMITED" | "WEAK_PASSWORD" | "INVALID_TOKEN"; message: string; field?: "email" | "password" };
+  | {
+      ok: false;
+      code: "INVALID_CREDENTIALS" | "RATE_LIMITED" | "WEAK_PASSWORD" | "INVALID_TOKEN";
+      message: string;
+      field?: "email" | "password";
+      /** Only on RATE_LIMITED: when the window resets, so the form can show a real cooldown instead of guessing. */
+      retryAt?: Date;
+    };
 
 export interface StaffAuthDeps {
   db: Db;
@@ -78,8 +86,13 @@ export async function signInStaff(input: { email: string; password: string }, de
   const perEmail = await consumeRateLimit(db, `staff:login:email:${email}`, STAFF_RULES.loginAttemptsPerEmail, STAFF_RULES.loginWindowMs, now);
   const perClient = deps.clientKey
     ? await consumeRateLimit(db, `staff:login:client:${deps.clientKey}`, STAFF_RULES.loginAttemptsPerClient, STAFF_RULES.loginWindowMs, now)
-    : { allowed: true };
-  if (!perEmail.allowed || !perClient.allowed) return { ok: false, code: "RATE_LIMITED", message: GENERIC_RATE_LIMIT };
+    : null;
+  if (!perEmail.allowed || (perClient && !perClient.allowed)) {
+    // The later of the two windows: telling somebody to come back before the limit actually lifts just invites
+    // another refused attempt, which is exactly the traffic a rate limit is trying to stop.
+    const retryAt = new Date(Math.max(perEmail.allowed ? 0 : perEmail.retryAt.getTime(), perClient && !perClient.allowed ? perClient.retryAt.getTime() : 0));
+    return { ok: false, code: "RATE_LIMITED", message: GENERIC_RATE_LIMIT, retryAt };
+  }
 
   const identity = email
     ? await db.authIdentity.findUnique({
@@ -99,11 +112,8 @@ export async function signInStaff(input: { email: string; password: string }, de
   const { user } = identity;
   if (user.accountType !== "STAFF" || user.status !== "ACTIVE" || !isStaffRole(user.role)) return fail;
 
-  const grant = await db.staffGrant.findUnique({
-    where: { claimedByUserId: identity.userId },
-    select: { status: true, role: true },
-  });
-  if (!grant || grant.status !== "ACTIVE" || !isStaffRole(grant.role)) return fail;
+  const grant = await findLiveStaffGrant(db, identity.userId);
+  if (!grant || !isStaffRole(grant.role)) return fail;
 
   if (check.needsRehash) {
     const passwordHash = await hashPassword(input.password);
@@ -142,8 +152,7 @@ export async function requestStaffPasswordReset(rawEmail: string, deps: StaffAut
   });
   if (!identity || !identity.passwordHash || identity.releasedAt !== null) return { ok: true };
   if (identity.user.accountType !== "STAFF" || identity.user.status !== "ACTIVE") return { ok: true };
-  const grant = await db.staffGrant.findUnique({ where: { claimedByUserId: identity.userId }, select: { status: true } });
-  if (grant?.status !== "ACTIVE") return { ok: true };
+  if (!(await findLiveStaffGrant(db, identity.userId))) return { ok: true };
 
   const { token } = await issueAuthToken(db, { identityId: identity.id, purpose: "PASSWORD_RESET" }, now);
   await deliver(provider, identity.email ?? email, staffPasswordResetEmail(staffResetUrl(token), TOKEN_TTL_MS.PASSWORD_RESET / 60_000));
@@ -171,8 +180,7 @@ export async function resetStaffPassword(input: { token: string; password: strin
   });
   if (!identity || identity.provider !== EMAIL_PROVIDER || identity.user.status === "DELETED") return invalid;
   if (identity.user.accountType !== "STAFF") return invalid;
-  const grant = await db.staffGrant.findUnique({ where: { claimedByUserId: identity.userId }, select: { status: true } });
-  if (grant?.status !== "ACTIVE") return invalid;
+  if (!(await findLiveStaffGrant(db, identity.userId))) return invalid;
 
   const passwordHash = await hashPassword(input.password);
   await db.authIdentity.update({ where: { id: identity.id }, data: { passwordHash, passwordUpdatedAt: now } });
@@ -192,6 +200,6 @@ export async function resetStaffPassword(input: { token: string; password: strin
 
 /** Whether an account is a live staff account. Used by the guards and by the tests. */
 export async function isLiveStaff(db: DbLike, userId: string): Promise<boolean> {
-  const grant = await db.staffGrant.findUnique({ where: { claimedByUserId: userId }, select: { status: true, role: true } });
-  return grant?.status === "ACTIVE" && isStaffRole(grant.role);
+  const grant = await findLiveStaffGrant(db, userId);
+  return grant !== null && isStaffRole(grant.role);
 }

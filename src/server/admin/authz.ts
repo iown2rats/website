@@ -15,6 +15,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
+import { findLiveStaffGrant } from "@/server/staff/live-grant";
 import { getAuthState } from "@/server/auth/current-user";
 import type { Actor } from "@/server/actor";
 
@@ -59,8 +60,8 @@ export const getAdminActor = cache(async (): Promise<AdminActor | null> => {
   if (state.kind !== "staff") return null;
   const actor = adminActorFrom(state.user);
   if (!actor) return null;
-  const grant = await getDb().staffGrant.findUnique({ where: { claimedByUserId: actor.userId }, select: { status: true, role: true } });
-  if (!grant || grant.status !== "ACTIVE" || !isAdminRole(grant.role)) return null;
+  const grant = await findLiveStaffGrant(getDb(), actor.userId);
+  if (!grant || !isAdminRole(grant.role)) return null;
   // The grant is the authority; the mirrored column is a convenience. If they ever disagree, believe the grant.
   return { userId: actor.userId, role: grant.role };
 });

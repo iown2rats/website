@@ -371,6 +371,11 @@ model User {
   welcomeCovers      WelcomeCover[]      @relation("WelcomeCoverCreator")
   welcomeCoverAssets WelcomeCoverAsset[] @relation("WelcomeCoverAssetCreator")
 
+  // Analytics (docs/ARCHITECTURE.md §30). SetNull on delete, so deleting an account severs the link without
+  // destroying the aggregate history — the rows survive as anonymous traffic, which is what they always were.
+  visitorSessions VisitorSession[]
+  analyticsEvents AnalyticsEvent[]
+
   @@index([status, onboardingCompletedAt])
   @@index([lastActiveAt])
   @@index([accountType])
@@ -1538,4 +1543,132 @@ model WelcomeCover {
 
   /// The selection query: PUBLISHED rows whose window contains "now".
   @@index([status, startsAt, endsAt])
+}
+
+// ─────────────────────────── Website analytics (docs/ARCHITECTURE.md §30) ───────────────────────────
+//
+// First-party, privacy-bounded traffic measurement. THREE THINGS ARE DELIBERATELY ABSENT FROM THESE TABLES and
+// their absence is the design: there is no IP column, no User-Agent column, and no fingerprint of any kind. What
+// is stored is what an aggregate report needs — coarse buckets and opaque server-minted ids — and nothing that
+// could re-identify a visitor who is not signed in.
+
+/// Where a session came from. Best-effort: browsers, in-app webviews and privacy tools all suppress referrers, so
+/// DIRECT genuinely means "no referrer was offered" rather than "the visitor typed the address".
+enum TrafficSource {
+  DIRECT
+  GOOGLE
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  TWITTER
+  SNAPCHAT
+  YOUTUBE
+  WHATSAPP
+  TELEGRAM
+  LINKEDIN
+  REDDIT
+  BING
+  EMAIL
+  OTHER
+}
+
+enum DeviceKind {
+  MOBILE
+  TABLET
+  DESKTOP
+  UNKNOWN
+}
+
+enum AnalyticsEventType {
+  PAGE_VIEW
+  SESSION_START
+  SIGNUP_STARTED
+  SIGNUP_COMPLETED
+  LOGIN
+  ONBOARDING_COMPLETED
+}
+
+/// One browser that has visited, identified only by an id this server minted. Nothing here is derived from the
+/// visitor: not their address, not their device, not their behaviour. The row exists to answer "new or returning",
+/// which is the only question that needs memory across sessions.
+model Visitor {
+  id           String   @id @default(cuid(2))
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+  sessionCount Int      @default(1)
+
+  sessions VisitorSession[]
+  events   AnalyticsEvent[]
+
+  @@index([lastSeenAt])
+  @@index([firstSeenAt])
+}
+
+/// A visit: one browsing spell, ended by 30 minutes of inactivity (PRODUCT.ANALYTICS.sessionIdleMs). Dimensions
+/// are resolved once, on the landing request, because that is when the referrer exists and because a session's
+/// device does not change halfway through.
+model VisitorSession {
+  id        String  @id @default(cuid(2))
+  visitorId String
+  /// Set ONLY from a valid server-side session cookie, never from anything the client claims. Null for everyone
+  /// who is not signed in, and never guessed at.
+  userId    String?
+
+  startedAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  source       TrafficSource @default(DIRECT)
+  /// Host only — never the full referring URL, whose path and query routinely carry personal data.
+  referrerHost String?
+  device       DeviceKind    @default(UNKNOWN)
+  /// Coarse family ("Chrome", "Safari"), never a version string: a version is a fingerprinting bit.
+  browser      String?
+  os           String?
+  /// Two-letter country from the edge, where the platform provides it. Never a city, region or coordinate.
+  country      String?
+  /// The normalised path of the first page seen (see src/lib/analytics/classify.ts): no query, no hash, and
+  /// dynamic segments collapsed to `:id` so a chat or post identifier never lands in analytics.
+  landingPath  String?
+  isReturning  Boolean       @default(false)
+  /// Staff traffic. Kept rather than discarded so an operator session is auditable, and excluded from every
+  /// figure the Analytics screen reports.
+  excluded     Boolean       @default(false)
+
+  visitor Visitor          @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  user    User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  events  AnalyticsEvent[]
+
+  @@index([visitorId])
+  @@index([startedAt])
+  @@index([lastSeenAt])
+  @@index([excluded, startedAt])
+  @@index([userId])
+}
+
+/// One recorded event.
+///
+/// `eventKey` IS the duplicate protection. The client mints one per navigation and the insert is
+/// `ON CONFLICT DO NOTHING`, so a double-invoked effect, a retried request, a replayed beacon and a reconnecting
+/// client all collide on the same key and exactly one row survives. Nothing counts, compares timestamps or trusts
+/// a flag — the constraint decides.
+model AnalyticsEvent {
+  id        String             @id @default(cuid(2))
+  eventKey  String             @unique
+  sessionId String
+  visitorId String
+  userId    String?
+  type      AnalyticsEventType
+  /// Normalised path only. Never a query string, never a fragment.
+  path      String?
+  createdAt DateTime           @default(now())
+
+  session VisitorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  visitor Visitor        @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@index([sessionId])
+  @@index([visitorId])
+  @@index([path, createdAt])
 }

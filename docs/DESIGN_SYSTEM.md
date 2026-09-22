@@ -1014,3 +1014,15 @@ Six category rows appear underneath **only once the master switch is on** — Me
 The block renders `null` — no placeholder, no "not supported on this device" row — when the runtime has no Push API or the deployment has no VAPID keys. Detection is `useSyncExternalStore` over `serviceWorker`/`PushManager`/`Notification`, so the server snapshot is `false` and the block is absent from the HTML: it appears on the client only where it can actually work, with no flash of a control that then vanishes. A user-agent test would have been the assumption §28.5 warns about.
 
 Refusals are stated, never silent. A browser-level block says so (*"Your browser is blocking notifications for Mellocrush"*) rather than flipping the switch back with no explanation, which is the one failure a toggle cannot express on its own.
+
+## 42. Admin → Analytics (2026-09-22)
+
+Built entirely from the existing admin kit — `AdminPage`, `Panel`, `StatCard`, `StatGrid`, `FilterLinks`, `DefinitionList` — so it reads as another admin screen rather than a dashboard product bolted on. No chart library, no client JavaScript: the charts are server-rendered HTML and CSS, on a screen that is read far more often than it is interacted with.
+
+**Two single-series charts, never one with two axes.** Visitors and page views are different measures on different scales. Sharing an axis would make one of them a decoration; giving them separate axes in one frame is the classic way to imply a correlation the data does not contain. Two small multiples over the same x-axis let them be compared honestly, and each needs no legend because its own title names it. Colour carries no meaning here — a single series has nothing to be told apart from — so bars wear the brand accent and every number stays in ordinary text ink.
+
+Empty buckets are drawn as a 2px stub rather than omitted: a chart built only from the buckets that exist compresses a quiet night out of the axis and makes traffic look continuous when it was not. The gaps are part of the answer.
+
+Every chart carries a **View as table** disclosure holding the same numbers. A chart that a screen reader cannot read is half a chart, and the bars themselves are `aria-hidden` rather than announced as a meaningless list of values.
+
+The screen ends with a plain-language **"What is and is not measured"** panel, and every stat carries a `hint` that says what it does *not* mean — that a person on two devices counts twice, that "Direct" includes every suppressed referrer, that conversion is approximate. A number without its caveat is the thing that gets misread in a meeting six weeks later.

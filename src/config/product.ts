@@ -190,6 +190,43 @@ export const PRESENCE = {
 /**
  * Push delivery (docs/ARCHITECTURE.md §29). Anti-noise, not monetization: none of this differs by tier.
  */
+/**
+ * Website analytics (docs/ARCHITECTURE.md §30). Measurement only: none of this differs by tier, and nothing here
+ * changes what a member sees.
+ */
+export const ANALYTICS = {
+  /**
+   * A visit ends after this much silence. Thirty minutes is the long-standing web-analytics convention and it is
+   * the number the Analytics screen explains to the operator, so the code and the label cannot drift.
+   */
+  sessionIdleMs: 30 * 60_000,
+  /** How long a returning visitor is remembered. Chrome caps cookie lifetime at 400 days; asking for more is discarded. */
+  visitorCookieDays: 365,
+  /** "Live now" window. Matches PRESENCE.activeWithinMs so signed-in and anonymous liveness mean the same thing. */
+  liveWithinMs: 5 * 60_000,
+  /** Raw events older than this are deleted (docs/ARCHITECTURE.md §30.5). Aggregated history is unaffected. */
+  retentionDays: 90,
+  /** Rows deleted per retention pass, so a purge is bounded and never holds a long lock. */
+  purgeBatchSize: 5_000,
+  /** Passes per invocation. batch x passes is the most one call can remove. */
+  purgeMaxBatches: 20,
+  /** At most one purge per this interval when kicked from ordinary admin traffic; the cron is not gated. */
+  purgeEveryMs: 24 * 3_600_000,
+  /** Events one known visitor may record per minute. Generous for real browsing, closed to a script. */
+  eventsPerMinute: 120,
+  /**
+   * New visitors that may be created per minute, across everybody.
+   *
+   * A caller with no cookie cannot be rate-limited individually without reading an address, and reading one is
+   * exactly what this feature refuses to do. So the creation of brand-new visitor rows is capped as a whole. The
+   * ceiling is far above real traffic here and the failure mode is benign — an unmeasured visit, never a broken
+   * page — which is the right way round for a courtesy feature.
+   */
+  newVisitorsPerMinute: 300,
+  /** Rows in the "recent activity" table and in each breakdown. */
+  listSize: 12,
+} as const;
+
 export const PUSH = {
   /**
    * How long after a notification is created it is still worth pushing. A notification found by the sweep hours

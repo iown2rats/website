@@ -25,7 +25,7 @@ export interface AdminNavBadges {
 }
 
 interface NavItem {
-  key: keyof AdminNavBadges | "dashboard" | "users" | "plans" | "methods" | "subscriptions" | "audit" | "staff" | "settings" | "welcome";
+  key: keyof AdminNavBadges | "dashboard" | "analytics" | "users" | "plans" | "methods" | "subscriptions" | "audit" | "staff" | "settings" | "welcome";
   label: string;
   href: string;
   Icon: ComponentType<IconProps>;
@@ -34,7 +34,13 @@ interface NavItem {
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
-  { title: "Overview", items: [{ key: "dashboard", label: "Dashboard", href: "/admin", Icon: InfoIcon, permission: "dashboard.view", exact: true }] },
+  {
+    title: "Overview",
+    items: [
+      { key: "dashboard", label: "Dashboard", href: "/admin", Icon: InfoIcon, permission: "dashboard.view", exact: true },
+      { key: "analytics", label: "Analytics", href: "/admin/analytics", Icon: WavesIcon, permission: "analytics.view" },
+    ],
+  },
   {
     title: "People",
     items: [

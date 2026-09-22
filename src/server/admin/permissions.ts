@@ -6,6 +6,7 @@ export type AdminRole = "MODERATOR" | "ADMIN";
 
 export type Permission =
   | "dashboard.view"
+  | "analytics.view"
   | "users.view"
   | "users.moderate"
   | "users.role"
@@ -22,6 +23,7 @@ export type Permission =
 
 const ALL_PERMISSIONS: readonly Permission[] = [
   "dashboard.view",
+  "analytics.view",
   "users.view",
   "users.moderate",
   "users.role",
@@ -37,6 +39,11 @@ const ALL_PERMISSIONS: readonly Permission[] = [
   "welcome-cover.manage",
 ];
 
+/**
+ * `analytics.view` is ADMIN only, deliberately. A moderator's job is the safety and verification queues; site
+ * traffic, acquisition and conversion are not needed to do it, and the Analytics screen is the one place where
+ * visits by people who never signed in are visible at all. Fewer eyes on it is the whole point.
+ */
 export const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
   ADMIN: ALL_PERMISSIONS,
   MODERATOR: ["dashboard.view", "users.view", "users.moderate", "reports.act", "verification.act", "photos.moderate"],

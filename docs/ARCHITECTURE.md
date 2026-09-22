@@ -1064,9 +1064,12 @@ ever told him, and it described neither the problem nor anything he could act on
 
 Three rules came out of it, and they apply to every unauthenticated portal action:
 
-- **An action that throws must still answer.** `portalFailure()` catches, logs, and returns the fault code in the
-  sentence the visitor reads. "Something went wrong at our end (P2002)" is worth a hundred silent spinners.
-  `redirect()` throws by design, so it is called *after* the `try` block rather than caught by it.
+- **An action that throws must still answer.** `portalFailure()` catches, logs the fault code and stack, and
+  returns one plain sentence: "Something went wrong at our end. Nothing was changed. Please try again." The
+  diagnostic detail stays in the server log — these actions are unauthenticated, and a code like `P2002` would
+  tell a stranger which constraint their input collided with. Saying *that* something failed and that nothing
+  changed is the part that was missing; saying *what* failed is for the log. `redirect()` throws by design, so it
+  is called *after* the `try` block rather than caught by it.
 - **The guard is a ref, not state.** `createSubmitLock()` (`src/lib/submit-lock.ts`) is taken and released
   synchronously, because two submit events in one tick both read a stale `busy`. One click, one request.
 - **A 429 starts a cooldown, never a retry.** The rate limiter's `retryAt` reaches the form as

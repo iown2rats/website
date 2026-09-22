@@ -46,8 +46,14 @@ function cooldown(retryAt: Date | undefined, now: Date = new Date()): number | u
  * client as a rejected promise that the form's `.catch()` turns into nothing at all: no message, no spinner, no
  * clue — so the person clicks again, and again, until the rate limiter finally says something. That is precisely
  * how one broken index turned into twenty identical failures and a "Too many attempts" (docs/ARCHITECTURE.md
- * §22.10). The fault code goes to the server log and, deliberately, into the sentence the visitor reads, because
- * "tell an administrator it said P2002" is a thousand times more useful than "that didn't go through".
+ * §22.10).
+ *
+ * The diagnostic detail — the Prisma fault code, the error name, the message, the stack — goes to the SERVER LOG
+ * and stops there. The visitor gets one plain sentence. These actions are unauthenticated: anybody at all can
+ * reach them, and an internal code like `P2002` tells a stranger which constraint their input just collided with,
+ * which is a free probe into the schema. The sentence still does the one job that was missing, which is to say
+ * that something happened and that nothing was changed; the code lives in the log, where the person who can act
+ * on it will look.
  */
 function portalFailure(where: string, e: unknown): { ok: false; message: string } {
   const code =
@@ -56,8 +62,8 @@ function portalFailure(where: string, e: unknown): { ok: false; message: string 
       : e instanceof Error
         ? e.name
         : "UNKNOWN";
-  console.error(`[staff] ${where} failed`, { code, message: e instanceof Error ? e.message : String(e) });
-  return { ok: false, message: `Something went wrong at our end (${code}). Nothing was changed. Try again, and tell an administrator if it keeps happening.` };
+  console.error(`[staff] ${where} failed`, { code, message: e instanceof Error ? e.message : String(e), stack: e instanceof Error ? e.stack : undefined });
+  return { ok: false, message: "Something went wrong at our end. Nothing was changed. Please try again." };
 }
 
 function failure(e: unknown): { ok: false; message: string } {

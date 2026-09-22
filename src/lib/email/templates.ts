@@ -90,3 +90,45 @@ export function newMessageEmail(fromName: string, url: string, more: number): Om
     html: shell(heading, body, { label: "Open Mellocrush", url }, footer),
   };
 }
+
+/**
+ * "You have a new match" (docs/ARCHITECTURE.md §12.16b).
+ *
+ * DELIBERATELY NAMES NOBODY, which is a departure from the message email above and worth saying why. A message
+ * email names its sender because the recipient already knows them — they are matched and talking. A match email
+ * announces a NEW connection, and the person's name and photo are the interesting part of that: precisely the
+ * part that belongs behind a sign-in rather than in an inbox that may be shared, synced, previewed on a lock
+ * screen or read at work. The count of one is all this needs to do its job, which is to get the app opened.
+ */
+export function newMatchEmail(url: string): Omit<EmailMessage, "to"> {
+  const heading = "You have a new match";
+  const body = `Someone you liked on ${BRAND} liked you back. Open the app to see who it is and say hello.`;
+  const footer = `You're getting this because match notifications are on. You can turn them off in Settings → Notifications.`;
+  return {
+    subject: `You have a new match on ${BRAND} 💗`,
+    text: `${heading}\n\n${body}\n\n${url}\n\n${footer}`,
+    html: shell(heading, body, { label: "View your match", url }, footer),
+  };
+}
+
+/**
+ * The likes digest (docs/ARCHITECTURE.md §12.16c).
+ *
+ * A COUNT AND NOTHING ELSE, for everybody, Plus included. Who likes you is the paywall (§12.5); naming them in an
+ * email would hand the feature to every Free member's inbox, and naming them only for Plus members would put the
+ * answer somewhere the entitlement cannot be re-checked when the mail is actually read — a subscription can lapse
+ * between sending and opening. A number is true whoever reads it.
+ */
+export function newLikesEmail(count: number, url: string): Omit<EmailMessage, "to"> {
+  const one = count === 1;
+  const heading = one ? "You have a new like" : `You have ${count} new likes`;
+  const body = one
+    ? `Someone liked your profile on ${BRAND}. Open the app to see who.`
+    : `${count} people liked your profile on ${BRAND}. Open the app to see who.`;
+  const footer = `You're getting this because like notifications are on. You can turn them off in Settings → Notifications.`;
+  return {
+    subject: one ? `You have a new like on ${BRAND} 👀` : `You have ${count} new likes on ${BRAND} 👀`,
+    text: `${heading}\n\n${body}\n\n${url}\n\n${footer}`,
+    html: shell(heading, body, { label: "See your likes", url }, footer),
+  };
+}

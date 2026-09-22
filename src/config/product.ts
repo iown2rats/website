@@ -269,6 +269,41 @@ export const MESSAGE_EMAIL = {
   giveUpAfterMs: 7 * 24 * 3_600_000,
 } as const;
 
+/**
+ * "You have a new match" email (docs/ARCHITECTURE.md §12.16b).
+ *
+ * A match happens once, so the cooldown is not really a rate limit — it is belt-and-braces duplicate protection
+ * on top of the NEW_MATCH notification row, which is already one per (member, conversation).
+ */
+export const MATCH_EMAIL = {
+  /** One email per match, for a week. A match cannot happen twice, so this only ever catches a bug or a replay. */
+  perMatchCooldownMs: 7 * 24 * 3_600_000,
+  sweepEveryMs: 60_000,
+  batchSize: 25,
+  /** Older than this and the moment has passed; the match is still waiting in the app. */
+  giveUpAfterMs: 3 * 24 * 3_600_000,
+} as const;
+
+/**
+ * The likes DIGEST email (docs/ARCHITECTURE.md §12.16c).
+ *
+ * Deliberately not one email per like. Likes arrive in bursts and are the easiest notification to make annoying;
+ * a digest says how many are waiting and nothing else. It also never names anybody — who liked you is what Plus
+ * sells (§12.5), and an email is not an authenticated surface, so the count is all it may carry for anyone.
+ */
+export const LIKE_EMAIL = {
+  /** Fewest unread likes worth an email. One is still worth knowing about; the window below stops it repeating. */
+  minLikes: 1,
+  /** At most one digest per member per day, however many likes arrive. */
+  digestEveryMs: 24 * 3_600_000,
+  /** Likes must have been waiting this long, so a digest never lands while the member is mid-session. */
+  unreadForMs: 30 * 60_000,
+  sweepEveryMs: 60_000,
+  batchSize: 25,
+  /** Likes older than this no longer count towards a digest. */
+  giveUpAfterMs: 7 * 24 * 3_600_000,
+} as const;
+
 export const NOTIFICATION_FEED = {
   dropdownSize: 5,
   pageSize: 20,

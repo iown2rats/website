@@ -25,6 +25,7 @@ import { newMessageEmail } from "@/lib/email/templates";
 import { emailDeliveryConfigured, getEnv } from "@/lib/env";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { isMemberPresent, isPresent } from "@/server/presence";
+import { logEmailOutcome, resolveEmailRecipient, warnEmailUnconfigured } from "./email-recipient";
 
 export type DeliveryOutcome = "sent" | "no-address" | "notifications-off" | "throttled" | "failed";
 
@@ -36,17 +37,12 @@ async function deliverMessageEmail(
   db: DbLike,
   input: { recipientId: string; conversationId: string; now: Date },
 ): Promise<DeliveryOutcome> {
-  const recipient = await db.user.findFirst({
-    where: { id: input.recipientId, status: "ACTIVE", deletedAt: null, accountType: "MEMBER" },
-    select: {
-      notificationSettings: { select: { messages: true } },
-      identities: { select: { email: true }, where: { email: { not: null } }, take: 1 },
-    },
-  });
-  if (!recipient) return "notifications-off";
-  if ((recipient.notificationSettings?.messages ?? true) === false) return "notifications-off";
-  const address = recipient.identities[0]?.email;
-  if (!address) return "no-address";
+  const recipient = await resolveEmailRecipient(db, input.recipientId, "messages");
+  if (!recipient.ok) {
+    logEmailOutcome("message", recipient.reason, input.recipientId);
+    return recipient.reason;
+  }
+  const address = recipient.address;
 
   // Counted before sending, so a provider failure cannot turn into a retry storm against a struggling provider.
   const gate = await consumeRateLimit(
@@ -76,6 +72,9 @@ async function deliverMessageEmail(
     await getEmailProvider().send({ to: address, ...message });
     return "sent";
   } catch {
+    // The error itself is not logged: a provider error can quote the recipient's address back at us, and an
+    // address is exactly what these logs must not hold. The outcome and the internal id are enough to chase.
+    logEmailOutcome("message", "failed", input.recipientId);
     return "failed";
   }
 }
@@ -91,7 +90,10 @@ export async function notifyAwayRecipient(
 ): Promise<DeliveryOutcome | "present" | "not-configured"> {
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
-  if (!emailDeliveryConfigured()) return "not-configured";
+  if (!emailDeliveryConfigured()) {
+    warnEmailUnconfigured("message emails");
+    return "not-configured";
+  }
   if (await isMemberPresent(db, input.recipientId, now)) return "present";
   return deliverMessageEmail(db, { ...input, now });
 }
@@ -116,7 +118,10 @@ export interface SweepResult {
 export async function sweepUnreadMessageEmails(options: { db?: Db; now?: Date; force?: boolean } = {}): Promise<SweepResult> {
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
-  if (!emailDeliveryConfigured()) return { sent: 0, skipped: 0, throttled: false };
+  if (!emailDeliveryConfigured()) {
+    warnEmailUnconfigured("message emails");
+    return { sent: 0, skipped: 0, throttled: false };
+  }
 
   if (!options.force) {
     const gate = await consumeRateLimit(db, "email:message:sweep", 1, MESSAGE_EMAIL.sweepEveryMs, now);

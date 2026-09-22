@@ -9,6 +9,7 @@ import { requireActiveUser } from "@/server/auth/current-user";
 import { getDiscoverAside } from "@/server/matching/aside";
 import { getNavBadges } from "@/server/notifications/badges";
 import { countUnreadNotifications } from "@/server/notifications/feed";
+import { kickEngagementEmailSweeps } from "@/server/notifications/engagement-email";
 import { kickMessageEmailSweep } from "@/server/notifications/message-email";
 import { kickPushSweep } from "@/server/notifications/push";
 import { touchPresence } from "@/server/presence";
@@ -29,6 +30,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
    */
   await touchPresence(getDb(), actor.userId);
   kickMessageEmailSweep();
+  // Match emails and the once-a-day likes digest, each behind its own one-per-minute gate, never awaited.
+  kickEngagementEmailSweeps();
   /*
    * The push safety net, on the same terms as the email one: behind its own one-per-minute gate, never awaited.
    *

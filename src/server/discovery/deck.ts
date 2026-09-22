@@ -11,6 +11,7 @@ import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provi
 import type { Actor } from "@/server/actor";
 import { getBoostAllowance, getEntitlements, getLikeAllowance, type LikeAllowance } from "@/server/entitlements";
 import { likeUser, passUser, undoLastPass, type LikeResult } from "@/server/likes/like";
+import { kickMatchEmail } from "@/server/notifications/engagement-email";
 import { kickPush } from "@/server/notifications/push";
 import { buildDiscoveryCards, isDemoKey, type DiscoveryCardDto } from "./dto";
 import { countAwaitingPhotoReview, countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate } from "./query";
@@ -158,6 +159,12 @@ export async function likeByHandle(actor: Actor, handle: string, deps: DeckDeps 
    * for it. Nothing is kicked for the actor, who is by definition in the app right now.
    */
   kickPush(targetId, { db });
+  /*
+   * And the match email, on the same terms: after the transaction, never awaited (ARCHITECTURE §12.16b). Only the
+   * TARGET is kicked — the actor is, by definition, in the app this very second, so a send for them would be a
+   * round trip that could only answer "present". The sweep collects them if they leave without opening it.
+   */
+  if (result.matched && result.conversationId) kickMatchEmail({ recipientId: targetId, conversationId: result.conversationId }, { db });
   let match: MatchDto | null = null;
   if (result.matched && result.matchId) {
     const [card] = await buildDiscoveryCards(db, actor.userId, [targetId], now, storage);

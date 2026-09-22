@@ -5,7 +5,6 @@ import { isDomainError } from "@/lib/errors";
 import { handleSchema } from "@/lib/validation/profile";
 import { requireMember } from "@/server/auth/current-user";
 import { getNotificationSettings, updateNotificationSettings, type NotificationSettingsDto } from "@/server/notifications/settings";
-import { addContactHashes, clearContactHashes, getContactHashKey } from "@/server/privacy/contact-hashes";
 import { setInvisibleMode } from "@/server/privacy/invisible-mode";
 import { getPrivacySettings, setDatingPaused, updatePrivacyToggles, type PrivacySettingsDto } from "@/server/privacy/settings";
 import { listBlockedUsers, unblockUser, type BlockedUserDto } from "@/server/safety/blocked";
@@ -89,32 +88,3 @@ export async function unblock(input: unknown): Promise<{ ok: true; blocked: Bloc
   }
 }
 
-/** The public salt the device needs to hash numbers exactly like the server (docs/CONTACT_BLOCKING.md §4). */
-export async function loadContactHashKey(): Promise<{ ok: true; key: string; version: number } | SettingsFailure> {
-  try {
-    await requireMember();
-    return { ok: true, ...getContactHashKey() };
-  } catch (e) {
-    return failure(e);
-  }
-}
-
-export async function addHiddenContacts(input: unknown): Promise<{ ok: true; added: number; total: number; privacy: PrivacySettingsDto } | SettingsFailure> {
-  try {
-    const actor = await requireMember();
-    const result = await addContactHashes(actor, input);
-    return { ok: true, ...result, privacy: await getPrivacySettings(actor) };
-  } catch (e) {
-    return failure(e);
-  }
-}
-
-export async function clearHiddenContacts(): Promise<PrivacyResult> {
-  try {
-    const actor = await requireMember();
-    await clearContactHashes(actor);
-    return { ok: true, privacy: await getPrivacySettings(actor) };
-  } catch (e) {
-    return failure(e);
-  }
-}

@@ -1,5 +1,24 @@
 # Block My Contacts — design and security assumptions
 
+> **WITHDRAWN FROM THE PRODUCT, 2026-09-22 (owner decision).**
+>
+> The whole mechanism below matches people by phone number, and Mellocrush does not ask for one: sign-in is
+> Google, Telegram or email. Production held **zero** phone numbers and **zero** contact hashes, while fourteen
+> members had the control switched on — so it was telling them their contacts were being matched when no matching
+> was possible, and blocking nobody. Every user-facing surface is gone: onboarding step 11, the Settings →
+> Privacy & Safety card and sheet, the Settings index row and the admin detail row. `savePrivacy` and
+> `privacyTogglesSchema` no longer read or write `blockContacts`, so nothing can set it.
+>
+> The data layer described here is still in place and still correct — `ContactHash`, the hashing rules, the
+> `noBlockOrContactSql` join — because the read side runs on every discovery and Community query and
+> `src/server/privacy/contact-hashes.ts` is the only thing that can give it a row to find, so its tests need it.
+> With no writer reachable from the app that join is a permanent no-op.
+>
+> This document is kept as the design of record. If a phone number is ever collected, restoring the feature is a
+> UI change and nothing below needs rewriting. If it is decided that one never will be, the columns and the join
+> should be dropped — see ARCHITECTURE.md §20.
+
+
 The prototype promises: "People you block from your contacts won't be shown your dating profile, and you won't see theirs. Numbers are hashed on your device and never stored in plain text." This document defines how the production system honours that promise, what it cannot promise, and what must be true before it is implemented (Phase 10).
 
 ## 0. Phone is optional (Google-auth migration)

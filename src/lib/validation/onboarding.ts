@@ -46,7 +46,6 @@ export const aboutSchema = z.object({
 export const privacySchema = z.object({
   hideLocation: z.boolean().default(false),
   hideAge: z.boolean().default(false),
-  blockContacts: z.boolean().default(false),
 });
 
 export const reorderPhotosSchema = z.object({ photoIds: z.array(z.string().min(1).max(64)).min(1).max(6) });

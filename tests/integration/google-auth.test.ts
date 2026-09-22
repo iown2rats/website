@@ -270,12 +270,12 @@ describe("phone as optional data", () => {
     const normalized = normalizeMaldivianPhone(c.phoneE164);
     if (!normalized.ok) throw new Error("setup");
     await addContactHashes(a, { hashes: [Buffer.from(hashPhone(normalized.e164)).toString("hex")], source: "MANUAL" }, { db, now: T0 });
-    await updatePrivacyToggles(a, { blockContacts: true }, { db });
+    await db.privacySettings.update({ where: { userId: a.userId }, data: { blockContacts: true } });
     expect(await canView(db, c.userId, a.userId, at(T0, 1000))).toBe(false);
     expect(await canView(db, a.userId, c.userId, at(T0, 1000))).toBe(false);
     // Nobody can hide from a through a number she never gave us; b (no number) is unaffected by anyone's list.
     await addContactHashes(c, { hashes: [Buffer.from(hashPhone("+9607000000")).toString("hex")], source: "MANUAL" }, { db, now: T0 });
-    await updatePrivacyToggles(c, { blockContacts: true }, { db });
+    await db.privacySettings.update({ where: { userId: c.userId }, data: { blockContacts: true } });
     expect(await canView(db, c.userId, b.userId, at(T0, 2000))).toBe(true);
   });
 });

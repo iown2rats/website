@@ -16,11 +16,10 @@ import { LinkRow, ListGroup, OceanCard, SectionLabel } from "@/components/ui/sur
 import { useToast } from "@/components/ui/toast";
 import { PageOverlay } from "@/components/layout/page-overlay";
 import type { PrivacySettingsDto } from "@/server/privacy/settings";
-import { ContactsSheet } from "./contacts-sheet";
 
 /*
  * Prototype "Privacy & Safety": ocean notice, PROFILE VISIBILITY radios (Everyone / Only people I like / Hidden),
- * toggle card, "Block my contacts" card with ON/OFF badge, links (Blocked profiles, Verification, Safety Center) and
+ * toggle card, links (Blocked profiles, Verification, Safety Center) and
  * the screenshots note. "Only people I like" is the approved Plus-only Invisible Mode; "Hidden" is Pause Dating.
  * Read receipts and profile sharing exist in the prototype but have no behaviour in the product, so they are not
  * offered as toggles (docs/ARCHITECTURE.md §19).
@@ -37,7 +36,6 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
   const [privacy, setPrivacy] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
-  const [contactsOpen, setContactsOpen] = useState(false);
   const visibility = visibilityOf(privacy);
 
   const apply = async (key: string, run: () => Promise<{ ok: true; privacy: PrivacySettingsDto } | { ok: false; code: string; message: string }>, done?: string) => {
@@ -69,7 +67,7 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
     else if (visibility === "hidden") toast.show("Dating resumed");
   };
 
-  const toggle = (key: "hideLocation" | "hideAge" | "hideActiveStatus" | "readReceipts" | "blockContacts", value: boolean) => {
+  const toggle = (key: "hideLocation" | "hideAge" | "hideActiveStatus" | "readReceipts", value: boolean) => {
     const before = privacy;
     setPrivacy({ ...privacy, [key]: value });
     void apply(key, () => savePrivacyToggles({ [key]: value })).then((ok) => { if (!ok) setPrivacy(before); });
@@ -147,23 +145,6 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
         ))}
       </ListGroup>
 
-      <div className="flex flex-col gap-2.5 rounded-card glass-card p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-h4 text-text">Block my contacts</h2>
-          <span className={cn("inline-flex h-5.5 items-center rounded-xs px-2 text-tag font-medium", privacy.blockContacts ? "bg-aqua-soft text-accent" : "bg-surface-muted text-text-secondary")} role="status">{privacy.blockContacts ? "ON" : "OFF"}</span>
-        </div>
-        <p className="m-0 text-body-sm leading-relaxed text-text-secondary">People you block from your contacts won&apos;t be shown your dating profile, and you won&apos;t see theirs. Numbers are hashed on your device — we never store your contacts.</p>
-        {privacy.blockContacts ? (
-          <>
-            <p className="text-caption text-text-secondary">{privacy.contactHashCount} number{privacy.contactHashCount === 1 ? "" : "s"} on your list.</p>
-            <Button variant="muted" onClick={() => setContactsOpen(true)} className="h-11.5">Manage blocked contacts</Button>
-            <Button variant="ghost" size="md" onClick={() => toggle("blockContacts", false)} disabled={busy === "blockContacts"}>Turn off (keeps your list)</Button>
-          </>
-        ) : (
-          <Button variant="ocean" onClick={() => toggle("blockContacts", true)} loading={busy === "blockContacts"} className="h-11.5">Block my contacts</Button>
-        )}
-      </div>
-
       <ListGroup>
         <LinkRow href="/settings/blocked" label="Blocked profiles" meta={String(privacy.blockedCount)} />
         <LinkRow href="/settings/verification" label="Verification" meta={VERIFICATION_LABELS[verificationStatus]} />
@@ -182,7 +163,6 @@ export function PrivacyClient({ initial, verificationStatus }: { initial: Privac
         </div>
       </ResponsiveDialog>
 
-      <ContactsSheet open={contactsOpen} onClose={() => setContactsOpen(false)} privacy={privacy} onChange={(p) => { setPrivacy(p); router.refresh(); }} />
     </PageOverlay>
   );
 }

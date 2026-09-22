@@ -143,7 +143,6 @@ export function SettingsClient({ maskedPhone, signIn, verificationStatus, notifi
             <LinkRow href="/settings/privacy" height={48} label="Profile visibility" meta={visibilityLabel} />
             <LinkRow href="/settings/privacy" height={48} label="Location visibility" meta={privacy.hideLocation ? "Hidden" : "Island only"} />
             <LinkRow href="/settings/blocked" height={48} label="Blocked users" meta={String(privacy.blockedCount)} />
-            <LinkRow href="/settings/privacy" height={48} label="Blocked contacts" meta={privacy.blockContacts ? "On" : "Off"} />
             <LinkRow href="/settings/privacy" height={48} label="Active status" meta={privacy.hideActiveStatus ? "Hidden" : "Shown"} />
           </ListGroup>
         </section>

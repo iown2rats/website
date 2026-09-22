@@ -65,7 +65,6 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 { label: "Bio", value: d.profile.bioLength ? `${d.profile.bioLength} characters` : "Empty" },
                 { label: "Interests / prompts", value: `${d.profile.interests} / ${d.profile.prompts}` },
                 { label: "Visibility", value: d.privacy ? `${d.privacy.paused ? "Paused" : d.privacy.visibility}${d.privacy.invisibleMode ? " · Invisible Mode on" : ""}` : "—" },
-                { label: "Block my contacts", value: d.privacy?.blockContacts ? "On" : "Off" },
               ]}
             />
           ) : (

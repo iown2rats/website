@@ -149,7 +149,6 @@ export async function submitPrivacy(_prev: StageFormState, formData: FormData): 
     await savePrivacy(actor, {
       hideLocation: formData.get("hideLocation") === "on",
       hideAge: formData.get("hideAge") === "on",
-      blockContacts: formData.get("blockContacts") === "on",
     });
   } catch (e) {
     return friendly(e);

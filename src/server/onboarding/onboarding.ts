@@ -37,7 +37,7 @@ export interface OnboardingData {
   bio: string;
   interestIds: string[];
   prompts: { promptId: string; answer: string }[];
-  privacy: { hideLocation: boolean; hideAge: boolean; blockContacts: boolean };
+  privacy: { hideLocation: boolean; hideAge: boolean };
   activePhotoCount: number;
   completion: CompletionResult;
 }
@@ -52,7 +52,7 @@ export async function getOnboardingData(actor: Actor, deps: { db?: Db } = {}): P
       dateOfBirth: true,
       gender: true,
       discoveryPreferences: { select: { interestedIn: true, connectionIntent: true, friendshipInterestedIn: true } },
-      privacy: { select: { hideLocation: true, hideAge: true, blockContacts: true } },
+      privacy: { select: { hideLocation: true, hideAge: true } },
       verification: { select: { status: true } },
       profile: {
         select: {
@@ -73,13 +73,28 @@ export async function getOnboardingData(actor: Actor, deps: { db?: Db } = {}): P
   // "Who do you want to meet" counts as answered once the branch that asks it is behind them. Dating never asks,
   // and is complete the moment the intent is saved, because the answer is derived from the gender.
   const reachedMeet = chosenIntent === "DATING" ? true : hasReached(user.onboardingStage, "LOCATION");
+  /*
+   * And the mirror image, which was missing and made Friendship onboarding IMPOSSIBLE TO FINISH.
+   *
+   * The flow branches after CONNECTION: Dating is asked INTENT ("how serious?") and skips MEET; Friendship is
+   * asked MEET ("who would you like to meet?") and skips INTENT. `Profile.intent` is written only by the INTENT
+   * stage — so for a Friendship member it is null forever, not because they failed to answer but because they
+   * were never asked. `computeCompletion` nonetheless required it, so every Friendship member reached the last
+   * screen and was told "Please finish: intent", with no screen left that could set it. Every one of them was
+   * stuck, permanently, and the pointer stayed on PRIVACY because `advance` stops there.
+   *
+   * So a skipped question counts as answered once the stage that would have asked it is behind them, which is
+   * exactly the rule `reachedMeet` above already applies to the other branch. Both paths now say the same thing:
+   * the question this path does not ask is not a question this path is missing.
+   */
+  const reachedIntent = chosenIntent === "FRIENDSHIP" ? hasReached(user.onboardingStage, "LOCATION") : Boolean(user.profile?.intent);
   const dob = user.dateOfBirth;
   const completion = computeCompletion({
     hasName: Boolean(user.profile?.displayName),
     hasDob: Boolean(dob),
     hasGender: Boolean(user.gender),
     hasInterestedIn: reachedMeet,
-    hasIntent: Boolean(user.profile?.intent),
+    hasIntent: reachedIntent,
     hasLocation: Boolean(user.profile?.locationId),
     activePhotoCount,
     hasBio: Boolean(user.profile?.bio),
@@ -102,7 +117,7 @@ export async function getOnboardingData(actor: Actor, deps: { db?: Db } = {}): P
     bio: user.profile?.bio ?? "",
     interestIds: user.profile?.interests.map((i) => i.interestId) ?? [],
     prompts: user.profile?.prompts ?? [],
-    privacy: { hideLocation: user.privacy?.hideLocation ?? false, hideAge: user.privacy?.hideAge ?? false, blockContacts: user.privacy?.blockContacts ?? false },
+    privacy: { hideLocation: user.privacy?.hideLocation ?? false, hideAge: user.privacy?.hideAge ?? false },
     activePhotoCount,
     completion,
   };
@@ -299,11 +314,14 @@ export async function saveAbout(actor: Actor, input: unknown, deps: { db?: Db } 
 
 export async function savePrivacy(actor: Actor, input: unknown, deps: { db?: Db } = {}): Promise<void> {
   const db = deps.db ?? getDb();
-  const { hideLocation, hideAge, blockContacts } = parse(privacySchema.safeParse(input));
+  const { hideLocation, hideAge } = parse(privacySchema.safeParse(input));
+  // `blockContacts` is deliberately neither read nor written. The step no longer offers it, so writing it would
+  // mean silently clearing the stored value of the fourteen members who had switched it on, on their next pass
+  // through this screen — a write nobody asked for, to settle a feature that no longer exists.
   await db.privacySettings.upsert({
     where: { userId: actor.userId },
-    create: { userId: actor.userId, hideLocation, hideAge, blockContacts },
-    update: { hideLocation, hideAge, blockContacts },
+    create: { userId: actor.userId, hideLocation, hideAge },
+    update: { hideLocation, hideAge },
   });
   await advance(db, actor.userId, "PRIVACY");
 }

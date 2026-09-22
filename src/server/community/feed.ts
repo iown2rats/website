@@ -14,7 +14,8 @@ import { getStorageProvider } from "@/lib/storage";
 import type { StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
 import { noBlockOrContactSql } from "@/server/discovery/predicate";
-import { ANONYMOUS_AUTHOR, isMediaDisplayable, loadAuthors, photoDto, type CommunityPostDto } from "./dto";
+import { EMPTY_REACTIONS } from "@/lib/reactions";
+import { ANONYMOUS_AUTHOR, isMediaDisplayable, loadAuthors, loadPostReactions, photoDto, type CommunityPostDto } from "./dto";
 import { loadPolls } from "./polls";
 import { loadPostContext } from "./social-context";
 import type { TopicKey } from "./topics";
@@ -131,20 +132,19 @@ export async function canSeePost(db: DbLike, actor: Actor, postId: string): Prom
  */
 export async function buildPostDtos(db: DbLike, storage: StorageProvider, actor: Actor, ids: string[]): Promise<CommunityPostDto[]> {
   if (ids.length === 0) return [];
-  const [rows, liked] = await Promise.all([
-    db.communityPost.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, authorId: true, kind: true, topic: true, isAnonymous: true, body: true, photoKey: true, photoBlurhash: true, photoModeration: true, likeCount: true, commentCount: true, createdAt: true },
-    }),
-    db.communityLike.findMany({ where: { postId: { in: ids }, userId: actor.userId }, select: { postId: true } }),
-  ]);
+  const rows = await db.communityPost.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, authorId: true, kind: true, topic: true, isAnonymous: true, body: true, photoKey: true, photoBlurhash: true, photoModeration: true, likeCount: true, commentCount: true, createdAt: true },
+  });
   const pollIds = rows.filter((r) => r.kind === "POLL").map((r) => r.id);
-  const [authors, polls, context] = await Promise.all([
+  const [authors, polls, context, reactions] = await Promise.all([
     loadAuthors(db, storage, actor.userId, rows.map((r) => r.authorId)),
     loadPolls(db, actor.userId, pollIds),
     loadPostContext(db, rows.map((r) => r.id)),
+    // Replaces the old "which of these did I like?" query: the summary carries the viewer's own reaction, so
+    // `likedByMe` is derived from the same rows the emoji counts come from and cannot disagree with them.
+    loadPostReactions(db, actor.userId, ids),
   ]);
-  const likedSet = new Set(liked.map((l) => l.postId));
   const byId = new Map(rows.map((r) => [r.id, r]));
   const out: CommunityPostDto[] = [];
   for (const id of ids) {
@@ -163,7 +163,8 @@ export async function buildPostDtos(db: DbLike, storage: StorageProvider, actor:
       poll: polls.get(r.id) ?? null,
       likeCount: r.likeCount,
       commentCount: r.commentCount,
-      likedByMe: likedSet.has(r.id),
+      likedByMe: (reactions.get(r.id) ?? EMPTY_REACTIONS).mine !== null,
+      reactions: reactions.get(r.id) ?? EMPTY_REACTIONS,
       createdAt: r.createdAt.toISOString(),
       isAnonymous: r.isAnonymous,
       author: r.isAnonymous ? ANONYMOUS_AUTHOR : author,

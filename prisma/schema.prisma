@@ -137,6 +137,26 @@ enum MessageKind {
   SYSTEM
 }
 
+/// The one set of reactions the whole product offers, in the order the picker shows them:
+/// ❤️ 😂 😮 😢 👍 🔥.
+///
+/// An enum and not a string, because "reaction values restricted to the approved set" is an integrity rule and
+/// belongs where it cannot be bypassed. A string column would let any write path — a future admin tool, a script,
+/// a mistake — put an arbitrary emoji (or a megabyte of text) on a message, and every reader would then have to
+/// defend itself. The database refuses instead.
+///
+/// The names are deliberately semantic rather than the characters themselves: the glyph a client draws is a
+/// presentation decision (src/lib/reactions.ts), so the set can be re-skinned without a data migration, and a row
+/// written today still means the same thing if the artwork changes.
+enum ReactionEmoji {
+  HEART
+  LAUGH
+  WOW
+  SAD
+  THUMBS_UP
+  FIRE
+}
+
 enum ReportReason {
   FAKE_PROFILE
   UNDERAGE_USER
@@ -226,6 +246,14 @@ enum NotificationType {
   PAYMENT_REJECTED
   SUBSCRIPTION_EXPIRING
   SUBSCRIPTION_EXPIRED
+  /// Someone reacted to one of your messages. Carries `conversationId` and `data.messageId`.
+  MESSAGE_REACTION
+  /// Someone reacted to one of your Community comments. Carries `postId` and `data.commentId`.
+  ///
+  /// There is deliberately no COMMUNITY_POST_REACTION: a reaction to a post IS the existing COMMUNITY_LIKE row,
+  /// now carrying `data.emoji`, because the heart on a post card became the reaction control rather than gaining
+  /// a rival. One act, one notification path, nothing that can report the same thing twice.
+  COMMUNITY_COMMENT_REACTION
 }
 
 enum PostKind {
@@ -297,38 +325,40 @@ model User {
   usageCounters         UsageCounter[]
   boosts                Boost[]
   subscriptions         Subscription[]
-  orders                SubscriptionOrder[]       @relation("OrderUser")
-  decidedOrders         SubscriptionOrder[]       @relation("OrderDecider")
-  receiptReruns         ReceiptVerification[]     @relation("ReceiptVerificationActor")
-  entitlementOverrides  EntitlementOverride[]     @relation("OverrideUser")
-  grantedOverrides      EntitlementOverride[]     @relation("OverrideGrantor")
-  likesGiven            Like[]                    @relation("LikeFrom")
-  likesReceived         Like[]                    @relation("LikeTo")
-  passesGiven           Pass[]                    @relation("PassFrom")
-  passesReceived        Pass[]                    @relation("PassTo")
-  matchesAsA            Match[]                   @relation("MatchA")
-  matchesAsB            Match[]                   @relation("MatchB")
-  unmatchedMatches      Match[]                   @relation("MatchUnmatchedBy")
-  conversationsAsA      Conversation[]            @relation("ConvA")
-  conversationsAsB      Conversation[]            @relation("ConvB")
+  orders                SubscriptionOrder[]        @relation("OrderUser")
+  decidedOrders         SubscriptionOrder[]        @relation("OrderDecider")
+  receiptReruns         ReceiptVerification[]      @relation("ReceiptVerificationActor")
+  entitlementOverrides  EntitlementOverride[]      @relation("OverrideUser")
+  grantedOverrides      EntitlementOverride[]      @relation("OverrideGrantor")
+  likesGiven            Like[]                     @relation("LikeFrom")
+  likesReceived         Like[]                     @relation("LikeTo")
+  passesGiven           Pass[]                     @relation("PassFrom")
+  passesReceived        Pass[]                     @relation("PassTo")
+  matchesAsA            Match[]                    @relation("MatchA")
+  matchesAsB            Match[]                    @relation("MatchB")
+  unmatchedMatches      Match[]                    @relation("MatchUnmatchedBy")
+  conversationsAsA      Conversation[]             @relation("ConvA")
+  conversationsAsB      Conversation[]             @relation("ConvB")
   participations        ConversationParticipant[]
   messages              Message[]
-  introsSent            Intro[]                   @relation("IntroFrom")
-  introsReceived        Intro[]                   @relation("IntroTo")
-  blocksGiven           Block[]                   @relation("BlockFrom")
-  blocksReceived        Block[]                   @relation("BlockTo")
-  reportsFiled          Report[]                  @relation("ReportBy")
-  reportsReceived       Report[]                  @relation("ReportTarget")
-  reportsResolved       Report[]                  @relation("ReportResolver")
-  verificationsReviewed Verification[]            @relation("VerificationReviewer")
+  introsSent            Intro[]                    @relation("IntroFrom")
+  introsReceived        Intro[]                    @relation("IntroTo")
+  blocksGiven           Block[]                    @relation("BlockFrom")
+  blocksReceived        Block[]                    @relation("BlockTo")
+  reportsFiled          Report[]                   @relation("ReportBy")
+  reportsReceived       Report[]                   @relation("ReportTarget")
+  reportsResolved       Report[]                   @relation("ReportResolver")
+  verificationsReviewed Verification[]             @relation("VerificationReviewer")
   posts                 CommunityPost[]
   comments              CommunityComment[]
   postLikes             CommunityLike[]
+  messageReactions      MessageReaction[]
+  commentReactions      CommunityCommentReaction[]
   pollVotes             CommunityPollVote[]
-  following             CommunityFollow[]         @relation("CommunityFollower")
-  followers             CommunityFollow[]         @relation("CommunityFollowing")
-  notifications         Notification[]            @relation("NotificationUser")
-  notificationsActed    Notification[]            @relation("NotificationActor")
+  following             CommunityFollow[]          @relation("CommunityFollower")
+  followers             CommunityFollow[]          @relation("CommunityFollowing")
+  notifications         Notification[]             @relation("NotificationUser")
+  notificationsActed    Notification[]             @relation("NotificationActor")
   pushSubscriptions     PushSubscription[]
   contactHashes         ContactHash[]
   auditLogs             AuditLog[]
@@ -763,6 +793,13 @@ model Conversation {
   matchId       String?            @unique
   status        ConversationStatus @default(PENDING)
   lastMessageAt DateTime?
+  /// Last time something changed about a message that already exists here: a reaction set, changed or removed, or
+  /// an edit. `lastMessageAt` cannot answer that — it moves only when a NEW message arrives, and the chat's
+  /// incremental poll asks "anything after this id?", which by construction never revisits a message the client
+  /// already holds. Without this column a reaction or an edit would be invisible to the other person until they
+  /// reloaded. The poll carries it back and forth as an opaque watermark and refetches the visible window only
+  /// when it has moved, so the steady-state poll stays one row read (docs/ARCHITECTURE.md §9.4).
+  interactionAt DateTime?
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
@@ -794,21 +831,60 @@ model ConversationParticipant {
 
 /// Messages are never hard-deleted (moderation evidence). The (senderId, createdAt) index serves the 9-minute cooldown check.
 model Message {
-  id             String      @id @default(cuid(2))
-  conversationId String
-  senderId       String
-  kind           MessageKind @default(TEXT)
-  body           String
-  createdAt      DateTime    @default(now())
-  deletedAt      DateTime?
+  id               String      @id @default(cuid(2))
+  conversationId   String
+  senderId         String
+  kind             MessageKind @default(TEXT)
+  body             String
+  createdAt        DateTime    @default(now())
+  deletedAt        DateTime?
+  /// The message this one is a reply to. A REFERENCE, never a copy of the quoted text: quoting by value would
+  /// freeze a sentence the author may later edit, and would put a second copy of someone's words in a row they do
+  /// not own. The quote is resolved at read time, so an edited original reads correctly in every reply to it.
+  ///
+  /// Always inside the same conversation. That is not something the column can express, so it is asserted on the
+  /// way in (src/server/conversations/messages.ts) — a reply may only point at a message the sender can already
+  /// see, which is the whole of the visibility rule for a conversation they are a participant in.
+  replyToMessageId String?
+  /// When the sender last edited the body. Null means never edited. `createdAt` is never touched by an edit, so
+  /// the message keeps its place in the thread and in every cursor that has already paged past it.
+  editedAt         DateTime?
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User              @relation(fields: [senderId], references: [id], onDelete: Restrict)
   intro        Intro?
   reports      Report[]
+  /// SetNull, not Cascade: if a quoted message ever did leave the table, the reply is still a real thing someone
+  /// said and must survive it. The client renders the dangling case as "Message unavailable".
+  replyTo      Message?          @relation("MessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies      Message[]         @relation("MessageReply")
+  reactions    MessageReaction[]
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId, kind, createdAt(sort: Desc)])
+  @@index([replyToMessageId])
+}
+
+/// One person's one reaction to one message.
+///
+/// The composite primary key IS the "one active reaction per user per message" rule. Nothing counts rows to decide
+/// whether a second is allowed, and no retry, double tap or duplicate request can produce two: changing a reaction
+/// is an UPDATE of this row, removing it is a DELETE, and adding one is an upsert that conflicts with itself. That
+/// is also why the emoji does not live in an array on the Message row — an array has no key, so concurrent writers
+/// lose each other's changes and "remove mine" becomes a read-modify-write race.
+model MessageReaction {
+  messageId String
+  userId    String
+  emoji     ReactionEmoji
+  createdAt DateTime      @default(now())
+  /// Bumped when the reaction is replaced, so "when did this last change" is answerable without a second table.
+  updatedAt DateTime      @default(now()) @updatedAt
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([userId])
 }
 
 model Intro {
@@ -1201,22 +1277,50 @@ model CommunityComment {
   createdAt DateTime  @default(now())
   deletedAt DateTime?
 
-  post    CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author  User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  reports Report[]
+  post      CommunityPost              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User                       @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  reports   Report[]
+  reactions CommunityCommentReaction[]
 
   @@index([postId, createdAt])
 }
 
+/// One person's one reaction to one post. Named `CommunityLike` because that is what it was: the single heart of
+/// the prototype. It is the post reaction table now, and the name is kept on purpose — renaming a live table is
+/// not an additive migration, and every existing row is already exactly what it should be, a ❤️ from that user on
+/// that post, which is why `emoji` defaults to HEART and no row had to be rewritten.
+///
+/// `CommunityPost.likeCount` is therefore the total number of reactions, which it already was: the primary key
+/// below has always allowed one per member per post, so the counter never counted anything else. Popular Today,
+/// the social-context line and the COMMUNITY_LIKE notification keep working untouched.
 model CommunityLike {
   postId    String
   userId    String
-  createdAt DateTime @default(now())
+  emoji     ReactionEmoji @default(HEART)
+  createdAt DateTime      @default(now())
 
   post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([postId, userId])
+}
+
+/// One person's one reaction to one comment. A separate model from CommunityLike and MessageReaction rather than
+/// one polymorphic `reactions` table with a nullable FK per kind of target: a real foreign key per target means
+/// the database refuses a reaction to a comment that does not exist, ON DELETE CASCADE needs no application code,
+/// and no read has to ask "which of these three columns is set?" before it can authorise anything.
+model CommunityCommentReaction {
+  commentId String
+  userId    String
+  emoji     ReactionEmoji
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @default(now()) @updatedAt
+
+  comment CommunityComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
 }
 
 // ───────────────────────────── Notifications ─────────────────────────────

@@ -4,10 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { photoBackground } from "@/lib/photos";
+import { reactionGlyph, reactionLabel, type ReactionKey } from "@/lib/reactions";
 import { shortRelativeTime } from "@/lib/time";
 import { Avatar } from "@/components/ui/avatar";
 import { Tag } from "@/components/ui/badge";
 import { ChatIcon, HeartIcon, ImageIcon, MoreIcon, VerifiedBadge, WhisperIcon } from "@/components/ui/icons";
+import { useLongPress } from "@/components/ui/long-press";
+import { ReactionSummary } from "@/components/ui/reactions";
 import type { CommunityAuthorDto, CommunityPostDto } from "@/server/community/dto";
 import type { PollDto } from "@/server/community/polls";
 import { TOPICS } from "@/server/community/topics";
@@ -22,6 +25,15 @@ import { PollBlock } from "./poll-block";
  *
  * Added since: a topic chip, polls, the follow control and the social-context line — all inside the existing card,
  * none of them changing its shape.
+ *
+ * REACTIONS, and the restraint they are held to. The heart BECAME the reaction control rather than gaining a rival
+ * beside it: a plain tap still hearts the post exactly as it always did, a long-press opens the picker, and the
+ * button then draws whichever emoji the viewer chose with the same total count next to it. The card's action row
+ * is the same 38px row with the same two controls in the same order.
+ *
+ * The grouped pills appear ONLY when more than one DISTINCT reaction exists, because until then the button itself
+ * already says everything — one emoji, one count — and a second row saying it again is the "large row of
+ * permanently visible emojis" the brief ruled out. A post nobody has reacted to renders precisely as before.
  *
  * ANONYMOUS POSTS. The card does not decide anonymity and cannot undo it: the server has already replaced the
  * author with a placeholder carrying no handle, no photo and no island (ANONYMOUS_AUTHOR). What this file adds is
@@ -57,6 +69,12 @@ export interface PostCardProps {
   /** Server clock for relative times (never Date.now in render). */
   now: string;
   onToggleLike: (post: CommunityPostDto) => void;
+  /** Long-press on the reaction control: open the picker at this point. Omitted where reacting is not offered. */
+  onReactionPicker?: (post: CommunityPostDto, point: { x: number; y: number }) => void;
+  /** A pill was tapped: set that reaction, or null to clear the viewer's own. */
+  onSetReaction?: (post: CommunityPostDto, emoji: ReactionKey | null) => void;
+  /** Show who reacted. */
+  onInspectReactions?: (post: CommunityPostDto) => void;
   onOpenAuthor: (author: CommunityAuthorDto) => void;
   onOpenMenu: (post: CommunityPostDto) => void;
   /** In the thread view the comments control focuses the composer instead of navigating. */
@@ -66,7 +84,8 @@ export interface PostCardProps {
   className?: string;
 }
 
-export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, onComments, onPollVoted, onFollowChanged, className }: PostCardProps) {
+export function PostCard({ post, now, onToggleLike, onReactionPicker, onSetReaction, onInspectReactions, onOpenAuthor, onOpenMenu, onComments, onPollVoted, onFollowChanged, className }: PostCardProps) {
+  const longPress = useLongPress((point) => onReactionPicker?.(post, point));
   const anonymous = post.isAnonymous;
   const meta = [post.author.location, shortRelativeTime(post.createdAt, new Date(now))].filter(Boolean).join(" · ");
   const photo = post.photo ? { url: post.photo.url, key: post.photo.demoKey, blurhash: post.photo.blurhash } : null;
@@ -74,6 +93,7 @@ export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, on
   const context = contextLine(post);
   const showFollow = !anonymous && !post.isMine && post.author.handle.length > 0;
   const commentsLabel = `Comments (${post.commentCount})`;
+  const mine = post.reactions.mine;
   const commentsInner = (
     <>
       <ChatIcon size={16} />
@@ -137,15 +157,36 @@ export function PostCard({ post, now, onToggleLike, onOpenAuthor, onOpenMenu, on
 
       {context ? <p className="m-0 text-caption-sm text-text-secondary">{context}</p> : null}
 
+      {/* Only when the button alone cannot say it: two or more different reactions. */}
+      {post.reactions.groups.length > 1 ? (
+        <ReactionSummary
+          reactions={post.reactions}
+          onToggle={onSetReaction ? (emoji) => onSetReaction(post, emoji) : undefined}
+          onInspect={onInspectReactions ? () => onInspectReactions(post) : undefined}
+          label="Reactions on this post"
+          className="-mb-1"
+        />
+      ) : null}
+
       <div className="-mb-0.5 flex gap-1 text-text-secondary">
         <button
           type="button"
+          {...(onReactionPicker ? longPress : {})}
           onClick={() => onToggleLike(post)}
           aria-pressed={post.likedByMe}
-          aria-label={`${post.likedByMe ? "Unlike" : "Like"} (${post.likeCount})`}
+          aria-label={
+            mine
+              ? `Remove your ${reactionLabel(mine)} reaction (${post.likeCount} in total). Press and hold to choose another`
+              : `React (${post.likeCount}). Press and hold to choose a reaction`
+          }
           className={cn(actionClass, post.likedByMe && "text-primary-ink")}
         >
-          <HeartIcon size={16} filled={post.likedByMe} className={post.likedByMe ? "text-primary" : undefined} />
+          {/* The viewer's own choice, drawn where the heart was. No reaction yet: the outline heart, as before. */}
+          {mine ? (
+            <span aria-hidden="true" className="text-[15px] leading-none">{reactionGlyph(mine)}</span>
+          ) : (
+            <HeartIcon size={16} filled={false} />
+          )}
           <span className="tabular-nums">{post.likeCount}</span>
         </button>
         {onComments ? (

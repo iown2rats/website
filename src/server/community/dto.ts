@@ -4,6 +4,7 @@
  * database ids, contact hashes, subscription, moderation or report data. Prisma rows are never serialised directly.
  */
 import type { DbLike } from "@/lib/db";
+import { EMPTY_REACTIONS, summarizeReactions, type ReactionSummaryDto } from "@/lib/reactions";
 import { displayableCommunityMediaStates, displayablePhotoWhere } from "@/lib/photo-policy";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import { isDemoKey } from "@/server/discovery/dto";
@@ -46,9 +47,16 @@ export interface CommunityPostDto {
   photoUnderReview: boolean;
   /** Options, totals and the viewer's own choice. Null for every kind but POLL. */
   poll: PollDto | null;
+  /**
+  * Total reactions on this post. Still `CommunityPost.likeCount`, and still the number beside the control: the
+  * heart became the reaction button rather than gaining a rival, so what it counted has not changed.
+  */
   likeCount: number;
   commentCount: number;
+  /** True when the viewer has ANY reaction on this post — what fills the control in. */
   likedByMe: boolean;
+  /** Which reactions, how many of each, and the viewer's own. Empty when nobody has reacted. */
+  reactions: ReactionSummaryDto;
   createdAt: string;
   /** True when `author` is the placeholder rather than a real member (see `ANONYMOUS_AUTHOR`). */
   isAnonymous: boolean;
@@ -64,6 +72,7 @@ export interface CommunityCommentDto {
   createdAt: string;
   author: CommunityAuthorDto;
   isMine: boolean;
+  reactions: ReactionSummaryDto;
 }
 
 /**
@@ -149,5 +158,44 @@ export async function loadAuthors(db: DbLike, storage: StorageProvider, viewerId
   const followed = new Set(follows.map((f) => f.followingId));
   const out = new Map<string, CommunityAuthorDto>();
   await Promise.all(rows.map(async (r) => out.set(r.id, await toAuthorDto(storage, viewerId, r, followed.has(r.id)))));
+  return out;
+}
+
+/** Reaction summaries for many posts in one grouped query. */
+export async function loadPostReactions(db: DbLike, viewerId: string, postIds: readonly string[]): Promise<Map<string, ReactionSummaryDto>> {
+  return loadReactionsFor(
+    postIds,
+    async (ids) => (await db.communityLike.findMany({ where: { postId: { in: ids } }, select: { postId: true, emoji: true, userId: true } })).map((r) => ({ targetId: r.postId, emoji: r.emoji, userId: r.userId })),
+    viewerId,
+  );
+}
+
+/** Reaction summaries for many comments in one grouped query. */
+export async function loadCommentReactions(db: DbLike, viewerId: string, commentIds: readonly string[]): Promise<Map<string, ReactionSummaryDto>> {
+  return loadReactionsFor(
+    commentIds,
+    async (ids) => (await db.communityCommentReaction.findMany({ where: { commentId: { in: ids } }, select: { commentId: true, emoji: true, userId: true } })).map((r) => ({ targetId: r.commentId, emoji: r.emoji, userId: r.userId })),
+    viewerId,
+  );
+}
+
+async function loadReactionsFor(
+  targetIds: readonly string[],
+  fetch: (ids: string[]) => Promise<{ targetId: string; emoji: string; userId: string }[]>,
+  viewerId: string,
+): Promise<Map<string, ReactionSummaryDto>> {
+  const out = new Map<string, ReactionSummaryDto>();
+  const ids = [...new Set(targetIds)];
+  if (ids.length === 0) return out;
+  const grouped = new Map<string, { emoji: string; userId: string }[]>();
+  for (const row of await fetch(ids)) {
+    const list = grouped.get(row.targetId) ?? [];
+    list.push({ emoji: row.emoji, userId: row.userId });
+    grouped.set(row.targetId, list);
+  }
+  for (const id of ids) {
+    const list = grouped.get(id);
+    out.set(id, list ? summarizeReactions(list, viewerId) : EMPTY_REACTIONS);
+  }
   return out;
 }

@@ -943,3 +943,62 @@ type inside a pill field would be wrong. That wrapper is the only left-aligned t
 Nothing about the depth system (§37): `auth-scrim`, `auth-recessed`, `auth-flat` and `auth-raised` are untouched, as
 are the cover, the `<picture>` art direction, the per-device preloads, the 16 px field floor and every piece of
 authentication behind the screen.
+
+## 40. Replies, edits and reactions (2026-09-22)
+
+The brief asked for Messenger's behaviour without Messenger's noise: "no clutter", "do not add unnecessary modals
+or oversized menus", "do not turn the feed into a large row of permanently visible emojis", and above all keep the
+existing Chat and Community layouts. Every decision below is that sentence applied.
+
+**Nothing appears until it exists.** `ReactionSummary` renders `null` when there are no reactions. That is the most
+important line in `src/components/ui/reactions.tsx`: a conversation nobody has reacted to, and a feed of unreacted
+posts, look *precisely* as they did before any of this shipped. A count is drawn beside an emoji only once more
+than one person has chosen it, so the common case is a single 13 px glyph in a 26 px pill.
+
+**The picker is a floating row, not a sheet.** Six 44 px round targets, 2 px apart, 6 px padding, on `glass-card`
+with `rounded-full`, placed just above the point pressed and clamped 8 px inside the viewport; below the finger
+only when there is no room above. Its width is a constant (286 px — six targets, five gaps, two paddings) rather
+than measured, because measuring means drawing it somewhere first and then moving it, which is a visible flinch on
+the one control that has to feel instant. A sheet was rejected outright: it covers the message you are reacting to.
+The backdrop is a transparent tap-catcher, not a scrim — dimming the screen for a six-emoji choice is exactly the
+"oversized" that was ruled out, and the message has to stay legible behind the row. The viewer's current reaction
+is drawn on `bg-primary-soft`, so "tap it again to remove" is visible rather than implied.
+
+**Chat.** The bubble is unchanged: same 78 % max width, same radii and tails, same `text-body`/1.45, same
+`bg-primary`/`text-on-primary` and `bg-aqua-soft`. A reply adds one compact quote inside the bubble above its own
+text — a 2 px left rule, the name in `text-micro` medium, the line in `text-caption`, truncated to one line, on a
+12 % wash of the bubble's own foreground. One line on purpose: a tall excerpt makes the reply harder to read than
+the thing it replies to. Tapping it scrolls to the original and flashes a `ring-2 ring-primary` for 1.2 s; when the
+original is gone it reads "Message unavailable" and stops being a button, because there is nowhere to go.
+
+"Edited" sits in the existing `text-tiny` metadata line beside the time and "Seen" — subtle, and reading as part
+of the metadata rather than as a badge, because the line was already there.
+
+The composer gains one strip above it, shared by both jobs: a 3 px accent bar (coral for a reply, ocean for an
+edit), the label in `text-micro`, the quoted or edited line truncated in `text-caption`, and a 44 px ✕. Escape does
+the same thing. The send button becomes a check while editing.
+
+**Community.** The action row keeps its shape entirely — 38 px, heart then comment, same order, same
+`text-caption`. The heart *became* the reaction control: a plain tap still hearts the post exactly as before, a
+long-press opens the picker, and the button then draws the viewer's chosen glyph at 15 px where the heart icon was,
+with the same total count beside it. Grouped pills appear above the row only when **two or more distinct** reactions
+exist; until then the button says everything. Comment rows get pills under the body at `mt-1.5` and nothing else.
+
+**Who reacted** is a `BottomSheet` opened from a deliberately quiet `···` at the end of the summary — counts are
+free, names cost a tap. Community rows carry a 32 px avatar, chat rows do not (there are only two people in a
+conversation).
+
+**Gestures, and the three things they must not break.** `useLongPress` ignores mouse input entirely, so
+click-and-hold to select, drag-select across bubbles and clicking links all behave as before; desktop gets the same
+menu from a ⋯ that fades in on hover or keyboard focus, which is the better affordance there anyway and adds no
+permanent control. It never calls `preventDefault` and never sets `touch-action`: the timer dies on 10 px of
+movement and on `pointercancel`, which is what the browser sends when it takes the gesture over to scroll, so the
+gesture cannot make a thread feel sticky. `contextmenu` is suppressed only on a press it actually handled.
+Text selection is `select-none` below the desktop breakpoint and `select-text` at and above it, so a phone gets the
+menu gesture (as every chat app does) while a mouse keeps full selection. Swipe-right-to-reply follows the same
+rules and additionally requires the gesture to declare itself horizontal — past 12 px and more than twice as far
+across as down — before anything moves; the worst it can do is fail to fire.
+
+Every new control is at least 44 px in its touch dimension (the pills are 26 px tall but sit in a row with 44 px of
+clearance and are not the primary path to anything), and every one carries an accessible name that says what will
+happen: "React with love", "Remove your laugh reaction", "3 love, including you. Tap to remove yours".

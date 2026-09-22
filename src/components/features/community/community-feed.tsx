@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { loadCommunityDiscover, loadFeed, reactToPost } from "@/actions/community";
+import { loadCommunityDiscover, loadFeed, loadPostReactorList, reactToPost, setPostEmoji } from "@/actions/community";
+import type { ReactionKey } from "@/lib/reactions";
+import { Avatar } from "@/components/ui/avatar";
+import { ReactionPicker, ReactorSheet, type ReactorRow } from "@/components/ui/reactions";
 import { IconButton, Spinner } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "@/components/ui/icons";
@@ -21,7 +24,7 @@ import { ContentMenu, type ContentTarget } from "./content-menu";
 import { CreateMenu } from "./create-menu";
 import { FeedFiller } from "./feed-filler";
 import { PopularToday } from "./popular-today";
-import { PostCard } from "./post-card";
+import { authorPhotoRef, PostCard } from "./post-card";
 import { QuickPost } from "./quick-post";
 import { TopicChips } from "./topic-chips";
 import { useProfileOverlay } from "./use-profile-overlay";
@@ -88,6 +91,10 @@ export function CommunityFeed({ initial, serverNow, island, canPost, me }: Commu
   const [menuTarget, setMenuTarget] = useState<ContentTarget | null>(null);
   const inFlight = useRef<Set<string>>(new Set());
   const pendingLikes = useRef<Set<string>>(new Set());
+  const [picker, setPicker] = useState<{ post: CommunityPostDto; point: { x: number; y: number } } | null>(null);
+  const [reactorsOpen, setReactorsOpen] = useState(false);
+  const [reactors, setReactors] = useState<ReactorRow[]>([]);
+  const [reactorsLoading, setReactorsLoading] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
   /*
    * Bumped whenever the chip row changes. A request that was already in the air when it changed is answering a
@@ -183,7 +190,35 @@ export function CommunityFeed({ initial, serverNow, island, canPost, me }: Commu
       toast.show(r.message);
       return;
     }
-    patchPost(post.id, (p) => ({ ...p, likedByMe: r.liked, likeCount: r.likeCount }));
+    patchPost(post.id, (p) => ({ ...p, likedByMe: r.liked, likeCount: r.likeCount, reactions: r.reactions }));
+  };
+
+  /** The picker's choice, or a pill tapped in the grouped row. The server's counts win over the optimistic ones. */
+  const setReaction = async (post: CommunityPostDto, emoji: ReactionKey | null) => {
+    setPicker(null);
+    const r = await call(() => setPostEmoji({ postId: post.id, emoji }));
+    if (!r.ok) {
+      if (r.code === "NOT_FOUND") dropPosts((p) => p.id === post.id);
+      else toast.show(r.message);
+      return;
+    }
+    patchPost(post.id, (p) => ({ ...p, likeCount: r.likeCount, likedByMe: r.reactions.mine !== null, reactions: r.reactions }));
+  };
+
+  const openReactors = async (post: CommunityPostDto) => {
+    setReactorsOpen(true);
+    setReactors([]);
+    setReactorsLoading(true);
+    const r = await call(() => loadPostReactorList({ postId: post.id }));
+    setReactorsLoading(false);
+    if (r.ok) {
+      setReactors(r.reactors.map((x) => ({
+        emoji: x.emoji,
+        name: x.isMe ? "You" : x.author.name,
+        isMe: x.isMe,
+        avatar: <Avatar name="" aria-hidden="true" photo={authorPhotoRef(x.author)} size={32} />,
+      })));
+    }
   };
 
   const onPollVoted = (postId: string, poll: PollDto) => patchPost(postId, (p) => ({ ...p, poll }));
@@ -265,6 +300,9 @@ export function CommunityFeed({ initial, serverNow, island, canPost, me }: Commu
                   post={post}
                   now={state.now}
                   onToggleLike={(p) => void toggleLike(p)}
+                  onReactionPicker={(p, point) => setPicker({ post: p, point })}
+                  onSetReaction={(p, emoji) => void setReaction(p, emoji)}
+                  onInspectReactions={(p) => void openReactors(p)}
                   onOpenAuthor={(a) => void profile.open(a)}
                   onOpenMenu={openMenu}
                   onPollVoted={onPollVoted}
@@ -344,6 +382,15 @@ export function CommunityFeed({ initial, serverNow, island, canPost, me }: Commu
           else { generation.current += 1; setTabs(allFresh(serverNow)); void load(tab, "first", topic); }
         }}
       />
+      <ReactionPicker
+        at={picker?.point ?? null}
+        current={picker?.post.reactions.mine ?? null}
+        onPick={(emoji) => { if (picker) void setReaction(picker.post, emoji); }}
+        onClose={() => setPicker(null)}
+        label="Choose a reaction"
+      />
+      <ReactorSheet open={reactorsOpen} onClose={() => setReactorsOpen(false)} rows={reactors} loading={reactorsLoading} />
+
       {profile.element}
     </AppScreen>
   );

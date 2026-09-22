@@ -3,21 +3,41 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { blockChatPartner, loadMatchProfile, loadOlderMessages, markChatRead, pollChatMessages, reportChatPartner, sendChatMessage, unmatchChat, type MessagingFailure } from "@/actions/messaging";
+import { blockChatPartner, editChatMessage, loadMatchProfile, loadMessageReactors, loadOlderMessages, markChatRead, pollChatMessages, reactToChatMessage, reportChatPartner, sendChatMessage, unmatchChat, type MessagingFailure } from "@/actions/messaging";
 import { REPORT_REASON_LABELS } from "@/constants/labels";
 import { MESSAGE_LIMITS } from "@/config/product";
 import { bubbleTime } from "@/lib/chat-time";
 import { cn } from "@/lib/cn";
+import type { ReactionKey } from "@/lib/reactions";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
 import { ActionSheet, BottomSheet, ConfirmationDialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ChevronLeftIcon, LockIcon, MoreIcon, VerifiedBadge } from "@/components/ui/icons";
+import { useLongPress, useSwipeToReply } from "@/components/ui/long-press";
+import { ReactionPicker, ReactionSummary, ReactorSheet, type ReactorRow } from "@/components/ui/reactions";
 import { useToast } from "@/components/ui/toast";
 import { FullProfile } from "@/components/features/discovery/full-profile";
 import { toDeckCard, type DeckCard } from "@/components/features/discovery/types";
 import { useServerClock } from "@/components/features/discovery/use-server-clock";
 import type { ConversationHeaderDto } from "@/server/conversations/list";
 import type { MessageDto, MessagePageDto } from "@/server/conversations/messages";
+
+/*
+ * MESSAGE INTERACTIONS (docs/ARCHITECTURE.md §9.4).
+ *
+ * Long-press a bubble and a sheet offers Reply, React and — on your own messages only — Edit. The offer is a
+ * convenience; the server decides. `editChatMessage` matches `{ id, senderId }` together, so a client that showed
+ * Edit on somebody else's bubble would simply be refused.
+ *
+ * Desktop gets the same menu from a ⋯ that appears on hover, because long-press on a mouse means "select text"
+ * and taking that away would be a worse trade than an extra affordance. `useLongPress` ignores mouse input
+ * entirely for the same reason.
+ *
+ * A reaction or an edit changes a message the OTHER person is already looking at, which the incremental poll
+ * ("everything after id X") can never deliver. The conversation carries an `interactionAt` watermark instead: it
+ * travels out with every poll and back on the next one, and only a watermark that has moved costs the server a
+ * second query. `updates` is how those changed messages come back.
+ */
 
 /*
  * Prototype conversation screen: glass header (56 + safe-top) with 44 px back (phone), 40 px avatar, 16/700 name +
@@ -39,7 +59,10 @@ export interface ConversationProps {
   serverNow: string;
 }
 
-type Pending = { clientId: string; body: string; at: string; state: "sending" | "failed"; error?: string };
+type Pending = { clientId: string; body: string; at: string; state: "sending" | "failed"; error?: string; replyTo: MessageDto | null };
+
+/** What the long-press sheet is currently open for, plus where the finger was (the picker is placed there). */
+type BubbleTarget = { message: MessageDto; point: { x: number; y: number } };
 const POLL_MS = 4000;
 const REASONS = Object.entries(REPORT_REASON_LABELS) as [keyof typeof REPORT_REASON_LABELS, string][];
 
@@ -64,7 +87,20 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
   const [confirm, setConfirm] = useState<null | "block" | "unmatch">(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [profile, setProfile] = useState<DeckCard | null>(null);
+  // Long-press state. `bubble` drives the sheet, `picker` the floating emoji row, `replyTo` the composer preview,
+  // and `editing` swaps the composer into edit mode without creating a second message.
+  const [bubble, setBubble] = useState<BubbleTarget | null>(null);
+  const [picker, setPicker] = useState<BubbleTarget | null>(null);
+  const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
+  const [editing, setEditing] = useState<MessageDto | null>(null);
+  const [reactorsFor, setReactorsFor] = useState<string | null>(null);
+  const [reactors, setReactors] = useState<ReactorRow[]>([]);
+  const [reactorsLoading, setReactorsLoading] = useState(false);
+  // The watermark. A ref, not state: it is read inside the poll loop and must never restart it.
+  const interactionAt = useRef<string | null>(initialPage.interactionAt ?? null);
   const scroller = useRef<HTMLDivElement>(null);
+  const bubbleRefs = useRef(new Map<string, HTMLDivElement>());
+  const [flash, setFlash] = useState<string | null>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const stickToBottom = useRef(true);
   const prependAnchor = useRef<{ height: number; top: number } | null>(null);
@@ -103,11 +139,18 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
     let latest = newestId;
     const poll = async () => {
       if (document.visibilityState === "visible" && navigator.onLine) {
-        const result = await pollChatMessages({ conversationId: header.id, afterId: latest }).catch(() => null);
+        const result = await pollChatMessages({ conversationId: header.id, afterId: latest, sinceInteractionAt: interactionAt.current }).catch(() => null);
         if (cancelled) return;
         if (result && result.ok) {
           sync(result.serverNow);
           setOtherReadAt(result.readState?.otherReadAt ?? null);
+          interactionAt.current = result.interactionAt;
+          // Reactions and edits on messages already on screen. Merged in place so nothing moves and the scroll
+          // position is untouched — a reaction appearing must not jump the thread under the reader's thumb.
+          if (result.updates.length) {
+            const byId = new Map(result.updates.map((m) => [m.id, m]));
+            setMessages((prev) => prev.map((m) => byId.get(m.id) ?? m));
+          }
           if (result.status !== header.status) setHeader((h) => ({ ...h, status: result.status, canUnmatch: false }));
           if (result.messages.length) {
             latest = result.messages[result.messages.length - 1]!.id;
@@ -166,15 +209,17 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
     });
   };
 
-  const send = async (text: string, existingClientId?: string) => {
+  const send = async (text: string, existingClientId?: string, replyOverride?: MessageDto | null) => {
     const body = text.trim();
     if (!body || sending || closed) return;
     const clientId = existingClientId ?? crypto.randomUUID();
+    const quoted = replyOverride !== undefined ? replyOverride : replyTo;
     setSending(true);
     setDraft("");
+    setReplyTo(null);
     stickToBottom.current = true;
-    setPending((p) => [...p.filter((x) => x.clientId !== clientId), { clientId, body, at: new Date(serverTime()).toISOString(), state: "sending" }]);
-    const result = await sendChatMessage({ conversationId: header.id, body }).catch((): MessagingFailure => ({ ok: false, code: "ERROR", message: "Couldn't reach Mellocrush. Try again.", serverNow: new Date().toISOString() }));
+    setPending((p) => [...p.filter((x) => x.clientId !== clientId), { clientId, body, at: new Date(serverTime()).toISOString(), state: "sending", replyTo: quoted }]);
+    const result = await sendChatMessage({ conversationId: header.id, body, replyToMessageId: quoted?.id ?? null }).catch((): MessagingFailure => ({ ok: false, code: "ERROR", message: "Couldn't reach Mellocrush. Try again.", serverNow: new Date().toISOString() }));
     setSending(false);
     if (result.ok) {
       sync(result.serverNow);
@@ -193,10 +238,112 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape" && (replyTo || editing)) {
+      e.preventDefault();
+      cancelCompose();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      void send(draft);
+      void submitComposer();
     }
+  };
+
+  /** Leaves edit or reply mode and puts the composer back the way it was. */
+  const cancelCompose = () => {
+    setEditing(null);
+    setReplyTo(null);
+    setDraft("");
+  };
+
+  /** One entry point for the send button and the Enter key, because the composer now has two jobs. */
+  const submitComposer = async () => {
+    if (editing) return saveEdit();
+    return send(draft);
+  };
+
+  /**
+   * Saves an edit. One row is rewritten, so nothing is appended to the thread: the bubble already on screen is
+   * replaced by the server's version of itself, which is also what carries the "Edited" marker.
+   */
+  const saveEdit = async () => {
+    const target = editing;
+    const body = draft.trim();
+    if (!target || !body || sending) return;
+    setSending(true);
+    const result = await editChatMessage({ messageId: target.id, body }).catch((): MessagingFailure => ({ ok: false, code: "ERROR", message: "Couldn't reach Mellocrush. Try again.", serverNow: new Date().toISOString() }));
+    setSending(false);
+    if (!result.ok) {
+      toast.show(result.message);
+      return;
+    }
+    const saved = result.message;
+    setMessages((prev) => prev.map((m) => (m.id === saved.id ? saved : m)));
+    cancelCompose();
+  };
+
+  /**
+   * Sets or clears my reaction. Optimistic, then reconciled with the server's own count — the server is the only
+   * thing that knows what the other person has done in the meantime.
+   */
+  const react = async (message: MessageDto, emoji: ReactionKey | null) => {
+    setPicker(null);
+    setBubble(null);
+    const result = await reactToChatMessage({ messageId: message.id, emoji }).catch(() => null);
+    if (!result || !result.ok) {
+      toast.show(result?.message ?? "Couldn't reach Mellocrush. Try again.");
+      return;
+    }
+    // Our own change is already accounted for, so the watermark advances here too: without this the very next
+    // poll would see a moved watermark and re-send the window for a change we made ourselves.
+    interactionAt.current = result.interactionAt;
+    setMessages((prev) => prev.map((m) => (m.id === result.messageId ? { ...m, reactions: result.reactions } : m)));
+  };
+
+  /** Scrolls to a quoted message and flashes it, or says so when it is no longer there. */
+  const jumpToQuoted = (id: string) => {
+    const el = bubbleRefs.current.get(id);
+    if (!el) {
+      // It exists, but this client has not paged back far enough to be holding it.
+      toast.show("That message is further up. Load earlier messages to see it.");
+      return;
+    }
+    stickToBottom.current = false;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setFlash(id);
+    setTimeout(() => setFlash((f) => (f === id ? null : f)), 1200);
+  };
+
+  const openReactors = async (message: MessageDto) => {
+    setBubble(null);
+    setReactorsFor(message.id);
+    setReactors([]);
+    setReactorsLoading(true);
+    const result = await loadMessageReactors({ messageId: message.id }).catch(() => null);
+    setReactorsLoading(false);
+    if (result && result.ok) setReactors(result.reactors.map((r) => ({ emoji: r.emoji, name: r.name, isMe: r.isMe })));
+  };
+
+  const beginEdit = (message: MessageDto) => {
+    setBubble(null);
+    setReplyTo(null);
+    setEditing(message);
+    setDraft(message.body);
+    // After the value lands, so the caret goes to the end rather than the start.
+    requestAnimationFrame(() => {
+      const el = textarea.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  };
+
+  const beginReply = (message: MessageDto) => {
+    setBubble(null);
+    setEditing(null);
+    setDraft("");
+    setReplyTo(message);
+    requestAnimationFrame(() => textarea.current?.focus());
   };
 
   const openProfile = async () => {
@@ -258,12 +405,33 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
         ) : (
           <div className="mb-3 self-center rounded-full bg-surface-muted px-3.5 py-1.5 text-center text-micro text-text-secondary">You matched with {header.other.name}. Say hello.</div>
         )}
-        {messages.map((m) => <Bubble key={m.id} message={m} now={serverTime} seen={m.id === lastSeenOutgoingId} />)}
+        {messages.map((m) => (
+          <Bubble
+            key={m.id}
+            message={m}
+            now={serverTime}
+            seen={m.id === lastSeenOutgoingId}
+            otherName={header.other.name}
+            flash={flash === m.id}
+            editingNow={editing?.id === m.id}
+            registerRef={(el) => { if (el) bubbleRefs.current.set(m.id, el); else bubbleRefs.current.delete(m.id); }}
+            onOpenMenu={(point) => { if (!closed) setBubble({ message: m, point }); }}
+            onQuickReact={(emoji) => void react(m, emoji)}
+            onInspectReactions={() => void openReactors(m)}
+            onJumpToQuoted={jumpToQuoted}
+            onReply={() => beginReply(m)}
+            interactive={!closed}
+          />
+        ))}
         {pending.map((p) => (
           <div key={p.clientId} className="flex max-w-[78%] flex-col items-end self-end">
-            <div className={cn("whitespace-pre-wrap break-words rounded-[20px] rounded-br-[6px] bg-primary px-3.75 py-2.75 text-body leading-[1.45] text-on-primary", p.state === "sending" && "opacity-60")}>{p.body}</div>
+            <div className={cn("flex flex-col items-end rounded-[20px] rounded-br-[6px] bg-primary px-3.75 py-2.75", p.state === "sending" && "opacity-60")}>
+              {p.replyTo ? <Quote quote={{ id: p.replyTo.id, fromMe: p.replyTo.fromMe, body: p.replyTo.body, available: true }} mine otherName={header.other.name} /> : null}
+              <span className="self-stretch whitespace-pre-wrap break-words text-body leading-[1.45] text-on-primary">{p.body}</span>
+            </div>
             {p.state === "failed" ? (
-              <button type="button" onClick={() => void send(p.body, p.clientId)} className="mx-1.5 mt-1 mb-1.5 border-0 bg-transparent text-tiny font-medium text-danger">
+              // Retried with the quote it was sent with, not with whatever is in the composer now.
+              <button type="button" onClick={() => void send(p.body, p.clientId, p.replyTo)} className="mx-1.5 mt-1 mb-1.5 border-0 bg-transparent text-tiny font-medium text-danger">
                 {p.error ?? "Not sent"} · Tap to retry
               </button>
             ) : (
@@ -281,8 +449,32 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
         </div>
       ) : (
         <div className="shrink-0 border-t border-border bg-background">
+          {/*
+            * One strip above the composer for both jobs. Compact on purpose: it says what will happen and how to
+            * stop it, and nothing else. Cancellable before sending, which is the whole requirement — the ✕ is a
+            * 44px target and Escape does the same thing from the keyboard.
+            */}
+          {editing || replyTo ? (
+            <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
+              <span aria-hidden="true" className={cn("h-8 w-0.75 shrink-0 rounded-full", editing ? "bg-ocean" : "bg-primary")} />
+              <div className="min-w-0 flex-1">
+                <div className={cn("text-micro font-medium", editing ? "text-ocean" : "text-primary-ink")}>
+                  {editing ? "Editing message" : `Replying to ${replyTo!.fromMe ? "yourself" : header.other.name}`}
+                </div>
+                <div className="truncate text-caption text-text-secondary">{(editing ?? replyTo)!.body}</div>
+              </div>
+              <button
+                type="button"
+                onClick={cancelCompose}
+                aria-label={editing ? "Stop editing" : "Cancel reply"}
+                className="grid size-11 shrink-0 place-items-center rounded-md border-0 bg-transparent text-text-secondary hover:bg-surface-muted"
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+          ) : null}
           <form
-            onSubmit={(e) => { e.preventDefault(); void send(draft); }}
+            onSubmit={(e) => { e.preventDefault(); void submitComposer(); }}
             className="flex items-end gap-2 px-3 pt-2.5"
             style={{ paddingBottom: "calc(12px + var(--safe-bottom))" }}
           >
@@ -293,14 +485,18 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, MESSAGE_LIMITS.maxLength))}
               onKeyDown={onKeyDown}
-              placeholder="Message"
+              placeholder={editing ? "Edit message" : "Message"}
               rows={1}
               maxLength={MESSAGE_LIMITS.maxLength}
               enterKeyHint="send"
               className="max-h-30 min-h-11 flex-1 resize-none rounded-[22px] bg-surface-muted px-4 py-2.75 text-field leading-[1.4] text-text outline-none placeholder:text-text-muted focus-visible:outline-2 focus-visible:outline-primary field-sizing-content"
             />
-            <button type="submit" aria-label="Send" disabled={!canSend} className="grid size-11 shrink-0 place-items-center rounded-full border-0 bg-primary text-on-primary pressable-round disabled:opacity-45">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            <button type="submit" aria-label={editing ? "Save edit" : "Send"} disabled={!canSend} className="grid size-11 shrink-0 place-items-center rounded-full border-0 bg-primary text-on-primary pressable-round disabled:opacity-45">
+              {editing ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+              )}
             </button>
           </form>
           {draft.length > MESSAGE_LIMITS.maxLength - 200 ? <p className="px-4 pb-2 text-right text-micro text-text-secondary tabular-nums">{draft.length}/{MESSAGE_LIMITS.maxLength}</p> : null}
@@ -366,22 +562,158 @@ export function Conversation({ header: initialHeader, initialPage, serverNow }: 
         )}
       </BottomSheet>
 
+      {/*
+        * The long-press menu. Edit is offered on your own messages only — a convenience, not the security
+        * boundary: the server matches the message id and the sender id together, so the option's absence here and
+        * its refusal there are two independent statements of the same rule.
+        */}
+      <ActionSheet
+        open={bubble !== null}
+        onClose={() => setBubble(null)}
+        label="Message options"
+        items={
+          bubble
+            ? [
+                { label: "Reply", onSelect: () => beginReply(bubble.message) },
+                { label: "React", onSelect: () => setPicker({ ...bubble, point: bubble.point }) },
+                ...(bubble.message.fromMe ? [{ label: "Edit", onSelect: () => beginEdit(bubble.message) }] : []),
+                ...(bubble.message.reactions.total > 0 ? [{ label: "See who reacted", onSelect: () => void openReactors(bubble.message) }] : []),
+              ]
+            : []
+        }
+      />
+
+      <ReactionPicker
+        at={picker?.point ?? null}
+        current={picker?.message.reactions.mine ?? null}
+        onPick={(emoji) => { if (picker) void react(picker.message, emoji); }}
+        onClose={() => setPicker(null)}
+        label={picker?.message.fromMe ? "React to your message" : `React to ${header.other.name}'s message`}
+      />
+
+      <ReactorSheet open={reactorsFor !== null} onClose={() => setReactorsFor(null)} rows={reactors} loading={reactorsLoading} />
+
       {profile ? <FullProfile profile={profile} onClose={() => setProfile(null)} /> : null}
     </div>
   );
 }
 
-function Bubble({ message, now, seen = false }: { message: MessageDto; now: () => number; seen?: boolean }) {
+/**
+ * The compact quote above a reply's own text.
+ *
+ * Deliberately one line. A quote is a pointer to something the reader can reach, and a tall excerpt of a long
+ * message would make the reply harder to read than the thing it is replying to. Tapping it scrolls to the
+ * original; when the original is gone it says so and stops being a button, because there is nowhere to go.
+ */
+function Quote({ quote, mine, otherName, onJump }: { quote: NonNullable<MessageDto["replyTo"]>; mine: boolean; otherName: string; onJump?: (id: string) => void }) {
+  const who = quote.available ? (quote.fromMe ? "You" : otherName) : null;
+  const body = (
+    <>
+      {who ? <span className={cn("block text-micro font-medium", mine ? "text-on-primary/85" : "text-primary-ink")}>{who}</span> : null}
+      <span className={cn("block truncate text-caption", mine ? "text-on-primary/75" : "text-text-secondary")}>
+        {quote.available ? quote.body : "Message unavailable"}
+      </span>
+    </>
+  );
+  const frame = cn(
+    "mb-1.5 flex w-full items-stretch gap-1.5 self-stretch rounded-md border-l-2 px-1.5 py-1 text-left",
+    mine ? "border-on-primary/45 bg-on-primary/12" : "border-primary/55 bg-surface/55",
+  );
+  if (!quote.available || !onJump) {
+    return <span className={frame}><span className="min-w-0 flex-1">{body}</span></span>;
+  }
+  return (
+    <button type="button" onClick={() => onJump(quote.id)} className={cn(frame, "border-0 border-l-2 bg-transparent", mine ? "bg-on-primary/12" : "bg-surface/55")} aria-label={`Go to the message from ${who}`}>
+      <span className="min-w-0 flex-1">{body}</span>
+    </button>
+  );
+}
+
+interface BubbleProps {
+  message: MessageDto;
+  now: () => number;
+  seen?: boolean;
+  otherName: string;
+  /** Briefly highlighted after somebody tapped a quote pointing at it. */
+  flash: boolean;
+  /** This bubble's body is currently loaded into the composer. */
+  editingNow: boolean;
+  registerRef: (el: HTMLDivElement | null) => void;
+  onOpenMenu: (point: { x: number; y: number }) => void;
+  onQuickReact: (emoji: ReactionKey | null) => void;
+  onInspectReactions: () => void;
+  onJumpToQuoted: (id: string) => void;
+  onReply: () => void;
+  /** False in a closed conversation: history stays readable and nothing in it can be changed. */
+  interactive: boolean;
+}
+
+function Bubble({ message, now, seen = false, otherName, flash, editingNow, registerRef, onOpenMenu, onQuickReact, onInspectReactions, onJumpToQuoted, onReply, interactive }: BubbleProps) {
+  const longPress = useLongPress((point) => onOpenMenu(point));
+  const swipe = useSwipeToReply(onReply, interactive);
+
   if (message.kind === "SYSTEM") {
     return <div className="my-1 self-center rounded-full bg-surface-muted px-3.5 py-1.5 text-center text-micro text-text-secondary">{message.body}</div>;
   }
   const me = message.fromMe;
   return (
-    <div className={cn("flex max-w-[78%] flex-col", me ? "items-end self-end" : "items-start self-start")}>
-      {/* User text is rendered as text: React escapes it and white-space keeps the author's line breaks. */}
-      <div className={cn("whitespace-pre-wrap break-words rounded-[20px] px-3.75 py-2.75 text-body leading-[1.45]", me ? "rounded-br-[6px] bg-primary text-on-primary" : "rounded-bl-[6px] bg-aqua-soft text-text")}>{message.body}</div>
-      <div className="mx-1.5 mt-1 mb-1.5 text-tiny text-text-secondary">
+    <div ref={registerRef} className={cn("group flex max-w-[78%] flex-col", me ? "items-end self-end" : "items-start self-start")}>
+      <div className={cn("relative flex items-center gap-1", me ? "flex-row" : "flex-row-reverse")}>
+        {/* Only drawn mid-swipe, so it costs a quiet thread nothing. */}
+        {swipe.swiping ? (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 flex items-center text-primary" style={{ opacity: Math.min(1, swipe.offset / 44) }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></svg>
+          </span>
+        ) : null}
+        {/*
+          * Desktop's way in. Hidden until the row is hovered or this button itself is focused, so it is there for
+          * a mouse and for the keyboard (Tab reaches it) without putting a permanent control beside every message.
+          * Long-press ignores mouse input, which is why this exists at all.
+          */}
+        {interactive ? (
+          <button
+            type="button"
+            onClick={(e) => onOpenMenu({ x: e.clientX, y: e.clientY })}
+            aria-label="Message options"
+            className="hidden size-8 shrink-0 place-items-center rounded-md border-0 bg-transparent text-text-muted opacity-0 hover:bg-surface-muted focus-visible:opacity-100 group-hover:opacity-100 desktop:grid"
+          >
+            <MoreIcon size={15} />
+          </button>
+        ) : null}
+        <div
+          {...(interactive ? longPress : {})}
+          {...(interactive ? swipe.handlers : {})}
+          // Follows the finger only while a horizontal swipe is actually in progress; released without committing,
+          // the transition below carries it back. No transition DURING the drag, or it would lag behind the finger.
+          style={swipe.offset > 0 ? { transform: `translateX(${swipe.offset}px)` } : undefined}
+          className={cn(
+            // User text is rendered as text: React escapes it and white-space keeps the author's line breaks.
+            // `select-none` only below the desktop breakpoint: a long-press on a phone is the menu gesture, while
+            // a mouse keeps full selection and drag-select exactly as before.
+            "flex min-w-0 flex-col whitespace-pre-wrap break-words rounded-[20px] px-3.75 py-2.75 text-body leading-[1.45] select-none desktop:select-text",
+            me ? "items-end rounded-br-[6px] bg-primary text-on-primary" : "items-start rounded-bl-[6px] bg-aqua-soft text-text",
+            flash && "ring-2 ring-primary ring-offset-2 ring-offset-background transition-shadow",
+            editingNow && "opacity-60",
+            swipe.offset === 0 && "transition-transform duration-150",
+          )}
+        >
+          {message.replyTo ? <Quote quote={message.replyTo} mine={me} otherName={otherName} onJump={onJumpToQuoted} /> : null}
+          <span className="self-stretch">{message.body}</span>
+        </div>
+      </div>
+
+      <ReactionSummary
+        reactions={message.reactions}
+        onToggle={interactive ? onQuickReact : undefined}
+        onInspect={message.reactions.total > 0 ? onInspectReactions : undefined}
+        label={me ? "Reactions on your message" : `Reactions on ${otherName}'s message`}
+        className={cn("-mt-1 mb-0.5", me ? "mr-1.5 justify-end" : "ml-1.5")}
+      />
+
+      <div className={cn("mx-1.5 mt-0.5 mb-1.5 text-tiny text-text-secondary", me ? "text-right" : "text-left")}>
         {bubbleTime(message.at, new Date(now()))}
+        {/* Subtle and beside the metadata, as asked: the time already sits here, so "Edited" reads as part of it. */}
+        {message.editedAt ? <span className="ml-1.5">Edited</span> : null}
         {seen ? <span className="ml-1.5 font-medium text-primary-ink">Seen</span> : null}
       </div>
     </div>

@@ -115,7 +115,7 @@ describe("community DTO privacy", () => {
     // An exact key list, not a subset: a new field on the post DTO has to be added here deliberately, which is
     // the moment to ask whether it is safe to hand to every other member.
     expect(Object.keys(feed.posts[0]!).sort()).toEqual([
-      "author", "body", "commentCount", "context", "createdAt", "id", "isAnonymous", "isMine", "kind", "likeCount", "likedByMe", "photo", "photoUnderReview", "poll", "topic",
+      "author", "body", "commentCount", "context", "createdAt", "id", "isAnonymous", "isMine", "kind", "likeCount", "likedByMe", "photo", "photoUnderReview", "poll", "reactions", "topic",
     ]);
     expect(Object.keys(feed.posts[0]!.author).sort()).toEqual(["followed", "handle", "isMe", "location", "name", "photo", "verified"]);
   });
@@ -160,8 +160,10 @@ describe("reactions", () => {
     const p = await post(a, "benches");
     const first = await setReaction(me, p.id, true, { db, now: T0 });
     const again = await setReaction(me, p.id, true, { db, now: at(T0, 1000) });
-    expect(first).toEqual({ liked: true, likeCount: 1 });
-    expect(again).toEqual({ liked: true, likeCount: 1 });
+    const oneHeart = { groups: [{ emoji: "HEART", count: 1, mine: true }], total: 1, mine: "HEART" };
+    expect(first).toEqual({ liked: true, likeCount: 1, reactions: oneHeart });
+    // Idempotent: the same call again leaves one row, one heart, and the same count.
+    expect(again).toEqual({ liked: true, likeCount: 1, reactions: oneHeart });
     const fans = await Promise.all(Array.from({ length: 8 }, () => createUser(db, { now: T0 })));
     await Promise.all(fans.map((f) => setReaction(f, p.id, true, { db, now: T0 })));
     await Promise.all([setReaction(me, p.id, true, { db, now: T0 }), setReaction(me, p.id, true, { db, now: T0 }), setReaction(me, p.id, true, { db, now: T0 })]);
@@ -169,7 +171,8 @@ describe("reactions", () => {
     expect(row.likeCount).toBe(9);
     expect(await db.communityLike.count({ where: { postId: p.id } })).toBe(9);
     const off = await setReaction(me, p.id, false, { db, now: at(T0, 2000) });
-    expect(off).toEqual({ liked: false, likeCount: 8 });
+    // Mine is gone; the eight fans' hearts are not. `mine: null` with a count of 8 is exactly that distinction.
+    expect(off).toEqual({ liked: false, likeCount: 8, reactions: { groups: [{ emoji: "HEART", count: 8, mine: false }], total: 8, mine: null } });
     expect((await setReaction(me, p.id, false, { db, now: at(T0, 3000) })).likeCount).toBe(8);
     // Dating boundary: no Like, Match, Conversation, and the like allowance is untouched.
     expect(await db.like.count()).toBe(0);

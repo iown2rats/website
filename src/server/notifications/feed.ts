@@ -24,6 +24,7 @@ import { getDb, type Db } from "@/lib/db";
 import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
+import { reactionGlyph } from "@/lib/reactions";
 import type { Actor } from "@/server/actor";
 import { isDemoKey } from "@/server/discovery/dto";
 import { getEntitlements } from "@/server/entitlements";
@@ -41,7 +42,9 @@ export type NotificationKind =
   | "PAYMENT_APPROVED"
   | "PAYMENT_REJECTED"
   | "SUBSCRIPTION_EXPIRING"
-  | "SUBSCRIPTION_EXPIRED";
+  | "SUBSCRIPTION_EXPIRED"
+  | "MESSAGE_REACTION"
+  | "COMMUNITY_COMMENT_REACTION";
 
 /** Which line icon a row falls back to when it shows no member photo. */
 export type NotificationIcon = "like" | "match" | "message" | "community" | "verification" | "billing" | "safety" | "account";
@@ -193,6 +196,8 @@ const ICONS: Record<NotificationKind, NotificationIcon> = {
   PAYMENT_REJECTED: "billing",
   SUBSCRIPTION_EXPIRING: "billing",
   SUBSCRIPTION_EXPIRED: "billing",
+  MESSAGE_REACTION: "message",
+  COMMUNITY_COMMENT_REACTION: "community",
 };
 
 /**
@@ -202,6 +207,7 @@ const ICONS: Record<NotificationKind, NotificationIcon> = {
 function destinationFor(row: Row): string | null {
   switch (row.type as NotificationKind) {
     case "MESSAGE":
+    case "MESSAGE_REACTION":
       return row.conversation ? `/chats/${row.conversation.id}` : "/chats";
     case "NEW_MATCH":
       return row.conversation ? `/chats/${row.conversation.id}` : "/likes";
@@ -210,6 +216,7 @@ function destinationFor(row: Row): string | null {
       return "/likes";
     case "COMMUNITY_LIKE":
     case "COMMUNITY_COMMENT":
+    case "COMMUNITY_COMMENT_REACTION":
       return row.post && row.post.deletedAt === null ? `/community/${row.post.id}` : null;
     case "VERIFICATION_UPDATE":
       return "/settings/verification";
@@ -239,10 +246,21 @@ function titleFor(row: Row, name: string | null): string {
       return name ? `${name} liked you` : "Someone liked you";
     case "INTRO_RECEIVED":
       return name ? `${name} sent you an intro` : "Someone sent you an intro";
-    case "COMMUNITY_LIKE":
+    case "COMMUNITY_LIKE": {
+      const glyph = typeof data.emoji === "string" && data.emoji !== "HEART" ? reactionGlyph(data.emoji) : null;
+      if (glyph) return name ? `${name} reacted ${glyph} to your post` : `Someone reacted ${glyph} to your post`;
       return name ? `${name} liked your post` : "Someone liked your post";
+    }
     case "COMMUNITY_COMMENT":
       return name ? `${name} commented on your post` : "New comment on your post";
+    case "MESSAGE_REACTION": {
+      const glyph = reactionGlyph(typeof data.emoji === "string" ? data.emoji : "HEART");
+      return name ? `${name} reacted ${glyph} to your message` : `Someone reacted ${glyph} to your message`;
+    }
+    case "COMMUNITY_COMMENT_REACTION": {
+      const glyph = reactionGlyph(typeof data.emoji === "string" ? data.emoji : "HEART");
+      return name ? `${name} reacted ${glyph} to your comment` : `Someone reacted ${glyph} to your comment`;
+    }
     case "VERIFICATION_UPDATE":
       return data.status === "VERIFIED" ? "You're photo verified" : "Photo verification update";
     case "PAYMENT_APPROVED":

@@ -12,7 +12,17 @@ import { followMember, unfollowMember } from "@/server/community/follows";
 import { votePoll, type PollDto } from "@/server/community/polls";
 import { deletePost } from "@/server/community/posts";
 import { getCommunityProfile } from "@/server/community/profile";
-import { setReaction } from "@/server/community/reactions";
+import {
+  listCommentReactors,
+  listPostReactors,
+  setCommentReaction,
+  setPostReaction,
+  setReaction,
+  type CommentReactionResult,
+  type CommunityReactorDto,
+  type PostReactionResult,
+} from "@/server/community/reactions";
+import { REACTIONS, type ReactionKey } from "@/lib/reactions";
 import { blockCommentAuthor, blockPostAuthor, reportComment, reportPost } from "@/server/community/reports";
 import { TOPICS, type TopicKey } from "@/server/community/topics";
 import type { DiscoveryCardDto } from "@/server/discovery/dto";
@@ -34,6 +44,15 @@ const handleSchema = z.string().min(1).max(64);
 const voteSchema = z.object({ postId: idSchema, optionId: idSchema });
 const commentsSchema = z.object({ postId: idSchema, cursor: z.string().max(200).nullable().optional() });
 const reactSchema = z.object({ postId: idSchema, liked: z.boolean() });
+/*
+ * The approved set, checked here as well as in the domain and again by the database's own enum. `nullable` is how
+ * "I have no reaction" is expressed: these actions are declarative — the payload is the state the member wants —
+ * so a retried request is harmless and cannot toggle something back on.
+ */
+const emojiSchema = z.enum(REACTIONS.map((r) => r.key) as [ReactionKey, ...ReactionKey[]]).nullable();
+const postEmojiSchema = z.object({ postId: idSchema, emoji: emojiSchema });
+const commentEmojiSchema = z.object({ commentId: idSchema, emoji: emojiSchema });
+const commentIdSchema = z.object({ commentId: idSchema });
 const commentSchema = z.object({ postId: idSchema, body: z.string().max(4000) });
 
 export type CommunityFailure = { ok: false; code: "NOT_FOUND" | "VALIDATION" | "UNAVAILABLE" | "ERROR"; message: string };
@@ -58,11 +77,56 @@ export async function loadFeed(input: unknown): Promise<({ ok: true } & FeedPage
   }
 }
 
-export async function reactToPost(input: unknown): Promise<{ ok: true; liked: boolean; likeCount: number } | CommunityFailure> {
+/** The post card's plain tap: add a ❤️, or clear whatever reaction the member had. */
+export async function reactToPost(input: unknown): Promise<({ ok: true; liked: boolean } & PostReactionResult) | CommunityFailure> {
   try {
     const actor = await requireMember();
     const parsed = reactSchema.parse(input);
     return { ok: true, ...(await setReaction(actor, parsed.postId, parsed.liked)) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** Sets the member's reaction to a post from the picker. `emoji: null` clears it. */
+export async function setPostEmoji(input: unknown): Promise<({ ok: true } & PostReactionResult) | CommunityFailure> {
+  try {
+    const actor = await requireMember();
+    const parsed = postEmojiSchema.parse(input);
+    return { ok: true, ...(await setPostReaction(actor, parsed.postId, parsed.emoji)) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** Sets the member's reaction to a comment. `emoji: null` clears it. */
+export async function setCommentEmoji(input: unknown): Promise<({ ok: true } & CommentReactionResult) | CommunityFailure> {
+  try {
+    const actor = await requireMember();
+    const parsed = commentEmojiSchema.parse(input);
+    return { ok: true, ...(await setCommentReaction(actor, parsed.commentId, parsed.emoji)) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** Who reacted to a post, and with what. Bounded and filtered by the same rules as the feed. */
+export async function loadPostReactorList(input: unknown): Promise<{ ok: true; reactors: CommunityReactorDto[] } | CommunityFailure> {
+  try {
+    const actor = await requireMember();
+    const parsed = z.object({ postId: idSchema }).parse(input);
+    return { ok: true, reactors: await listPostReactors(actor, parsed.postId) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** Who reacted to a comment, and with what. */
+export async function loadCommentReactorList(input: unknown): Promise<{ ok: true; reactors: CommunityReactorDto[] } | CommunityFailure> {
+  try {
+    const actor = await requireMember();
+    const parsed = commentIdSchema.parse(input);
+    return { ok: true, reactors: await listCommentReactors(actor, parsed.commentId) };
   } catch (e) {
     return failure(e);
   }

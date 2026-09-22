@@ -13,7 +13,8 @@ import type { StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
 import { consumeRateLimit } from "@/server/auth/rate-limit";
 import { noBlockOrContactSql } from "@/server/discovery/predicate";
-import { loadAuthors, type CommunityCommentDto } from "./dto";
+import { EMPTY_REACTIONS } from "@/lib/reactions";
+import { loadAuthors, loadCommentReactions, type CommunityCommentDto } from "./dto";
 import { canSeePost } from "./feed";
 import { notifyCommunity } from "./notify";
 import { assertMemberAccount } from "@/server/members/guard";
@@ -60,10 +61,15 @@ export async function listComments(actor: Actor, postId: string, options: { curs
   `);
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
-  const authors = await loadAuthors(db, storage, actor.userId, page.map((r) => r.authorId));
+  const [authors, reactions] = await Promise.all([
+    loadAuthors(db, storage, actor.userId, page.map((r) => r.authorId)),
+    loadCommentReactions(db, actor.userId, page.map((r) => r.id)),
+  ]);
   const comments = page.flatMap((r) => {
     const author = authors.get(r.authorId);
-    return author ? [{ id: r.id, body: r.body, createdAt: r.createdAt.toISOString(), author, isMine: r.authorId === actor.userId }] : [];
+    return author
+      ? [{ id: r.id, body: r.body, createdAt: r.createdAt.toISOString(), author, isMine: r.authorId === actor.userId, reactions: reactions.get(r.id) ?? EMPTY_REACTIONS }]
+      : [];
   });
   const last = page[page.length - 1];
   return { comments, nextCursor: hasMore && last ? encode(last.createdAt, last.id) : null };
@@ -88,7 +94,8 @@ export async function addComment(actor: Actor, postId: string, rawBody: string, 
     return created;
   });
   const authors = await loadAuthors(db, storage, actor.userId, [actor.userId]);
-  return { id: comment.id, body: parsed.data, createdAt: comment.createdAt.toISOString(), author: authors.get(actor.userId)!, isMine: true };
+  // A comment that has just been created cannot have been reacted to yet.
+  return { id: comment.id, body: parsed.data, createdAt: comment.createdAt.toISOString(), author: authors.get(actor.userId)!, isMine: true, reactions: EMPTY_REACTIONS };
 }
 
 /** Soft delete by the comment's author only. */

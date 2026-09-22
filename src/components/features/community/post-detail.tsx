@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { loadComments, postComment, reactToPost } from "@/actions/community";
+import { loadComments, loadCommentReactorList, loadPostReactorList, postComment, reactToPost, setCommentEmoji, setPostEmoji } from "@/actions/community";
 import { COMMUNITY } from "@/config/product";
 import { cn } from "@/lib/cn";
+import { EMPTY_REACTIONS, type ReactionKey } from "@/lib/reactions";
 import { shortRelativeTime } from "@/lib/time";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, Spinner } from "@/components/ui/button";
 import { ChevronLeftIcon, MoreIcon, VerifiedBadge } from "@/components/ui/icons";
+import { useLongPress } from "@/components/ui/long-press";
+import { ReactionPicker, ReactionSummary, ReactorSheet, type ReactorRow } from "@/components/ui/reactions";
 import { useToast } from "@/components/ui/toast";
 import type { CommentsPage } from "@/server/community/comments";
 import type { CommunityCommentDto, CommunityPostDto } from "@/server/community/dto";
@@ -46,6 +49,11 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
   const [menuTarget, setMenuTarget] = useState<ContentTarget | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const likePending = useRef(false);
+  // One picker serves the post and every comment; `target` says which.
+  const [picker, setPicker] = useState<{ target: { kind: "post" | "comment"; id: string }; current: ReactionKey | null; point: { x: number; y: number } } | null>(null);
+  const [reactorsOpen, setReactorsOpen] = useState(false);
+  const [reactors, setReactors] = useState<ReactorRow[]>([]);
+  const [reactorsLoading, setReactorsLoading] = useState(false);
 
   if (!post) return <PostUnavailable />;
 
@@ -66,6 +74,46 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
       return;
     }
     setPost((cur) => cur && { ...cur, likedByMe: r.liked, likeCount: r.likeCount });
+  };
+
+  /** Sets or clears a reaction on the post, then takes the server's counts as the truth. */
+  const reactToThePost = async (emoji: ReactionKey | null) => {
+    setPicker(null);
+    const r = await call(() => setPostEmoji({ postId: post.id, emoji }));
+    if (!r.ok) {
+      if (r.code === "NOT_FOUND") return gone();
+      toast.show(r.message);
+      return;
+    }
+    setPost((cur) => cur && { ...cur, likeCount: r.likeCount, likedByMe: r.reactions.mine !== null, reactions: r.reactions });
+  };
+
+  const reactToComment = async (commentId: string, emoji: ReactionKey | null) => {
+    setPicker(null);
+    const r = await call(() => setCommentEmoji({ commentId, emoji }));
+    if (!r.ok) {
+      // A comment that has gone leaves the thread rather than keeping a control that cannot work.
+      if (r.code === "NOT_FOUND") { setComments((cur) => cur.filter((c) => c.id !== commentId)); return; }
+      toast.show(r.message);
+      return;
+    }
+    setComments((cur) => cur.map((c) => (c.id === commentId ? { ...c, reactions: r.reactions } : c)));
+  };
+
+  const openReactors = async (target: { kind: "post" | "comment"; id: string }) => {
+    setReactorsOpen(true);
+    setReactors([]);
+    setReactorsLoading(true);
+    const r = await call(() => (target.kind === "post" ? loadPostReactorList({ postId: target.id }) : loadCommentReactorList({ commentId: target.id })));
+    setReactorsLoading(false);
+    if (r.ok) {
+      setReactors(r.reactors.map((x) => ({
+        emoji: x.emoji,
+        name: x.isMe ? "You" : x.author.name,
+        isMe: x.isMe,
+        avatar: <Avatar name="" aria-hidden="true" photo={authorPhotoRef(x.author)} size={32} />,
+      })));
+    }
   };
 
   const loadMore = async () => {
@@ -90,7 +138,7 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
     if (!body || sending) return;
     setSending(true);
     const tempId = `tmp-${crypto.randomUUID()}`;
-    const optimistic: LocalComment = { id: tempId, body, createdAt: serverNow, author: { handle: "", name: "You", verified: false, location: null, photo: null, isMe: true, followed: false }, isMine: true, pending: true };
+    const optimistic: LocalComment = { id: tempId, body, createdAt: serverNow, author: { handle: "", name: "You", verified: false, location: null, photo: null, isMe: true, followed: false }, isMine: true, reactions: EMPTY_REACTIONS, pending: true };
     setComments((cur) => [...cur, optimistic]);
     setDraft("");
     const r = await call(() => postComment({ postId: post.id, body }));
@@ -140,6 +188,9 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
           post={post}
           now={serverNow}
           onToggleLike={(p) => void toggleLike(p)}
+          onReactionPicker={(p, point) => setPicker({ target: { kind: "post", id: p.id }, current: p.reactions.mine, point })}
+          onSetReaction={(p, emoji) => void reactToThePost(emoji ?? (p.reactions.mine === null ? "HEART" : null))}
+          onInspectReactions={(p) => void openReactors({ kind: "post", id: p.id })}
           onOpenAuthor={(a) => void profile.open(a)}
           onOpenMenu={(p) => setMenuTarget({ kind: "post", id: p.id, authorName: p.isAnonymous ? "this person" : p.author.name, authorHandle: p.author.handle, isMine: p.isMine })}
           onComments={() => composer.current?.focus()}
@@ -156,24 +207,16 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
           ) : (
             <ul className="m-0 flex list-none flex-col p-0">
               {comments.map((c) => (
-                <li key={c.id} className={cn("flex gap-2.5 border-b border-border py-3 last:border-b-0", c.pending && "opacity-60")}>
-                  <button type="button" onClick={() => void profile.open(c.author)} aria-label={c.isMine ? "Your profile" : `View ${c.author.name}'s profile`} className="shrink-0 self-start rounded-full border-0 bg-transparent p-0">
-                    <Avatar name="" aria-hidden="true" photo={authorPhotoRef(c.author)} size={40} />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.25 text-body-sm">
-                      <span className="truncate font-medium text-text">{c.author.name}</span>
-                      {c.author.verified ? <VerifiedBadge size={13} className="shrink-0" /> : null}
-                      <span className="text-text-secondary">· {c.pending ? "sending" : shortRelativeTime(c.createdAt, new Date(serverNow))}</span>
-                    </div>
-                    <p className="m-0 mt-0.5 whitespace-pre-wrap break-words text-body leading-normal text-text">{c.body}</p>
-                  </div>
-                  {!c.pending ? (
-                    <button type="button" onClick={() => commentMenu(c)} aria-label="Comment options" className="grid size-8 shrink-0 place-items-center self-start rounded-sm border-0 bg-transparent text-text-secondary hover:bg-surface-muted">
-                      <MoreIcon size={16} />
-                    </button>
-                  ) : null}
-                </li>
+                <CommentRow
+                  key={c.id}
+                  comment={c}
+                  serverNow={serverNow}
+                  onOpenAuthor={() => void profile.open(c.author)}
+                  onOpenMenu={() => commentMenu(c)}
+                  onReactionPicker={(point) => setPicker({ target: { kind: "comment", id: c.id }, current: c.reactions.mine, point })}
+                  onSetReaction={(emoji) => void reactToComment(c.id, emoji)}
+                  onInspectReactions={() => void openReactors({ kind: "comment", id: c.id })}
+                />
               ))}
             </ul>
           )}
@@ -214,8 +257,93 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
       </form>
       {draft.length > COMMUNITY.commentMaxLength - 100 ? <p className="bg-surface px-4 pb-2 text-right text-micro tabular-nums text-text-secondary">{draft.length}/{COMMUNITY.commentMaxLength}</p> : null}
 
+      <ReactionPicker
+        at={picker?.point ?? null}
+        current={picker?.current ?? null}
+        onPick={(emoji) => {
+          if (!picker) return;
+          if (picker.target.kind === "post") void reactToThePost(emoji);
+          else void reactToComment(picker.target.id, emoji);
+        }}
+        onClose={() => setPicker(null)}
+        label="Choose a reaction"
+      />
+      <ReactorSheet open={reactorsOpen} onClose={() => setReactorsOpen(false)} rows={reactors} loading={reactorsLoading} />
+
       <ContentMenu target={menuTarget} onClose={() => setMenuTarget(null)} onDeleted={onDeleted} onBlocked={onBlocked} />
       {profile.element}
     </div>
+  );
+}
+
+/**
+ * One comment.
+ *
+ * Reacting works the way it does on a post: long-press the row (or use the ⋯ on a mouse) for the picker, and the
+ * grouped pills appear underneath ONLY once somebody has actually reacted. A thread nobody has reacted to looks
+ * exactly as it did before reactions existed, which is the point — the comment list is the densest surface in the
+ * app and could not afford a permanent row of emoji under every line.
+ */
+function CommentRow({
+  comment,
+  serverNow,
+  onOpenAuthor,
+  onOpenMenu,
+  onReactionPicker,
+  onSetReaction,
+  onInspectReactions,
+}: {
+  comment: LocalComment;
+  serverNow: string;
+  onOpenAuthor: () => void;
+  onOpenMenu: () => void;
+  onReactionPicker: (point: { x: number; y: number }) => void;
+  onSetReaction: (emoji: ReactionKey | null) => void;
+  onInspectReactions: () => void;
+}) {
+  // An optimistic comment has no server id yet, so nothing may be attached to it.
+  const live = !comment.pending;
+  const longPress = useLongPress(onReactionPicker);
+
+  return (
+    <li className={cn("group flex gap-2.5 border-b border-border py-3 last:border-b-0", comment.pending && "opacity-60")}>
+      <button type="button" onClick={onOpenAuthor} aria-label={comment.isMine ? "Your profile" : `View ${comment.author.name}'s profile`} className="shrink-0 self-start rounded-full border-0 bg-transparent p-0">
+        <Avatar name="" aria-hidden="true" photo={authorPhotoRef(comment.author)} size={40} />
+      </button>
+      <div className="min-w-0 flex-1" {...(live ? longPress : {})}>
+        <div className="flex items-center gap-1.25 text-body-sm">
+          <span className="truncate font-medium text-text">{comment.author.name}</span>
+          {comment.author.verified ? <VerifiedBadge size={13} className="shrink-0" /> : null}
+          <span className="text-text-secondary">· {comment.pending ? "sending" : shortRelativeTime(comment.createdAt, new Date(serverNow))}</span>
+        </div>
+        {/* Selectable with a mouse; below the desktop breakpoint the long-press is the menu gesture instead. */}
+        <p className="m-0 mt-0.5 whitespace-pre-wrap break-words text-body leading-normal text-text select-none desktop:select-text">{comment.body}</p>
+        {live ? (
+          <ReactionSummary
+            reactions={comment.reactions}
+            onToggle={onSetReaction}
+            onInspect={comment.reactions.total > 0 ? onInspectReactions : undefined}
+            label={`Reactions on ${comment.isMine ? "your comment" : `${comment.author.name}'s comment`}`}
+            className="mt-1.5"
+          />
+        ) : null}
+      </div>
+      {live ? (
+        <div className="flex shrink-0 flex-col items-center gap-0.5 self-start">
+          <button type="button" onClick={onOpenMenu} aria-label="Comment options" className="grid size-8 place-items-center rounded-sm border-0 bg-transparent text-text-secondary hover:bg-surface-muted">
+            <MoreIcon size={16} />
+          </button>
+          {/* The mouse route to the picker: shown on hover or keyboard focus, never permanently. */}
+          <button
+            type="button"
+            onClick={(e) => onReactionPicker({ x: e.clientX, y: e.clientY })}
+            aria-label="React to this comment"
+            className="hidden size-8 place-items-center rounded-sm border-0 bg-transparent text-text-muted opacity-0 hover:bg-surface-muted focus-visible:opacity-100 group-hover:opacity-100 desktop:grid"
+          >
+            <span aria-hidden="true" className="text-[14px] leading-none">☺</span>
+          </button>
+        </div>
+      ) : null}
+    </li>
   );
 }

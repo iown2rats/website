@@ -105,7 +105,10 @@ describe("staff invitations", () => {
     const a = await admin();
     const grant = await createStaffGrant(a, { email: "fresh@example.com", role: "MODERATOR", reason: "New moderator" }, { db, now: T0 });
 
-    expect(await describeInvite(db, grant.token)).toEqual({ email: "fresh@example.com", role: "MODERATOR", setup: true });
+    // `now` explicitly, like every other call in this test. The default is the real clock, and STAFF_RULES gives an
+    // invite three days: read against wall time this assertion passed until 2026-09-22 and then began failing on
+    // its own, describing nothing but the date it was run on.
+    expect(await describeInvite(db, grant.token, T0)).toEqual({ email: "fresh@example.com", role: "MODERATOR", setup: true });
 
     const claimed = await claimStaffInvite({ token: grant.token, password: PASSWORD }, { db, now: T0 });
     expect(claimed.ok).toBe(true);

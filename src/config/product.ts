@@ -84,6 +84,15 @@ export const UNDO: { readonly maxAgeMs: number | null } = {
  */
 export const MESSAGE_SPAM_CEILING = {
   perMinute: 30,
+  /**
+   * Reactions and edits get their own ceilings for the same reason and on the same terms: safety, every tier, no
+   * upgrade removes them. They are separate numbers because they are separate kinds of noise — a reaction is one
+   * tap and costs the recipient a glance, so it can be looser than a message; an edit rewrites something already
+   * on someone else's screen, so it is tighter. Neither shares the message budget: reacting to a chat should
+   * never be able to use up the allowance for actually replying.
+   */
+  reactionsPerMinute: 60,
+  editsPerMinute: 20,
 } as const;
 
 /** Passed profiles resurface after this long unless undone. */
@@ -104,6 +113,8 @@ export const COMMUNITY = {
   postsPerHour: 10,
   commentsPerMinute: 20,
   reactionsPerMinute: 60,
+  /** Longest "who reacted" list. A sheet on a 320px screen cannot usefully show more, and it bounds the query. */
+  reactorsPageSize: 50,
   /**
    * OWNER DECISION (approved 2026-09-17): Invisible Mode controls dating-discovery visibility only. An Invisible
    * Mode user may view Community, post, comment, react and have their Community profile/content viewed under the

@@ -189,7 +189,7 @@ export function PostDetail({ initialPost, initialComments, serverNow }: PostDeta
           now={serverNow}
           onToggleLike={(p) => void toggleLike(p)}
           onReactionPicker={(p, point) => setPicker({ target: { kind: "post", id: p.id }, current: p.reactions.mine, point })}
-          onSetReaction={(p, emoji) => void reactToThePost(emoji ?? (p.reactions.mine === null ? "HEART" : null))}
+          onSetReaction={(_, emoji) => void reactToThePost(emoji)}
           onInspectReactions={(p) => void openReactors({ kind: "post", id: p.id })}
           onOpenAuthor={(a) => void profile.open(a)}
           onOpenMenu={(p) => setMenuTarget({ kind: "post", id: p.id, authorName: p.isAnonymous ? "this person" : p.author.name, authorHandle: p.author.handle, isMine: p.isMine })}

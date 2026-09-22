@@ -21,6 +21,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *
  * The press is reported on `pointerdown` + timer rather than on `pointerup`, so it fires under the finger while it
  * is still down — the Messenger feel — and the caller can position a picker at the point that was pressed.
+ *
+ * THE CLICK THAT FOLLOWS. Lifting the finger after a handled long-press still makes the browser synthesise a
+ * click, so an element that is both long-pressable and clickable would do both things at once — long-press the
+ * heart on a post card and you would open the picker AND toggle your reaction. That is why the element's click
+ * handler is passed IN rather than set alongside these handlers: the hook owns `onClick` and drops the one click
+ * that belongs to a press it just handled. Spreading the handlers next to a separate `onClick` would silently
+ * reintroduce the bug, so there is deliberately no way to do that.
  */
 
 export interface LongPressOptions {
@@ -35,8 +42,11 @@ export interface LongPressPoint {
   y: number;
 }
 
-export function useLongPress(onLongPress: (point: LongPressPoint) => void, options: LongPressOptions = {}) {
-  const { delay = 450, moveTolerance = 10 } = options;
+export function useLongPress(
+  onLongPress: (point: LongPressPoint) => void,
+  options: LongPressOptions & { onClick?: (e: React.MouseEvent) => void } = {},
+) {
+  const { delay = 450, moveTolerance = 10, onClick } = options;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origin = useRef<LongPressPoint | null>(null);
   const handled = useRef(false);
@@ -75,6 +85,15 @@ export function useLongPress(onLongPress: (point: LongPressPoint) => void, optio
     onPointerCancel: clear,
     onContextMenu: (e: React.MouseEvent) => {
       if (handled.current) e.preventDefault();
+    },
+    onClick: (e: React.MouseEvent) => {
+      // The click the browser synthesises after the finger lifts. If the press was already handled as a long
+      // press, this click is an artefact of that same gesture and must not also count as a tap.
+      if (handled.current) {
+        handled.current = false;
+        return;
+      }
+      onClick?.(e);
     },
   };
 }

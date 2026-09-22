@@ -85,7 +85,9 @@ export interface PostCardProps {
 }
 
 export function PostCard({ post, now, onToggleLike, onReactionPicker, onSetReaction, onInspectReactions, onOpenAuthor, onOpenMenu, onComments, onPollVoted, onFollowChanged, className }: PostCardProps) {
-  const longPress = useLongPress((point) => onReactionPicker?.(post, point));
+  // The tap handler goes THROUGH the hook so the click that follows a long-press does not also toggle the
+  // reaction: one gesture, one outcome.
+  const longPress = useLongPress((point) => onReactionPicker?.(post, point), { onClick: () => onToggleLike(post) });
   const anonymous = post.isAnonymous;
   const meta = [post.author.location, shortRelativeTime(post.createdAt, new Date(now))].filter(Boolean).join(" · ");
   const photo = post.photo ? { url: post.photo.url, key: post.photo.demoKey, blurhash: post.photo.blurhash } : null;
@@ -171,8 +173,7 @@ export function PostCard({ post, now, onToggleLike, onReactionPicker, onSetReact
       <div className="-mb-0.5 flex gap-1 text-text-secondary">
         <button
           type="button"
-          {...(onReactionPicker ? longPress : {})}
-          onClick={() => onToggleLike(post)}
+          {...(onReactionPicker ? longPress : { onClick: () => onToggleLike(post) })}
           aria-pressed={post.likedByMe}
           aria-label={
             mine

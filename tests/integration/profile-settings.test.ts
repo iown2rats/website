@@ -295,7 +295,22 @@ describe("notification settings", () => {
     await likeUser(fan1, me.userId, { db, now: T0 });
     expect(await db.notification.count({ where: { userId: me.userId, type: "LIKE_RECEIVED" } })).toBe(1);
     const settings = await updateNotificationSettings(me, { likes: false, community: true, role: "ADMIN" }, { db });
-    expect(settings).toEqual({ matches: true, likes: false, messages: true, community: true, marketing: false });
+    // Exhaustive on purpose: a new preference must be added here deliberately rather than appear unnoticed. Every
+    // push column is false, because a member who has never opened that block has agreed to nothing (§29.6).
+    expect(settings).toEqual({
+      matches: true,
+      likes: false,
+      messages: true,
+      community: true,
+      marketing: false,
+      push: false,
+      pushMessages: false,
+      pushLikes: false,
+      pushMatches: false,
+      pushReactions: false,
+      pushCommunity: false,
+      pushAccount: false,
+    });
     expect(await getNotificationSettings(me, { db })).toEqual(settings);
     await likeUser(fan2, me.userId, { db, now: at(T0, minutes(1)) });
     expect(await db.notification.count({ where: { userId: me.userId, type: "LIKE_RECEIVED" } })).toBe(1); // historical row kept, no new one

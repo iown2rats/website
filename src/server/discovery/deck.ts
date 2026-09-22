@@ -11,6 +11,7 @@ import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provi
 import type { Actor } from "@/server/actor";
 import { getBoostAllowance, getEntitlements, getLikeAllowance, type LikeAllowance } from "@/server/entitlements";
 import { likeUser, passUser, undoLastPass, type LikeResult } from "@/server/likes/like";
+import { kickPush } from "@/server/notifications/push";
 import { buildDiscoveryCards, isDemoKey, type DiscoveryCardDto } from "./dto";
 import { countAwaitingPhotoReview, countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate } from "./query";
 
@@ -150,6 +151,13 @@ export async function likeByHandle(actor: Actor, handle: string, deps: DeckDeps 
   const now = deps.now ?? new Date();
   const targetId = await resolveHandle(db, handle);
   const result: LikeResult = await likeUser(actor, targetId, { db, now });
+  /*
+   * The push, after the transaction and never awaited (docs/ARCHITECTURE.md §29.1). Both the "someone likes you"
+   * and the "it's a match" notifications for the OTHER person were written by the call above, so this is the
+   * moment they can reach a phone; the engine decides for itself whether they are away and whether they asked
+   * for it. Nothing is kicked for the actor, who is by definition in the app right now.
+   */
+  kickPush(targetId, { db });
   let match: MatchDto | null = null;
   if (result.matched && result.matchId) {
     const [card] = await buildDiscoveryCards(db, actor.userId, [targetId], now, storage);

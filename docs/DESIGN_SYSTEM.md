@@ -1002,3 +1002,15 @@ across as down — before anything moves; the worst it can do is fail to fire.
 Every new control is at least 44 px in its touch dimension (the pills are 26 px tall but sit in a row with 44 px of
 clearance and are not the primary path to anything), and every one carries an accessible name that says what will
 happen: "React with love", "Remove your laugh reaction", "3 love, including you. Tap to remove yours".
+
+## 41. "Also notify my phone" (2026-09-22)
+
+Push lives **inside** the existing Notifications section of Settings, not on a screen of its own. It is one more block below the five in-app category rows, built from the same `ListGroup` / `ListRow` / `Switch` at the same 48 px height, so it reads as another thing you can switch rather than a feature being sold to you.
+
+One master row, `Also notify my phone`, with the caption *"Notifications on your lock screen when you're not using Mellocrush. They never show what a message says — only that one is waiting."* The second sentence is the promise of §29.2 said in the member's language, and it is on the screen where the promise is made rather than buried in a policy.
+
+Six category rows appear underneath **only once the master switch is on** — Messages, Likes, Matches, Reactions, Community activity, Account and security. Granting the browser permission and enabling the switch are one gesture, and the categories then appear already showing what that gesture turned on, every one individually switchable. Nothing is enabled out of sight.
+
+The block renders `null` — no placeholder, no "not supported on this device" row — when the runtime has no Push API or the deployment has no VAPID keys. Detection is `useSyncExternalStore` over `serviceWorker`/`PushManager`/`Notification`, so the server snapshot is `false` and the block is absent from the HTML: it appears on the client only where it can actually work, with no flash of a control that then vanishes. A user-agent test would have been the assumption §28.5 warns about.
+
+Refusals are stated, never silent. A browser-level block says so (*"Your browser is blocking notifications for Mellocrush"*) rather than flipping the switch back with no explanation, which is the one failure a toggle cannot express on its own.

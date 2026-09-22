@@ -188,6 +188,30 @@ export const PRESENCE = {
 } as const;
 
 /**
+ * Push delivery (docs/ARCHITECTURE.md §29). Anti-noise, not monetization: none of this differs by tier.
+ */
+export const PUSH = {
+  /**
+   * How long after a notification is created it is still worth pushing. A notification found by the sweep hours
+   * later is news the member will see in the app anyway, and a phone buzzing about something stale is worse than
+   * silence.
+   */
+  freshForMs: 30 * 60_000,
+  /** Most devices a member may register. Generous, but not a way to make one account fan out indefinitely. */
+  maxDevicesPerUser: 20,
+  /** Consecutive transient failures before an endpoint is disabled. A permanent failure disables immediately. */
+  maxFailures: 5,
+  /** How many notifications one sweep will consider. */
+  batchSize: 50,
+  /** Floor between sweeps, so ordinary traffic cannot turn into a stampede of them. */
+  sweepEveryMs: 60_000,
+  /** How long a PENDING claim may sit before the sweep is allowed to try it again. */
+  retryStuckAfterMs: 5 * 60_000,
+  /** Attempts per (notification, device) before giving up for good. */
+  maxAttempts: 3,
+} as const;
+
+/**
  * "Someone messaged you while you were away" email (docs/ARCHITECTURE.md §12.13).
  *
  * The trigger is "still unread after a while", not "user looks offline". The only activity signals available are

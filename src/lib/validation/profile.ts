@@ -39,6 +39,18 @@ export const notificationSettingsSchema = z.object({
   messages: z.boolean().optional(),
   community: z.boolean().optional(),
   marketing: z.boolean().optional(),
+  /*
+   * Push, which is a separate question from the five above: those decide whether a notification exists at all,
+   * these decide whether an existing one also reaches the member's phone. Keeping them apart is what lets
+   * somebody switch every push off and keep the in-app feed untouched.
+   */
+  push: z.boolean().optional(),
+  pushMessages: z.boolean().optional(),
+  pushLikes: z.boolean().optional(),
+  pushMatches: z.boolean().optional(),
+  pushReactions: z.boolean().optional(),
+  pushCommunity: z.boolean().optional(),
+  pushAccount: z.boolean().optional(),
 });
 export type NotificationSettingsInput = z.infer<typeof notificationSettingsSchema>;
 

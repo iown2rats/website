@@ -16,6 +16,7 @@ import { useTheme } from "@/components/layout/theme-toggle";
 import type { NotificationSettingsDto } from "@/server/notifications/settings";
 import type { PrivacySettingsDto } from "@/server/privacy/settings";
 import { DeleteAccountSheet, type RecentAuthDto } from "./delete-account-sheet";
+import { PushSection } from "./push-section";
 import { ROUTES } from "@/server/auth/route-access";
 
 /*
@@ -133,6 +134,9 @@ export function SettingsClient({ maskedPhone, signIn, verificationStatus, notifi
             {NOTIFICATION_ROWS.map((r) => <span key={r.key} id={`notif-${r.key}-d`} className="sr-only">{r.description}</span>)}
             Notifications appear inside Mellocrush. Turning a category off stops new notifications of that kind; earlier ones stay.
           </p>
+          {/* Push (docs/ARCHITECTURE.md §29). Renders nothing where the runtime has no Push API, so the five
+              rows above remain the whole section on those devices. */}
+          <PushSection settings={notifications} onSettings={setNotifications} />
         </section>
       ) : null}
 

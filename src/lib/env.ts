@@ -55,6 +55,21 @@ const schema = z
     ADMIN_BOOTSTRAP_TOKEN: z.string().min(32, "ADMIN_BOOTSTRAP_TOKEN must be at least 32 characters").optional(),
     /** Which photo moderation states other users may see (src/lib/photo-policy.ts). Defaults per NODE_ENV. */
     PHOTO_VISIBILITY_POLICY: z.enum(["approved-only", "approved-and-pending"]).optional(),
+    /*
+     * Web Push (docs/ARCHITECTURE.md §29). A VAPID keypair identifies THIS SERVER to the push services; it is
+     * generated once with `npx web-push generate-vapid-keys` and belongs to us — there is no account anywhere and
+     * no third party is involved in issuing it.
+     *
+     * The public key is not secret (browsers receive it to create a subscription) but is NOT prefixed
+     * NEXT_PUBLIC_: it is handed to the client by a server action alongside the rest of the push state, so the
+     * key and the question "is push even configured here?" are answered together. Unset means push is switched
+     * off entirely — subscribing is refused and nothing is ever sent — which is what keeps every environment
+     * without keys, including local development and the test database, silent by default.
+     */
+    VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+    VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+    /** `mailto:` or `https:` contact a push service can use to reach us about our traffic. Required by RFC 8292. */
+    VAPID_SUBJECT: z.string().regex(/^(mailto:|https:\/\/)/, "VAPID_SUBJECT must be a mailto: or https:// URL").optional(),
   })
   .transform((env) => ({
     ...env,
@@ -82,6 +97,12 @@ const schema = z
     }
     if (!!env.TELEGRAM_CLIENT_ID !== !!env.TELEGRAM_CLIENT_SECRET) {
       ctx.addIssue({ code: "custom", path: ["TELEGRAM_CLIENT_ID"], message: "Telegram sign-in needs both TELEGRAM_CLIENT_ID and TELEGRAM_CLIENT_SECRET (or neither)" });
+    }
+    // All three or none. A half-configured keypair would fail at the moment somebody grants permission, which is
+    // the worst possible time to find out.
+    const vapid = [env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT].filter(Boolean).length;
+    if (vapid !== 0 && vapid !== 3) {
+      ctx.addIssue({ code: "custom", path: ["VAPID_PUBLIC_KEY"], message: "Web push needs VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT together (or none of them)" });
     }
     if (env.EMAIL_PROVIDER === "resend" && (!env.RESEND_API_KEY || !env.EMAIL_FROM)) {
       ctx.addIssue({ code: "custom", path: ["EMAIL_PROVIDER"], message: "EMAIL_PROVIDER=resend needs RESEND_API_KEY and EMAIL_FROM" });
@@ -123,6 +144,14 @@ export function emailAuthConfigured(env: Env = getEnv()): boolean {
  * turns the method off without saying anything about the mailer. A notification still needs sending when sign-in
  * happens to be Google-only, so the two questions get two functions.
  */
+/**
+ * Whether web push can work at all here. False in local development and in tests unless keys are set, which is
+ * why nothing in the test suite can accidentally reach a real push service.
+ */
+export function webPushConfigured(env: Env = getEnv()): boolean {
+  return Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT);
+}
+
 export function emailDeliveryConfigured(env: Env = getEnv()): boolean {
   if (env.EMAIL_PROVIDER === "resend") return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
   return env.EMAIL_PROVIDER === "console" && env.NODE_ENV !== "production";

@@ -16,7 +16,6 @@ import { getCommunityProfile } from "@/server/community/profile";
 import { canView, getDeckCandidateIds } from "@/server/discovery/query";
 import { likeUser } from "@/server/likes/like";
 import { addContactHashes } from "@/server/privacy/contact-hashes";
-import { updatePrivacyToggles } from "@/server/privacy/settings";
 import { deleteAccount } from "@/server/users/deletion";
 import { disconnectDb, resetDb, testDb } from "../helpers/db";
 import { at, createIdentity, createUser, minutes } from "../helpers/factory";

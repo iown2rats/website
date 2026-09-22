@@ -10,6 +10,7 @@ import { getDiscoverAside } from "@/server/matching/aside";
 import { getNavBadges } from "@/server/notifications/badges";
 import { countUnreadNotifications } from "@/server/notifications/feed";
 import { kickMessageEmailSweep } from "@/server/notifications/message-email";
+import { kickPushSweep } from "@/server/notifications/push";
 import { touchPresence } from "@/server/presence";
 
 /**
@@ -28,6 +29,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
    */
   await touchPresence(getDb(), actor.userId);
   kickMessageEmailSweep();
+  /*
+   * The push safety net, on the same terms as the email one: behind its own one-per-minute gate, never awaited.
+   *
+   * Worth being clear about why driving it from ordinary traffic is not a conflict of interest: presence is
+   * written just above, so the member who triggered this sweep has already been marked present and cannot be
+   * pushed to by it. What it catches is everyone ELSE whose notification nobody has delivered yet — including
+   * the case no send-path call can cover, where the recipient was in the app when it arrived and has since left
+   * without reading it.
+   */
+  kickPushSweep();
   const [badges, aside, unread] = await Promise.all([getNavBadges(actor), getDiscoverAside(actor), countUnreadNotifications(actor)]);
   const now = new Date();
   const discoverAside = (

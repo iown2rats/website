@@ -4,6 +4,7 @@ import { z } from "zod";
 import { isDomainError } from "@/lib/errors";
 import { handleSchema } from "@/lib/validation/profile";
 import { requireMember } from "@/server/auth/current-user";
+import { getPushState, registerPushDevice, unregisterAllPushDevices, unregisterPushDevice, type PushStateDto } from "@/server/notifications/devices";
 import { getNotificationSettings, updateNotificationSettings, type NotificationSettingsDto } from "@/server/notifications/settings";
 import { setInvisibleMode } from "@/server/privacy/invisible-mode";
 import { getPrivacySettings, setDatingPaused, updatePrivacyToggles, type PrivacySettingsDto } from "@/server/privacy/settings";
@@ -88,3 +89,55 @@ export async function unblock(input: unknown): Promise<{ ok: true; blocked: Bloc
   }
 }
 
+// ───────────────────────────── Push devices ─────────────────────────────
+
+type PushResult = { ok: true; push: PushStateDto } | SettingsFailure;
+
+const endpointSchema = z.object({
+  endpoint: z.string().min(1).max(2048),
+  keys: z.object({ p256dh: z.string().min(1).max(512), auth: z.string().min(1).max(512) }),
+  userAgent: z.string().max(400).optional().nullable(),
+});
+
+/** What the client needs to decide whether to offer push: is it configured here, and how many devices are live. */
+export async function loadPushState(): Promise<PushResult> {
+  try {
+    const actor = await requireMember();
+    return { ok: true, push: await getPushState(actor) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** Registers this browser after the member grants permission. Upserts on the endpoint, so re-granting is not a duplicate. */
+export async function savePushDevice(input: unknown): Promise<PushResult> {
+  try {
+    const actor = await requireMember();
+    const parsed = endpointSchema.parse(input);
+    return { ok: true, push: await registerPushDevice(actor, { endpoint: parsed.endpoint, keys: parsed.keys, userAgent: parsed.userAgent ?? null }) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** Forgets this browser. Scoped to the session user, so somebody else's endpoint is a silent no-op. */
+export async function forgetPushDevice(input: unknown): Promise<PushResult> {
+  try {
+    const actor = await requireMember();
+    const endpoint = z.object({ endpoint: z.string().min(1).max(2048) }).parse(input).endpoint;
+    return { ok: true, push: await unregisterPushDevice(actor, endpoint) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** Turning push off everywhere: clears the preference AND forgets every device, so nothing can arrive after. */
+export async function disablePushEverywhere(): Promise<{ ok: true; settings: NotificationSettingsDto; push: PushStateDto } | SettingsFailure> {
+  try {
+    const actor = await requireMember();
+    const settings = await updateNotificationSettings(actor, { push: false });
+    return { ok: true, settings, push: await unregisterAllPushDevices(actor) };
+  } catch (e) {
+    return failure(e);
+  }
+}

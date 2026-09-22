@@ -12,6 +12,7 @@ import { REACTIONS, type ReactionKey } from "@/lib/reactions";
 import { getMatchProfile } from "@/server/conversations/profile";
 import { unmatchConversation } from "@/server/conversations/unmatch";
 import { kickAwayRecipientEmail } from "@/server/notifications/message-email";
+import { kickPush } from "@/server/notifications/push";
 import { touchPresence } from "@/server/presence";
 import type { DiscoveryCardDto } from "@/server/discovery/dto";
 import { blockUser } from "@/server/safety/block";
@@ -86,6 +87,12 @@ export async function sendChatMessage(input: unknown): Promise<{ ok: true; messa
      */
     const conversation = await getConversationForActor(getDb(), actor, parsed.conversationId);
     kickAwayRecipientEmail({ recipientId: conversation.otherUserId, conversationId: parsed.conversationId });
+    /*
+     * And the push, on exactly the same terms: after the transaction, never awaited, never able to fail a send.
+     * It decides for itself whether the recipient is away and whether they asked for this — nothing about that
+     * judgement belongs in the send path.
+     */
+    kickPush(conversation.otherUserId);
     // Read back through the same hydration every other bubble uses, so a reply arrives with its quote already
     // resolved. The sender cannot build that locally: a quote comes from the database, not from the request.
     const message = await getMessageDto(getDb(), actor.userId, parsed.conversationId, sent.id);

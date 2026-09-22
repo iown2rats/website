@@ -593,12 +593,30 @@ model DiscoveryPreferences {
 }
 
 model NotificationSettings {
-  userId    String   @id
-  matches   Boolean  @default(true)
-  likes     Boolean  @default(true)
-  messages  Boolean  @default(true)
-  community Boolean  @default(false)
-  marketing Boolean  @default(false)
+  userId    String  @id
+  matches   Boolean @default(true)
+  likes     Boolean @default(true)
+  messages  Boolean @default(true)
+  community Boolean @default(false)
+  marketing Boolean @default(false)
+
+  /**
+   * PUSH, which is a separate question from the five above.
+   * Those decide whether a notification EXISTS — they gate the in-app feed and always have. These decide whether
+   * an existing one also leaves the building. Keeping them apart is what lets somebody switch every push off and
+   * keep the in-app feed exactly as it was, which is the point.
+   * All default FALSE, without exception. Push needs a browser permission the member grants deliberately, and a
+   * default that notified somebody's phone because a column said true would be the opposite of asking.
+   */
+  push          Boolean @default(false)
+  pushMessages  Boolean @default(false)
+  pushLikes     Boolean @default(false)
+  pushMatches   Boolean @default(false)
+  pushReactions Boolean @default(false)
+  pushCommunity Boolean @default(false)
+  /// Verification results, payments and Plus notices.
+  pushAccount   Boolean @default(false)
+
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1338,22 +1356,88 @@ model Notification {
 
   user         User           @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
   actor        User?          @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  pushes       PushDelivery[]
   conversation Conversation?  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   post         CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt(sort: Desc)])
 }
 
-model PushSubscription {
-  id        String   @id @default(cuid(2))
-  userId    String
-  endpoint  String   @unique
-  keys      Json
-  createdAt DateTime @default(now())
+/// How a device is reached. WEBPUSH is the IETF Web Push Protocol (RFC 8030/8291) and is all that is implemented;
+/// FCM exists so the Android shell can be added without a second delivery path, since a Capacitor WebView cannot
+/// receive web push (docs/ARCHITECTURE.md §29.4).
+enum PushTransport {
+  WEBPUSH
+  FCM
+}
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+/// One browser or device a member has allowed to notify them.
+///
+/// A ROW PER DEVICE, never a token on the User row: one person legitimately has a laptop, a phone browser and the
+/// Android app at once, and each has its own endpoint, its own keys and its own way of going stale. A single
+/// column would silently drop every device but the last one to ask.
+///
+/// Nothing here is deleted when it breaks. A push service answering 404 or 410 means that endpoint is gone for
+/// good, so `disabledAt` is set and it is never tried again — but the row stays, because the same browser
+/// re-subscribing gets the same endpoint back and must be recognised rather than duplicated.
+model PushSubscription {
+  id           String        @id @default(cuid(2))
+  userId       String
+  transport    PushTransport @default(WEBPUSH)
+  /// Web Push: the endpoint URL the push service issued to this browser. FCM: the device token. Unique either
+  /// way, which is what makes re-subscribing an upsert rather than a second row.
+  endpoint     String        @unique
+  /// Web Push: `{ p256dh, auth }`, the browser's own public key and auth secret. These are what make the payload
+  /// readable by this browser ALONE — the push service relays ciphertext it cannot open. Never logged.
+  keys         Json
+  /// For the member's own "signed-in devices" list. Display only; never used to make a decision.
+  userAgent    String?
+  lastSeenAt   DateTime?
+  /// Consecutive transient failures. Reset on success; a permanent failure disables outright instead.
+  failureCount Int           @default(0)
+  /// Set when the endpoint is gone (404/410) or has failed too many times. A disabled row is never sent to again.
+  disabledAt   DateTime?
+  createdAt    DateTime      @default(now())
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries PushDelivery[]
 
   @@index([userId])
+  /// The send path's only lookup: this member's devices that are still worth trying.
+  @@index([userId, disabledAt])
+}
+
+enum PushDeliveryStatus {
+  /// Claimed, not yet confirmed sent. A row stuck here is retried by the sweep, bounded by `attempts`.
+  PENDING
+  SENT
+  FAILED
+}
+
+/// One attempt to push one notification to one device — and THE IDEMPOTENCY KEY of the whole system.
+///
+/// `@@unique([notificationId, subscriptionId])` is what makes "a retry cannot send twice" a property of the
+/// database rather than a promise made by the code. The sender does not check-then-send; it INSERTs the claim
+/// first with ON CONFLICT DO NOTHING, and only the request that actually won the insert goes on to send. A job
+/// retrying, a request replayed, a page polling, a user reconnecting and a background sweep running again all
+/// collide with the same row and do nothing. This is deliberately the guarantee that the in-app notification
+/// producers get from an advisory lock, moved into a constraint.
+model PushDelivery {
+  id             String             @id @default(cuid(2))
+  notificationId String
+  subscriptionId String
+  status         PushDeliveryStatus @default(PENDING)
+  attempts       Int                @default(0)
+  /// Why it failed, for support. A provider's message, never a payload.
+  error          String?
+  createdAt      DateTime           @default(now())
+  sentAt         DateTime?
+
+  notification Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscription PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, subscriptionId])
+  @@index([status, createdAt])
 }
 
 // ───────────────────────────── Contact blocking ─────────────────────────────

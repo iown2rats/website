@@ -1026,3 +1026,38 @@ Empty buckets are drawn as a 2px stub rather than omitted: a chart built only fr
 Every chart carries a **View as table** disclosure holding the same numbers. A chart that a screen reader cannot read is half a chart, and the bars themselves are `aria-hidden` rather than announced as a meaningless list of values.
 
 The screen ends with a plain-language **"What is and is not measured"** panel, and every stat carries a `hint` that says what it does *not* mean — that a person on two devices counts twice, that "Direct" includes every suppressed referrer, that conversion is approximate. A number without its caveat is the thing that gets misread in a meeting six weeks later.
+
+## 43. Teaching the swipe, once (2026-09-23)
+
+A dating app's whole interaction is one gesture, and nothing on the Discover screen said what it was. New members
+met a photograph and a pair of buttons and had to guess that the card moves at all.
+
+So on a member's first Discover, the **real card** leans a little way right with its LIKE stamp coming up, returns
+to centre, leans left with PASS, and returns. Roughly four seconds, 750 ms after the first card is ready. It is not
+a modal, an overlay or a coach-mark: it is the card itself, which is the only honest way to demonstrate a gesture.
+
+**It cannot do anything.** `useSwipeGuide` (`src/components/features/discovery/swipe-guide.ts`) emits nothing but
+numbers — an x offset and two opacities — and the deck renders them. Every route that can like, pass, spend an
+allowance, make a match or advance the deck runs through `swipe()` → `commit()`, which the lesson never calls and
+cannot reach. The furthest it leans is 84 px against a 110 px commit threshold, and a unit test holds those two
+numbers apart.
+
+**It yields instantly.** Pointer down, a key, or a control button calls `cancel()` before anything else in the
+handler; the next render is already reading the member's own drag. The card snaps to the finger rather than
+carrying the lean over into the gesture — deliberately, because an inherited 84 px offset would let a 30 px flick
+cross the commit threshold, and a tutorial that likes somebody for you is worse than one that jumps.
+
+**Stamps.** LIKE is green and PASS is coral, each carrying the icon its control button uses, so gesture and button
+read as the same action. Green is the only second hue in Mellocrush and the exception is scoped: the stamps live on
+a photograph, inside the `on-photo` family, for the half-second of a drag. App chrome stays single-hue.
+
+Opacity is `stampOpacity(dx, direction)` — linear in distance over 90 px, clamped, signed so only one can ever show.
+The same function serves the lesson and every real drag, so the demo is a true picture of the gesture.
+
+**Reduced motion** gets the lesson without the movement: each stamp simply appears for a beat, then the other. The
+card does not move. Screen readers were already told the whole thing by the card's own label ("Right arrow to like,
+left arrow to pass"), so both stamps and the hint stay `aria-hidden` rather than narrating a transform.
+
+**Once.** A `thundi.swipeGuideSeen` flag in localStorage, the same mechanism and prefix as the appearance choice.
+No migration: a cleared storage or a second device replays a four-second animation, which is a cheaper failure than
+a column on the members table. The flag is written when the lesson starts, so an interrupted run still counts.

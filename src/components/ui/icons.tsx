@@ -165,6 +165,18 @@ export const ShareIcon = (p: IconProps) => (
     <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M12 15V3M7 8l5-5 5 5" />
   </Base>
 );
+/**
+ * The swipe hint glyph: a double-headed horizontal arrow, for the first-visit Discover lesson. A hand was drawn
+ * first and thrown away — at the 16 px this sits at beside caption text, a hand is a smudge, while an arrow that
+ * points both ways says "this moves left and right" at any size, which is the whole sentence.
+ */
+export const SwipeIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M4 12h16" />
+    <path d="M7.5 8.5L4 12l3.5 3.5" />
+    <path d="M16.5 8.5L20 12l-3.5 3.5" />
+  </Base>
+);
 export const UndoIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M9 14L4 9l5-5" />

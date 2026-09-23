@@ -4,13 +4,13 @@ import { cn } from "@/lib/cn";
 import { intentLower } from "@/constants/labels";
 import { isDemoPhoto, photoBackground } from "@/lib/photos";
 import { LockedPhoto } from "@/components/ui/locked-photo";
-import { PinIcon, VerifiedBadge } from "@/components/ui/icons";
+import { CloseIcon, HeartIcon, PinIcon, VerifiedBadge } from "@/components/ui/icons";
 import type { CardProfile } from "./types";
 
 /*
  * Deck card (prototype lines 158–169): radius 26, shadow-lg, photo fills; bottom scrim 55 %;
- * 3 px photo bars (gap 5, top 12, inset 14); LIKE stamp (teal, rotate −12°, top 40 left 24) and PASS stamp
- * (white, rotate 12°, right 24); info block padding 18px 18px 20px, gap 7: name 28/800 + 20 px badge,
+ * 3 px photo bars (gap 5, top 12, inset 14); LIKE stamp (green, rotate −12°, top 40 left 24) and PASS stamp
+ * (coral, rotate 12°, right 24), both with the icon their control button uses; info block padding 18px 18px 20px, gap 7: name 28/800 + 20 px badge,
  * location · occupation 15 px with 14 px pin, "Looking for …" glass pill 30 px, interest chips 28 px white/.92 ocean 12.5/700.
  */
 export interface ProfileCardProps {
@@ -75,18 +75,27 @@ export function ProfileCard({
 
       {variant === "deck" ? (
         <>
+          {/*
+            * Stamped onto the photo, angled like a rubber stamp, and carrying the same two icons as the Like and
+            * Pass buttons below the card so the gesture and the button read as one action. Both are aria-hidden
+            * and pointer-events-none: a screen reader hears the card's own label and the deck's live region, never
+            * a stamp that is really just the transform in words, and neither stamp can intercept a drag.
+            * Opacity is passed in, never decided here — see `stampOpacity` in ./swipe-guide.
+            */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-6 top-10 rounded-sm border-[2.5px] border-primary px-3.5 py-2 text-h3 tracking-[.06em] text-primary transition-opacity duration-100 -rotate-12"
+            className="pointer-events-none absolute left-6 top-10 flex items-center gap-1.5 rounded-sm border-[2.5px] border-stamp-like px-3.5 py-2 text-h3 tracking-[.06em] text-stamp-like transition-opacity duration-100 -rotate-12"
             style={{ opacity: likeOpacity }}
           >
+            <HeartIcon size={18} filled strokeWidth={0} />
             LIKE
           </span>
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute right-6 top-10 rounded-sm border-[2.5px] border-white px-3.5 py-2 text-h3 tracking-[.06em] text-white transition-opacity duration-100 rotate-12"
+            className="pointer-events-none absolute right-6 top-10 flex items-center gap-1.5 rounded-sm border-[2.5px] border-stamp-pass px-3.5 py-2 text-h3 tracking-[.06em] text-stamp-pass transition-opacity duration-100 rotate-12"
             style={{ opacity: passOpacity }}
           >
+            <CloseIcon size={17} strokeWidth={2.6} />
             PASS
           </span>
         </>

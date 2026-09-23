@@ -263,6 +263,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
           undoDisabled={undoBusy}
           empty={empty}
           disabled={limitOpen || match != null}
+          guide
           remainingHint={likesExhausted ? `You've used today's ${allowance.limit} likes. Passing still works.` : `${allowance.remaining} likes left today.`}
         />
       </DiscoveryFrame>

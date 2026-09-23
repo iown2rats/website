@@ -48,6 +48,15 @@
   --on-photo: #ffffff;
   --on-photo-muted: rgba(255, 255, 255, 0.85);
   --on-photo-glass: rgba(255, 255, 255, 0.16);
+  /*
+   * Swipe stamps. The only place in Mellocrush with a second hue, and the exception is deliberate: these sit ON a
+   * photograph, inside the `on-photo` family that already runs its own white-based palette, and they exist for the
+   * half-second a card is being dragged. Green here is not a brand colour, it is the universal "yes" of a swipe —
+   * teaching the gesture matters more than hue purity on a surface no chrome shares. App chrome stays single-hue.
+   * Both values are chosen to stay legible over an arbitrary photo rather than to match the text ramp.
+   */
+  --stamp-like: #2fb97f;
+  --stamp-pass: #fd7979;
 
   /* Elevation — soft and diffuse only */
   --shadow-sm: 0 12px 32px rgba(88, 59, 45, 0.1);
@@ -158,6 +167,8 @@
   --scrim: rgba(0, 0, 0, 0.6);
   --shadow-sm: 0 12px 32px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.7);
+  --stamp-like: #7fd39a;
+  --stamp-pass: #fd8585;
 }
 
 

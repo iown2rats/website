@@ -520,6 +520,38 @@ Free: the read model returns `{ count, placeholders: [{ blurhash, verified }] }`
 
 Phase 10 built the screen (`/likes`, `src/server/likes/likes-page.ts`): Free receives `count` and `placeholders` (blurhash + verified flag) and renders blurred tiles behind a lock card ("N people like you · Plus feature · See who likes you" → the lock sheet → Membership); Plus receives the standard discovery card DTO and can open a profile, like back (a mutual like shows the match screen) or pass. The Matches tab lists active matches with a way into each chat. Tested in `tests/integration/plus-enforcement.test.ts`: the Free payload contains no names, handles, ids or URLs.
 
+#### 12.5.1 One eligibility rule, and the order of a pass
+
+`src/server/likes/eligibility.ts` owns the only answer to "may this viewer be told that this person liked them".
+Three surfaces call it — the Likes You grid and count, the Discover aside, and the notification feed's decision to
+print a liker's name — so none of them can reveal somebody another one hides.
+
+A pass suppresses an incoming like **only when the pass came after it**:
+
+```sql
+AND NOT EXISTS (
+  SELECT 1 FROM "Pass" pa
+  WHERE pa."fromUserId" = <viewer> AND pa."toUserId" = u.id
+    AND pa."undoneAt" IS NULL
+    AND pa."createdAt" > l."createdAt"      -- strict: simultaneous does not suppress
+)
+```
+
+Passing somebody *after* they liked you is an informed "no" and it sticks. Passing them *before* was a decision
+made without the very information this app sells, so it does not cancel the like. Expiry is deliberately not
+considered: a lapsed pass that followed a like still suppresses it.
+
+This was found the expensive way. A member passed somebody in Discover; she liked him six hours later; his
+notification named her the moment he bought Plus; and Likes You — which excluded anyone he had already swiped on,
+in either order — showed him nothing. He paid MVR 49 to be told a name that led to an empty page. Two surfaces,
+two definitions, one refund.
+
+A corollary worth stating: a `LIKE_RECEIVED` notification always has a `Like` row behind it, written in the same
+transaction by `likeUser`. A fixture that creates the notification alone is testing a state production cannot
+reach, and after this change such a row is correctly never named.
+
+Covered by `tests/integration/like-pass-order.test.ts`.
+
 ### 12.6 Invisible Mode
 
 Stored as `PrivacySettings.invisibleMode` (the user's wish). It is effective only while the user holds the entitlement. In the discovery predicate, candidate U is shown to viewer V only if:

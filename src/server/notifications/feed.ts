@@ -12,8 +12,9 @@
  *  - A like is the paywall. Free members see a count and anonymised placeholders on Likes You (§12.5), so a
  *    LIKE_RECEIVED / INTRO_RECEIVED row reads "Someone liked you" with no name and no photo unless the viewer
  *    holds `seeIncomingLikes`. The client is never sent the liker's identity to hide.
- *  - A blocked member is never named, whatever the row is. A like from an account that is not ACTIVE stays
- *    anonymous too, matching what Likes You would show.
+*  - A blocked member is never named, whatever the row is. A like row names its liker only when that liker is
+ *    actually on the viewer's Likes You page — the same `nameableLikers` rule the page runs — so the feed can
+ *    never reveal somebody the page then refuses to show (§12.5).
  *  - A message preview is one line of a conversation the viewer is a participant in — the query re-asserts that
  *    participation instead of trusting the notification. Soft-deleted and non-text messages are skipped and the
  *    preview is truncated.
@@ -28,6 +29,7 @@ import { reactionGlyph } from "@/lib/reactions";
 import type { Actor } from "@/server/actor";
 import { isDemoKey } from "@/server/discovery/dto";
 import { getEntitlements } from "@/server/entitlements";
+import { nameableLikers } from "@/server/likes/eligibility";
 
 export type NotificationKind =
   | "NEW_MATCH"
@@ -337,6 +339,7 @@ export async function getNotificationFeed(
   const actorIds = rows.flatMap((r) => (r.actorId ? [r.actorId] : []));
   const hasLikeRow = rows.some((r) => r.type === "LIKE_RECEIVED" || r.type === "INTRO_RECEIVED");
 
+  const likeActorIds = rows.flatMap((r) => ((r.type === "LIKE_RECEIVED" || r.type === "INTRO_RECEIVED") && r.actorId ? [r.actorId] : []));
   const [photos, previews, blocked, canSeeLikers] = await Promise.all([
     actorPhotos(db, actorIds, storage),
     messagePreviews(db, actor.userId, rows.flatMap((r) => (r.type === "MESSAGE" && r.conversationId ? [r.conversationId] : []))),
@@ -345,13 +348,22 @@ export async function getNotificationFeed(
     hasLikeRow ? getEntitlements(db, actor.userId, now).then((e) => e.rules.canSeeIncomingLikes) : Promise.resolve(false),
   ]);
 
+  /*
+   * A like row may name its liker only when that liker is on the viewer's Likes You page right now — the same
+   * `nameableLikers` rule the page itself runs. Paying for Plus and then being told a name that leads to an empty
+   * page is worse than not being told (docs/ARCHITECTURE.md §12.5); this is what makes the two agree.
+   *
+   * Asked only once the entitlement is known, so a Free viewer costs no extra query.
+   */
+  const nameable = canSeeLikers ? await nameableLikers(db, actor.userId, likeActorIds, now) : new Set<string>();
+
   const items = rows.map((r) => {
     const kind = r.type as NotificationKind;
     const isLike = kind === "LIKE_RECEIVED" || kind === "INTRO_RECEIVED";
     const named =
       r.actorId !== null &&
       !blocked.has(r.actorId) &&
-      (!isLike || (canSeeLikers && r.actor?.status === "ACTIVE"));
+      (!isLike || (canSeeLikers && nameable.has(r.actorId)));
     const name = named ? r.actor?.profile?.displayName ?? null : null;
     return {
       id: r.id,

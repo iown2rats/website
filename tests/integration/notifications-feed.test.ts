@@ -28,6 +28,19 @@ async function match(a: TestUser, b: TestUser, now = T0): Promise<string> {
   return r.conversationId;
 }
 
+/**
+ * The row a real like leaves behind: the `Like` itself plus its notification.
+ *
+ * Both, because a like row may only name its liker while that liker is on the viewer's Likes You page, and being
+ * on that page means having a `Like` (src/server/likes/eligibility.ts). A notification with no `Like` behind it
+ * cannot happen in production — `likeUser` writes the two in one transaction — and a fixture that creates one
+ * tests a state the app cannot reach.
+ */
+async function likedBy(viewerId: string, likerId: string, when: Date = T0, type: "LIKE_RECEIVED" | "INTRO_RECEIVED" = "LIKE_RECEIVED") {
+  await db.like.create({ data: { fromUserId: likerId, toUserId: viewerId, createdAt: when } });
+  return notify(viewerId, type, { actorId: likerId, createdAt: when });
+}
+
 /** A raw row, so the reader is tested independently of which producer happens to create that type today. */
 function notify(
   userId: string,
@@ -156,7 +169,8 @@ describe("privacy: who a row may name", () => {
   it("a Free member's like row names nobody and carries no photo", async () => {
     const me = await createUser(db, { gender: "MAN", now: T0 });
     const liker = await createUser(db, { now: T0, name: "Hassan" });
-    await notify(me.userId, "LIKE_RECEIVED", { actorId: liker.userId });
+    // A liker who IS on his Likes You page, so what hides the name is the paywall and nothing else.
+    await likedBy(me.userId, liker.userId);
 
     const feed = await getNotificationFeed(me, {}, deps);
     expect(feed.items[0]!.title).toBe("Someone liked you");
@@ -173,7 +187,7 @@ describe("privacy: who a row may name", () => {
     const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const liker = await createUser(db, { now: T0, name: "Hassan" });
-    await notify(me.userId, "LIKE_RECEIVED", { actorId: liker.userId });
+    await likedBy(me.userId, liker.userId);
 
     const feed = await getNotificationFeed(me, {}, deps);
     expect(feed.items[0]!.title).toBe("Hassan liked you");
@@ -184,7 +198,8 @@ describe("privacy: who a row may name", () => {
   it("an intro row follows the same paywall as a like", async () => {
     const me = await createUser(db, { gender: "MAN", now: T0 });
     const other = await createUser(db, { now: T0, name: "Zara" });
-    await notify(me.userId, "INTRO_RECEIVED", { actorId: other.userId });
+    // An intro is a like carrying an `Intro` (see `Like.introId`), so it leaves the same row behind.
+    await likedBy(me.userId, other.userId, T0, "INTRO_RECEIVED");
     expect((await getNotificationFeed(me, {}, deps)).items[0]!.title).toBe("Someone sent you an intro");
 
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
@@ -195,7 +210,7 @@ describe("privacy: who a row may name", () => {
     const me = await createUser(db, { gender: "MAN", now: T0 });
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     const liker = await createUser(db, { now: T0, name: "Hassan" });
-    await notify(me.userId, "LIKE_RECEIVED", { actorId: liker.userId });
+    await likedBy(me.userId, liker.userId);
     await db.user.update({ where: { id: liker.userId }, data: { status: "BANNED" } });
 
     const feed = await getNotificationFeed(me, {}, deps);

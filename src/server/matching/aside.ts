@@ -13,6 +13,7 @@ import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provi
 import type { Actor } from "@/server/actor";
 import { isDemoKey } from "@/server/discovery/dto";
 import { getEntitlements } from "@/server/entitlements";
+import { nameableLikers } from "@/server/likes/eligibility";
 
 export interface AsidePhoto {
   url: string | null;
@@ -86,8 +87,12 @@ export async function getDiscoverAside(actor: Actor, deps: { db?: Db; storage?: 
   const canSeeLikers = notifications.some((n) => n.type === "LIKE_RECEIVED")
     ? (await getEntitlements(db, actor.userId, now)).rules.canSeeIncomingLikes
     : false;
+  // Same rule as Likes You and the notification feed: a liker is named only while they are on that page.
+  const nameable = canSeeLikers
+    ? await nameableLikers(db, actor.userId, notifications.flatMap((n) => (n.type === "LIKE_RECEIVED" && n.actorId ? [n.actorId] : [])), now)
+    : new Set<string>();
   const activity = notifications.map((n) => {
-    const named = n.type !== "LIKE_RECEIVED" || canSeeLikers;
+    const named = n.type !== "LIKE_RECEIVED" || (canSeeLikers && n.actorId !== null && nameable.has(n.actorId));
     return {
       name: (named ? n.actor?.profile?.displayName : null) ?? "Someone",
       text: text[n.type as keyof typeof text] ?? "",

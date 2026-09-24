@@ -20,12 +20,15 @@ export function LockedPhoto({
   onUnlock,
   className,
   label = "Unlock with Plus",
+  title,
   compact = false,
 }: {
   blurhash: string | null;
   onUnlock?: () => void;
   className?: string;
   label?: string;
+  /** Optional headline above the label, e.g. "3 more photos" — a count the caller took from the server's DTO. */
+  title?: string;
   /** Small tiles (a card's photo strip) show the lock alone; large ones show the wording too. */
   compact?: boolean;
 }) {
@@ -38,6 +41,7 @@ export function LockedPhoto({
         <span className="grid size-11 place-items-center rounded-full bg-sand/25 text-sand backdrop-blur-sm" aria-hidden="true">
           <LockIcon size={compact ? 16 : 20} />
         </span>
+        {compact || !title ? null : <span className="text-body font-semibold text-on-photo">{title}</span>}
         {compact ? null : <span className="text-caption font-medium text-sand">{label}</span>}
       </span>
     </>
@@ -46,13 +50,13 @@ export function LockedPhoto({
   const shell = cn("relative grid place-items-center overflow-hidden bg-surface-muted", className);
   if (!onUnlock) {
     return (
-      <div className={shell} role="img" aria-label={`Locked photo. ${label}.`}>
+      <div className={shell} role="img" aria-label={title ? `${title}, locked. ${label}.` : `Locked photo. ${label}.`}>
         {body}
       </div>
     );
   }
   return (
-    <button type="button" onClick={onUnlock} aria-label={`Locked photo. ${label}.`} className={cn(shell, "border-0 p-0 text-left pressable")}>
+    <button type="button" onClick={onUnlock} aria-label={title ? `${title}, locked. ${label}.` : `Locked photo. ${label}.`} className={cn(shell, "border-0 p-0 text-left pressable")}>
       {body}
     </button>
   );

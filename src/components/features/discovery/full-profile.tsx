@@ -27,10 +27,10 @@ export interface FullProfileProps {
   onUnlockPhotos?: () => void;
 }
 
-function Photo({ photo, alt, className, priority = false, onUnlock }: { photo: DeckCard["photos"][number] | undefined; alt: string; className?: string; priority?: boolean; onUnlock?: () => void }) {
+function Photo({ photo, alt, className, priority = false, onUnlock, lockedTitle }: { photo: DeckCard["photos"][number] | undefined; alt: string; className?: string; priority?: boolean; onUnlock?: () => void; lockedTitle?: string }) {
   if (!photo) return null;
   // A locked photo has no url to render — the server never sent one — so this is the whole of it.
-  if (photo.locked) return <LockedPhoto blurhash={photo.blurhash ?? null} onUnlock={onUnlock} className={className} />;
+  if (photo.locked) return <LockedPhoto blurhash={photo.blurhash ?? null} onUnlock={onUnlock} className={className} title={lockedTitle} />;
   return (
     <div className={cn("relative overflow-hidden bg-aqua-soft", className)} style={photoBackground(photo)}>
       {photo.url ? <Image src={photo.url} alt={alt} fill unoptimized sizes="(min-width: 900px) 640px, 100vw" className="object-cover" priority={priority} loading={priority ? undefined : "lazy"} /> : null}
@@ -48,6 +48,14 @@ export function FullProfile({ profile, onClose, onPass, onLike, onUnlockPhotos }
   }, [onClose]);
 
   const title = profile.age != null ? `${profile.name}, ${profile.age}` : profile.name;
+  /*
+   * "3 more photos" on the first locked tile only. The number is the photos THIS viewer cannot open, counted from
+   * what the server sent — a locked entry exists only when the server withheld that photo's keys — so a Plus member
+   * or a match (no locked entries) never sees it, and it can never claim a photo that does not exist.
+   */
+  const lockedCount = profile.photos.filter((p) => p.locked).length;
+  const firstLocked = profile.photos.findIndex((p) => p.locked);
+  const lockedTitleFor = (index: number) => (index === firstLocked && lockedCount > 0 ? (lockedCount === 1 ? "1 more photo" : `${lockedCount} more photos`) : undefined);
   const intent = intentLower(profile.intent);
   const [firstPrompt, secondPrompt] = profile.prompts;
   const info: [string, string][] = [
@@ -106,7 +114,7 @@ export function FullProfile({ profile, onClose, onPass, onLike, onUnlockPhotos }
                 <div className="text-prompt leading-[1.35] tracking-[-.015em] text-pretty">{firstPrompt.answer}</div>
               </div>
             ) : null}
-            <Photo photo={profile.photos[1]} alt={profile.photos[1]?.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} />
+            <Photo photo={profile.photos[1]} alt={profile.photos[1]?.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} lockedTitle={lockedTitleFor(1)} />
             {rows.length > 0 ? (
               <dl className="m-0 overflow-hidden rounded-3xl glass-card [&>div+div]:border-t [&>div+div]:border-border">
                 {rows.map(([k, v]) => (
@@ -133,8 +141,8 @@ export function FullProfile({ profile, onClose, onPass, onLike, onUnlockPhotos }
                 <div className="text-prompt leading-[1.35] tracking-[-.015em]">{secondPrompt.answer}</div>
               </div>
             ) : null}
-            <Photo photo={profile.photos[2]} alt={profile.photos[2]?.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} />
-            {profile.photos.slice(3).map((p, i) => <Photo key={i} photo={p} alt={p.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} />)}
+            <Photo photo={profile.photos[2]} alt={profile.photos[2]?.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} lockedTitle={lockedTitleFor(2)} />
+            {profile.photos.slice(3).map((p, i) => <Photo key={i} photo={p} alt={p.alt ?? ""} className="h-80 rounded-[22px]" onUnlock={onUnlockPhotos} lockedTitle={lockedTitleFor(i + 3)} />)}
           </div>
         </div>
 

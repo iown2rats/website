@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { likeCard, loadDeck, passCard, refreshAllowance, saveFilters, undoLastCard, type ActionFailure } from "@/actions/discovery";
 import { DISCOVERY } from "@/config/product";
+import { membershipHref, type PlusSurface } from "@/lib/plus-surfaces";
 import { formatDuration } from "@/lib/time";
 import type { PhotoRef } from "@/lib/photos";
 import { IconButton } from "@/components/ui/button";
@@ -68,7 +69,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
   const [match, setMatch] = useState<{ name: string; photo: PhotoRef | null; conversationId: string | null } | null>(null);
   const [undoBusy, setUndoBusy] = useState(false);
   const [boost, setBoost] = useState<BoostDto>(initial.boost);
-  const [lock, setLock] = useState<{ feature: string; description: string } | null>(null);
+  const [lock, setLock] = useState<{ feature: string; description: string; surface?: PlusSurface } | null>(null);
   const loadingMore = useRef(false);
   const cardsRef = useRef<DeckCard[]>(cards);
   useEffect(() => {
@@ -185,7 +186,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     setUndoBusy(false);
     if (!result.ok) {
       applyFailure(result);
-      if (result.code === "ENTITLEMENT") setLock({ feature: "Undo your last pass", description: "Plus brings back the person you just passed on." });
+      if (result.code === "ENTITLEMENT") setLock({ feature: "Undo your last pass", description: "Plus brings back the person you just passed on.", surface: "undo" });
       else if (result.code === "UNDO_UNAVAILABLE") toast.show(result.message);
       else toast.show("Couldn't reach Mellocrush. Try again.");
       return;
@@ -274,7 +275,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
           onClose={() => setOpenProfile(null)}
           onPass={cards[0]?.handle === openProfile.handle ? () => void onPass(openProfile) : undefined}
           onLike={cards[0]?.handle === openProfile.handle ? () => void onLike(openProfile) : undefined}
-          onUnlockPhotos={() => setLock({ feature: "See all their photos", description: "Plus opens the rest of their photos before you match." })}
+          onUnlockPhotos={() => setLock({ feature: "See all their photos", description: "Plus opens the rest of their photos before you match.", surface: "photo_lock" })}
         />
       ) : null}
 
@@ -300,7 +301,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         resetsAt={allowance.resetsAt}
         serverTime={serverTime}
         onCountdownDone={onCountdownDone}
-        onGetPlus={() => { setLimitOpen(false); router.push("/settings/membership"); }}
+        onGetPlus={() => { setLimitOpen(false); router.push(membershipHref("daily_limit")); }}
       />
 
       <FiltersSheet
@@ -313,7 +314,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         onApply={onApplyFilters}
         onLockedAdvanced={() => setLock({ feature: "Advanced filters", description: "Plus adds height and education to your filters." })}
       />
-      <PlusLockSheet open={lock != null} onClose={() => setLock(null)} feature={lock?.feature ?? ""} description={lock?.description ?? ""} />
+      <PlusLockSheet open={lock != null} onClose={() => setLock(null)} feature={lock?.feature ?? ""} description={lock?.description ?? ""} surface={lock?.surface} />
     </AppScreen>
   );
 }

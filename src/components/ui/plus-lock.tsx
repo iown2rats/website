@@ -6,6 +6,7 @@ import { PlusTag } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogTitle, ResponsiveDialog } from "@/components/ui/dialog";
 import { LockIcon } from "@/components/ui/icons";
+import { membershipHref, type PlusSurface } from "@/lib/plus-surfaces";
 
 /**
  * The one lock state for Plus features (docs/ARCHITECTURE.md §12): what the feature is, that it is part of Plus, and
@@ -19,11 +20,11 @@ import { LockIcon } from "@/components/ui/icons";
  * short sentence by rule; anything longer belongs on Membership, which is one tap away. Counts and prices are NOT
  * repeated here, both to keep it short and so this copy cannot drift from src/config/product.ts.
  *
- * "Get Mellocrush Plus" is the label everywhere a control actually leads to Membership (the like-limit dialog and
+ * "Get MelloCrush Plus" is the label everywhere a control actually leads to Membership (the like-limit dialog and
  * the Membership CTA use the same words); a control that only opens this sheet is named after the locked feature
  * instead, so two buttons in a row never both read as "upgrade".
  */
-export function PlusLockSheet({ open, onClose, feature, description, children }: { open: boolean; onClose: () => void; feature: string; description: string; children?: ReactNode }) {
+export function PlusLockSheet({ open, onClose, feature, description, surface, children }: { open: boolean; onClose: () => void; feature: string; description: string; /** Which promotion this is, carried to Membership as `?from=` (a closed list). */ surface?: PlusSurface; children?: ReactNode }) {
   const titleId = useId();
   return (
     <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId}>
@@ -40,7 +41,7 @@ export function PlusLockSheet({ open, onClose, feature, description, children }:
           "Not now" is the dismiss, and it stays filled rather than ghost: the sheet is glass, so a transparent
           button at the foot of it puts its label straight over the bottom navigation showing through. */}
       <div className="flex flex-col gap-2 pt-0.5">
-        <Link href="/settings/membership" onClick={onClose} className="inline-flex h-11.5 items-center justify-center rounded-lg bg-primary px-5 text-cta-lg text-on-primary pressable">Get Mellocrush Plus</Link>
+        <Link href={membershipHref(surface)} onClick={onClose} className="inline-flex h-11.5 items-center justify-center rounded-lg bg-primary px-5 text-cta-lg text-on-primary pressable">Get MelloCrush Plus</Link>
         <Button variant="muted" size="md" onClick={onClose} fullWidth>Not now</Button>
       </div>
     </ResponsiveDialog>

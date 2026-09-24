@@ -6,8 +6,10 @@ import { PlusHeroTag } from "@/components/ui/badge";
 import { BoltIcon, EyeIcon, FilterIcon, HeartIcon, PeopleIcon, SendIcon, ShieldIcon, UndoIcon } from "@/components/ui/icons";
 import { OceanCard } from "@/components/ui/surface";
 import { PageOverlay } from "@/components/layout/page-overlay";
+import { parsePlusSurface, type PlusSurface } from "@/lib/plus-surfaces";
 import { requireActiveUser } from "@/server/auth/current-user";
 import { getMembership } from "@/server/entitlements/presentation";
+import { getLikesTeaser } from "@/server/likes/likes-you";
 import type { ComparisonCell, ComparisonRow } from "@/server/entitlements/presentation";
 
 export const metadata = { title: "Membership" };
@@ -22,6 +24,17 @@ export const dynamic = "force-dynamic";
  * The table carries only what DIFFERS between the tiers. Rows reading "Included / Included" made it a third longer
  * while answering nothing, so what both tiers get is said once underneath instead.
  */
+
+/**
+ * The comparison row a promotion was about, so arriving from "See who likes you" lands on that row highlighted.
+ * Surfaces with no row of their own (a locked photo, a reminder) highlight nothing.
+ */
+const SURFACE_ROW: Partial<Record<PlusSurface, ComparisonRow["key"]>> = {
+  likes_you: "incoming-likes",
+  discover_likes: "incoming-likes",
+  daily_limit: "likes",
+  undo: "undo",
+};
 
 /** One icon per row, keyed on the row's identity rather than its label, so rewording copy cannot silently drop it. */
 const ROW_ICONS: Record<ComparisonRow["key"], ReactNode> = {
@@ -44,9 +57,15 @@ function Cell({ cell, emphasis }: { cell: ComparisonCell; emphasis: boolean }) {
   return <span className={cn("text-balance", emphasis ? "font-semibold text-sand" : "text-text-secondary")}>{cell.text}</span>;
 }
 
-export default async function MembershipPage() {
+export default async function MembershipPage({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
   const actor = await requireActiveUser();
-  const m = await getMembership(actor);
+  const sp = await searchParams;
+  // `from` is a closed list; anything else is ignored rather than rendered or stored.
+  const from = parsePlusSurface(sp.from);
+  const [m, teaser] = await Promise.all([getMembership(actor), getLikesTeaser(actor)]);
+  // Personal only when it is true: a Free member with at least one eligible like. Plus members get null.
+  const likes = m.tier === "FREE" && teaser && teaser.count > 0 ? teaser.count : 0;
+  const highlight = from ? SURFACE_ROW[from] ?? null : null;
   const periodEnd = m.periodEnd ? new Date(m.periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : null;
   const isPlus = m.tier === "PLUS";
 
@@ -57,13 +76,12 @@ export default async function MembershipPage() {
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 pb-1">
             <div><PlusHeroTag /></div>
             {isPlus ? (
-              <h2 className="text-h2 text-text">You&apos;re on Mellocrush Plus.</h2>
+              <h2 className="text-h2 text-text">You&apos;re on MelloCrush Plus.</h2>
+            ) : likes > 0 ? (
+              // The real number of people on this member's Likes You page, from the shared eligibility rule.
+              <h2 className="text-h2 text-text">{likes === 1 ? "Someone likes you" : `${likes} people like you`}</h2>
             ) : (
-              <h2 className="text-h2 text-text">
-                More of what matters.
-                <br />
-                <span className="text-sand">Nothing you don&apos;t need.</span>
-              </h2>
+              <h2 className="text-h2 text-text">MelloCrush Plus</h2>
             )}
             <p className="text-body-sm leading-normal text-text-secondary">
               {isPlus
@@ -71,7 +89,9 @@ export default async function MembershipPage() {
                   ? // Never "Renews": Plus is bought by bank transfer and never renews automatically (see the footer).
                     `Plus active until ${periodEnd}${m.planName ? ` · ${m.planName}` : ""}.`
                   : "Plus is active on your account."
-                : "Dating on Mellocrush stays free. Plus adds a few quiet advantages."}
+                : likes > 0
+                  ? "See who's interested with MelloCrush Plus."
+                  : "Dating on MelloCrush stays free. Plus adds a few quiet advantages."}
             </p>
           </div>
           {/* Hidden on the narrowest phones, where the headline needs the whole width more than the lockup does. */}
@@ -80,7 +100,7 @@ export default async function MembershipPage() {
       </OceanCard>
 
       <section aria-labelledby="compare-heading" className="relative">
-        <h2 id="compare-heading" className="sr-only">Mellocrush Free compared with Mellocrush Plus</h2>
+        <h2 id="compare-heading" className="sr-only">MelloCrush Free compared with MelloCrush Plus</h2>
         <div className="overflow-hidden rounded-3xl glass-card">
           <table className="w-full table-fixed border-collapse text-caption">
             <thead>
@@ -103,8 +123,10 @@ export default async function MembershipPage() {
             <tbody>
               {m.comparison.map((row, i) => {
                 const last = i === m.comparison.length - 1;
+                // The row the member came here about, for Free members only: a Plus member is not being sold anything.
+                const lit = !isPlus && highlight === row.key;
                 return (
-                  <tr key={row.key} className="align-middle">
+                  <tr key={row.key} className={cn("align-middle", lit && "bg-sand/12")} aria-current={lit ? "true" : undefined}>
                     <th scope="row" className={cn("px-3.5 py-3 text-left font-medium text-text", !last && "border-b border-border")}>
                       <span className="flex items-center gap-2.5">
                         <span aria-hidden="true" className="shrink-0 text-primary">{ROW_ICONS[row.key]}</span>

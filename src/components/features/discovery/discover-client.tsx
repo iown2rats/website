@@ -305,7 +305,8 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
           onLike={onLike}
           onPass={onPass}
           onOpen={(p) => setOpenProfile(p as DeckCard)}
-          onUndo={capabilities.canUndo ? onUndo : undefined}
+          onUndo={capabilities.showUndo ? onUndo : undefined}
+          undoLocked={!capabilities.canUndo}
           undoDisabled={undoBusy}
           empty={empty}
           disabled={limitOpen || match != null}

@@ -30,6 +30,8 @@ export interface SwipeDeckProps {
   /** Rendered as the far-left control when provided (Plus). */
   onUndo?: () => void;
   undoDisabled?: boolean;
+  /** Draw Undo with a Plus tag: a tap still goes to the server, which explains Plus if it refuses. */
+  undoLocked?: boolean;
   /** Shown when there is no current card. */
   empty?: ReactNode;
   showPlaceholderLabels?: boolean;
@@ -61,7 +63,7 @@ export function useReducedMotion(): boolean {
   return useSyncExternalStore(subscribeMotion, () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => false);
 }
 
-export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, undoDisabled = false, empty, showPlaceholderLabels = false, disabled = false, remainingHint, guide = false, className }: SwipeDeckProps) {
+export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, undoDisabled = false, undoLocked = false, empty, showPlaceholderLabels = false, disabled = false, remainingHint, guide = false, className }: SwipeDeckProps) {
   const reducedMotion = useReducedMotion();
   const [photo, setPhoto] = useState<{ id: string; idx: number } | null>(null);
   const [drag, setDrag] = useState({ dx: 0, dy: 0, dragging: false });
@@ -216,6 +218,7 @@ export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, u
           onIntro={onIntro ? () => onIntro(current) : undefined}
           onUndo={onUndo}
           undoDisabled={undoDisabled}
+          undoLocked={undoLocked}
           disabled={Boolean(exiting) || disabled}
         />
       </div>

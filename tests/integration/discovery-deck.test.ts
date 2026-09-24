@@ -26,7 +26,7 @@ describe("deck page", () => {
     const page = await getDeck(viewer, {}, deps());
     expect(page.cards.map((c) => c.handle)).toEqual([a.handle]);
     expect(page.allowance).toMatchObject({ limit: 30, used: 0, remaining: 30, resetsAt: null, tier: "FREE" });
-    expect(page.capabilities).toEqual({ canUndo: false, canUseAdvancedFilters: false, tier: "FREE", plusDailyLikeLimit: PRODUCT_RULES.PLUS.dailyLikeLimit });
+    expect(page.capabilities).toEqual({ canUndo: false, canUseAdvancedFilters: false, tier: "FREE", plusDailyLikeLimit: PRODUCT_RULES.PLUS.dailyLikeLimit, showUndo: false });
     expect(page.serverNow).toBe(T0.toISOString());
     expect(page.emptyReason).toBe("NONE");
     expect(page.me.name).toMatch(/^User/);

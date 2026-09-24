@@ -39,6 +39,11 @@ export interface DeckCapabilities {
   tier: "FREE" | "PLUS";
   /** Plus's daily like allowance, from the product rules, for the Free like-limit copy. Never hard-coded in the UI. */
   plusDailyLikeLimit: number;
+  /**
+   * Whether to draw the Undo control. Always for Plus (unchanged); for Free only while PLUS_UNDO_UI is on, where a tap
+   * asks the server and a refusal explains Plus. Drawing it is never permission: `undoLastPass` decides.
+   */
+  showUndo: boolean;
 }
 
 /** Boost state for the Discover header (docs/ARCHITECTURE.md §12.8). Free: limit 0. */
@@ -139,6 +144,7 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
       canUseAdvancedFilters: entitlements.rules.canUseAdvancedFilters,
       tier: entitlements.tier,
       plusDailyLikeLimit: PRODUCT_RULES.PLUS.dailyLikeLimit,
+      showUndo: entitlements.rules.canUndoPass || flagEnabled("PLUS_UNDO_UI"),
     },
     boost: { limit: boost.limit, remaining: boost.remaining, activeEndsAt: boost.activeBoostEndsAt?.toISOString() ?? null, resetsAt: boost.resetsAt?.toISOString() ?? null },
     serverNow: now.toISOString(),

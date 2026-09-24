@@ -7,7 +7,9 @@ import { cn } from "@/lib/cn";
  * Deck controls (prototype line 172–176): centred row, 20 px gap, 68 px tall at bottom 4 px:
  * Pass 56 px bordered white circle (X 24/2.4), Like 66 px teal gradient circle with like glow (heart 30 filled),
  * Intro 48 px bordered circle with ocean chat-plus icon and a PLUS tag at the corner, View profile 48 px bordered.
- * Undo (Plus) is added as a 48 px control on the far left when enabled.
+ * Undo (Plus) is added as a 48 px control on the far left when enabled. For a Free member (while PLUS_UNDO_UI is
+ * on) it carries the same PLUS tag as Intro; tapping it asks the server, and only a refusal explains Plus — nothing
+ * is shown after an ordinary pass.
  */
 export interface SwipeControlsProps {
   onPass: () => void;
@@ -16,16 +18,18 @@ export interface SwipeControlsProps {
   onOpen?: () => void;
   onUndo?: () => void;
   undoDisabled?: boolean;
+  undoLocked?: boolean;
   disabled?: boolean;
   className?: string;
 }
 
-export function SwipeControls({ onPass, onLike, onIntro, onOpen, onUndo, undoDisabled = false, disabled = false, className }: SwipeControlsProps) {
+export function SwipeControls({ onPass, onLike, onIntro, onOpen, onUndo, undoDisabled = false, undoLocked = false, disabled = false, className }: SwipeControlsProps) {
   return (
     <div className={cn("flex h-15 items-center justify-center gap-4", className)}>
       {onUndo ? (
-        <IconButton aria-label="Undo last pass" round elevated size={44} onClick={onUndo} disabled={disabled || undoDisabled} className="text-text-secondary">
+        <IconButton aria-label={undoLocked ? "Undo last pass (Plus)" : "Undo last pass"} round elevated size={44} onClick={onUndo} disabled={disabled || undoDisabled} className={cn("text-text-secondary", undoLocked && "relative overflow-visible")}>
           <UndoIcon size={18} strokeWidth={2} />
+          {undoLocked ? <PlusTag size="xs" className="absolute -right-1.5 -top-1" /> : null}
         </IconButton>
       ) : null}
       <IconButton aria-label="Pass" round elevated size={48} onClick={onPass} disabled={disabled}>

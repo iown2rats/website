@@ -10,7 +10,8 @@ import { getEmailProvider, resetEmailProviderCache, type ConsoleEmailProvider } 
 import { reminderCutoff, remindOrder, sweepCheckoutReminders } from "@/server/billing/checkout-reminder";
 import { cancelOrder, createOrder, submitReceipt } from "@/server/billing/orders";
 import { getNotificationFeed } from "@/server/notifications/feed";
-import { getDeck } from "@/server/discovery/deck";
+import { getDeck, undoAndRestore } from "@/server/discovery/deck";
+import { EntitlementRequiredError } from "@/lib/errors";
 import { createPaymentMethod } from "@/server/billing/payment-methods";
 import { createPlan } from "@/server/billing/plans";
 import { setOcrEngine, textEngine } from "@/server/ocr/engine";
@@ -435,5 +436,42 @@ describe("Discover Likes You prompt (Option A)", () => {
     await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
     await likedBy(me, 2);
     expect((await getDeck(me, {}, { db, storage, now: T0 })).likesTeaser).toBeNull();
+  });
+});
+
+describe("Undo button exposure", () => {
+  it("Free members see no Undo while PLUS_UNDO_UI is off (unchanged behaviour)", async () => {
+    const me = await createUser(db, { now: T0 });
+    expect((await getDeck(me, {}, { db, storage, now: T0 })).capabilities).toMatchObject({ canUndo: false, showUndo: false });
+  });
+
+  it("with PLUS_UNDO_UI on, Free members see Undo but the server still refuses it and changes nothing", async () => {
+    process.env.PLUS_UNDO_UI = "on";
+    const me = await createUser(db, { now: T0 });
+    const other = await createUser(db, { now: T0 });
+    expect((await getDeck(me, {}, { db, storage, now: T0 })).capabilities).toMatchObject({ canUndo: false, showUndo: true });
+    await passUser(me, other.userId, { db, now: T0 });
+    const before = await db.pass.findMany({ where: { fromUserId: me.userId } });
+    await expect(undoAndRestore(me, { db, storage, now: at(T0, minutes(1)) })).rejects.toBeInstanceOf(EntitlementRequiredError);
+    expect(await db.pass.findMany({ where: { fromUserId: me.userId } })).toEqual(before);
+  });
+
+  it("Plus members keep Undo whatever the switch says, with the existing server behaviour", async () => {
+    const me = await createUser(db, { gender: "MAN", now: T0 });
+    await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
+    const other = await createUser(db, { now: T0 });
+    expect((await getDeck(me, {}, { db, storage, now: T0 })).capabilities).toMatchObject({ canUndo: true, showUndo: true });
+    await passUser(me, other.userId, { db, now: T0 });
+    const restored = await undoAndRestore(me, { db, storage, now: at(T0, minutes(1)) });
+    expect(restored.card?.handle).toBe(other.handle);
+  });
+
+  it("Undo never restores somebody the member has since blocked", async () => {
+    const me = await createUser(db, { now: T0 });
+    await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
+    const other = await createUser(db, { now: T0 });
+    await passUser(me, other.userId, { db, now: T0 });
+    await blockUser(other, me.userId, { db, now: at(T0, minutes(1)) });
+    expect((await undoAndRestore(me, { db, storage, now: at(T0, minutes(2)) })).card).toBeNull();
   });
 });

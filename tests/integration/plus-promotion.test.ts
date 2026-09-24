@@ -1,8 +1,9 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
-import { likeUser } from "@/server/likes/like";
-import { getLikesYou } from "@/server/likes/likes-you";
+import { likeUser, passUser } from "@/server/likes/like";
+import { getLikesTeaser, getLikesYou } from "@/server/likes/likes-you";
+import { blockUser } from "@/server/safety/block";
 import { disconnectDb, resetDb, testDb } from "../helpers/db";
-import { createUser, type TestUser } from "../helpers/factory";
+import { at, createUser, grantPlus, hours, minutes, type TestUser } from "../helpers/factory";
 
 /*
  * Plus promotion (docs/ARCHITECTURE.md §12.19). Every personalised claim must come from the same server rule the
@@ -69,5 +70,56 @@ describe("Free Likes You preview: approved photos only", () => {
     if (result.tier !== "FREE") throw new Error("expected Free");
     expect(result.placeholders[0]!.blurhash).toBe("APPROVEDHASH1");
     expect(JSON.stringify(result)).not.toContain("PENDINGHASH");
+  });
+});
+
+describe("Likes You count", () => {
+  it("is the real count, not capped at the page size", async () => {
+    const me = await createUser(db, { now: T0 });
+    await likedBy(me, 53);
+    const result = await getLikesYou(me, { db, now: T0 });
+    if (result.tier !== "FREE") throw new Error("expected Free");
+    expect(result.count).toBe(53);
+    // The tiles stay one page, and every one is a real liker.
+    expect(result.placeholders).toHaveLength(50);
+  });
+
+  it("the teaser and the page agree, under every exclusion the page applies", async () => {
+    const me = await createUser(db, { now: T0 });
+    const [kept, passedAfter, blocked, likedBack] = await likedBy(me, 4);
+    const blindPass = await createUser(db, { now: T0, name: "Blind" });
+    await passUser(me, blindPass.userId, { db, now: at(T0, -hours(1)) });
+    await likeUser(blindPass, me.userId, { db, now: T0 });
+
+    await passUser(me, passedAfter!.userId, { db, now: at(T0, minutes(5)) });
+    await blockUser(me, blocked!.userId, { db, now: at(T0, minutes(5)) });
+    await likeUser(me, likedBack!.userId, { db, now: at(T0, minutes(5)) });
+
+    const now = at(T0, minutes(10));
+    const page = await getLikesYou(me, { db, now });
+    const teaser = await getLikesTeaser(me, { db, now });
+    // kept + the blind pass (a pass made BEFORE the like does not hide it).
+    expect(page.count).toBe(2);
+    expect(teaser).toEqual({ count: 2 });
+    expect(kept).toBeTruthy();
+  });
+
+  it("is zero, not absent, when nobody likes a Free member — callers must then say nothing personal", async () => {
+    const me = await createUser(db, { now: T0 });
+    expect(await getLikesTeaser(me, { db, now: T0 })).toEqual({ count: 0 });
+  });
+
+  it("is never offered to a Plus member", async () => {
+    const me = await createUser(db, { now: T0 });
+    await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
+    await likedBy(me, 3);
+    expect(await getLikesTeaser(me, { db, now: T0 })).toBeNull();
+  });
+
+  it("returns to a Free prompt when Plus has expired", async () => {
+    const me = await createUser(db, { now: T0 });
+    await grantPlus(db, me.userId, at(T0, -hours(48)), at(T0, -hours(1)));
+    await likedBy(me, 2);
+    expect(await getLikesTeaser(me, { db, now: T0 })).toEqual({ count: 2 });
   });
 });

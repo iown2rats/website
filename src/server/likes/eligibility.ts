@@ -52,14 +52,8 @@ export interface EligibilityOptions {
  */
 export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, now: Date, options: EligibilityOptions = {}): Promise<EligibleLiker[]> {
   if (options.onlyLikerIds?.length === 0) return [];
-  const viewer = await db.user.findUniqueOrThrow({ where: { id: viewerId }, select: { phoneHash: true } });
-  const restrict = options.onlyLikerIds?.length
-    ? Prisma.sql`AND u.id IN (${Prisma.join(options.onlyLikerIds)})`
-    : Prisma.empty;
+  const eligible = await eligibleLikesSql(db, viewerId, now, options);
   const limit = options.limit != null ? Prisma.sql`LIMIT ${Math.min(options.limit, 100)}` : Prisma.empty;
-  // Time bounds narrow WHICH likes are asked about; they never change what makes a like eligible.
-  const after = options.likedAfter ? Prisma.sql`AND l."createdAt" > ${options.likedAfter}` : Prisma.empty;
-  const before = options.likedBefore ? Prisma.sql`AND l."createdAt" < ${options.likedBefore}` : Prisma.empty;
 
   return db.$queryRaw<EligibleLiker[]>(Prisma.sql`
     SELECT u.id,
@@ -68,6 +62,35 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
            -- viewer even as a 32-pixel colour wash. No approved photo → null → the plain placeholder tile.
            (SELECT ph.blurhash FROM "ProfilePhoto" ph JOIN "Profile" pp ON pp.id = ph."profileId"
              WHERE pp."userId" = u.id AND ph.moderation = 'APPROVED' ORDER BY ph.position ASC LIMIT 1) AS blurhash
+    ${eligible}
+    ORDER BY l."createdAt" DESC
+    ${limit}
+  `);
+}
+
+/**
+ * How many people are on the viewer's Likes You page — the same FROM/WHERE as the list, counted rather than capped.
+ * The list is limited to what one page renders; the number a member is told ("4 people like you") must not be.
+ */
+export async function countEligibleIncomingLikes(db: DbLike, viewerId: string, now: Date): Promise<number> {
+  const eligible = await eligibleLikesSql(db, viewerId, now, {});
+  const rows = await db.$queryRaw<{ n: bigint | number }[]>(Prisma.sql`SELECT count(*) AS n ${eligible}`);
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * THE rule, as SQL: the FROM and WHERE both the list and the count run, so they cannot drift apart. Every exclusion
+ * lives here and nowhere else.
+ */
+async function eligibleLikesSql(db: DbLike, viewerId: string, now: Date, options: EligibilityOptions): Promise<Prisma.Sql> {
+  const viewer = await db.user.findUniqueOrThrow({ where: { id: viewerId }, select: { phoneHash: true } });
+  const restrict = options.onlyLikerIds?.length
+    ? Prisma.sql`AND u.id IN (${Prisma.join(options.onlyLikerIds)})`
+    : Prisma.empty;
+  // Time bounds narrow WHICH likes are asked about; they never change what makes a like eligible.
+  const after = options.likedAfter ? Prisma.sql`AND l."createdAt" > ${options.likedAfter}` : Prisma.empty;
+  const before = options.likedBefore ? Prisma.sql`AND l."createdAt" < ${options.likedBefore}` : Prisma.empty;
+  return Prisma.sql`
     FROM "Like" l
     JOIN "User" u ON u.id = l."fromUserId"
     JOIN "PrivacySettings" ps ON ps."userId" = u.id
@@ -85,9 +108,7 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
           -- Only a pass made AFTER the like counts. See THE PASS RULE above.
           AND pa."createdAt" > l."createdAt"
       )
-    ORDER BY l."createdAt" DESC
-    ${limit}
-  `);
+  `;
 }
 
 /**

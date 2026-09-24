@@ -87,7 +87,9 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
             <div className="flex flex-col items-center gap-3 rounded-3xl glass-card p-4 text-center">
               <span className="grid size-12 place-items-center rounded-full bg-aqua-soft text-accent" aria-hidden="true"><LockIcon size={22} /></span>
               <div>
-                <h2 className="text-h4 text-text">{data.count === 1 ? "1 person likes you" : `${data.count} people like you`}</h2>
+                {/* The real count from the shared eligibility rule; this branch only renders when it is at least one. */}
+                <h2 className="text-h4 text-text">{data.count === 1 ? "Someone likes you" : `${data.count} people like you`}</h2>
+                <p className="mt-1 text-caption text-text-secondary">See who&apos;s interested in you with MelloCrush Plus.</p>
                 <div className="mt-1.5"><PlusTag size="sm" label="Plus feature" /></div>
               </div>
               {/* Named after what is locked, not after upgrading: this opens the explainer, and only the one CTA

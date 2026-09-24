@@ -1,5 +1,6 @@
 import { AppScreen, ScrollArea } from "@/components/layout/page";
 import { TabHeader } from "@/components/layout/screen-header";
+import { parsePlusSurface } from "@/lib/plus-surfaces";
 import { requireActiveUser } from "@/server/auth/current-user";
 import { getLikesPage } from "@/server/likes/likes-page";
 import { getMyProfileSummary } from "@/server/profiles/me";
@@ -9,7 +10,7 @@ export const metadata = { title: "Likes" };
 // Personalised, tier-dependent data: never cached or shared between users.
 export const dynamic = "force-dynamic";
 
-export default async function LikesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function LikesPage({ searchParams }: { searchParams: Promise<{ tab?: string; from?: string }> }) {
   const actor = await requireActiveUser();
   const sp = await searchParams;
   const [page, me] = await Promise.all([getLikesPage(actor), getMyProfileSummary(actor)]);
@@ -18,7 +19,7 @@ export default async function LikesPage({ searchParams }: { searchParams: Promis
     <AppScreen aria-label="Likes">
       <TabHeader title="Likes" />
       <ScrollArea>
-        <LikesClient initial={page} initialTab={sp.tab === "matches" ? "matches" : "you"} myPhoto={myPhoto} />
+        <LikesClient initial={page} initialTab={sp.tab === "matches" ? "matches" : "you"} myPhoto={myPhoto} source={parsePlusSurface(sp.from) === "discover_likes" ? "discover_likes" : "likes_you"} />
       </ScrollArea>
     </AppScreen>
   );

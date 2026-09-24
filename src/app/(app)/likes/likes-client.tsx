@@ -32,7 +32,7 @@ import { usePlusPromptView } from "@/components/features/analytics/plus-track";
  */
 type Tab = "you" | "matches";
 
-export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYouPageDto; initialTab: Tab; myPhoto: PhotoRef | null }) {
+export function LikesClient({ initial, initialTab, myPhoto, source = "likes_you" }: { initial: LikesYouPageDto; initialTab: Tab; myPhoto: PhotoRef | null; /** The promotion that brought the member here: the Discover prompt keeps its credit through to checkout. */ source?: "likes_you" | "discover_likes" }) {
   const router = useRouter();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -65,7 +65,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
   }, [tab, initial.serverNow, setUnread, router]);
 
   // Funnel (§12.19): the Free "N people like you" card is on screen. Never fires at zero or for Plus.
-  usePlusPromptView("likes_you", tab === "you" && data.tier === "FREE" && data.count > 0);
+  usePlusPromptView(source, tab === "you" && data.tier === "FREE" && data.count > 0);
 
   const remove = (handle: string) => {
     setCards((prev) => prev.filter((c) => c.handle !== handle));
@@ -164,7 +164,7 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
 
       {open ? <FullProfile profile={open} onClose={() => setOpen(null)} onPass={() => void act(open, "pass")} onLike={() => void act(open, "like")} /> : null}
       <MatchOverlay open={match != null} name={match?.name ?? ""} theirPhoto={match?.photo ?? null} myPhoto={myPhoto} onSayHello={() => { const id = match?.conversationId; setMatch(null); router.push(id ? `/chats/${id}` : "/chats"); }} onKeepSwiping={() => setMatch(null)} />
-      <PlusLockSheet open={lockOpen} onClose={() => setLockOpen(false)} feature="See who likes you" description="Plus shows who liked you, so you can like them back." surface="likes_you" />
+      <PlusLockSheet open={lockOpen} onClose={() => setLockOpen(false)} feature="See who likes you" description="Plus shows who liked you, so you can like them back." surface={source} />
     </>
   );
 }

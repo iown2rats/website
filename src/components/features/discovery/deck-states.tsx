@@ -101,7 +101,8 @@ export function DeckPaused() {
  * deck state, never over, beside or near a live card, so it cannot touch a swipe or the swipe lesson.
  *
  * `count` is the server's eligible-likes count for a Free member, and the owner renders this only when it is at least
- * one; Plus members are never sent a count. It leads to Likes You — the real, blurred tiles — not straight to a price.
+ * one; Plus members are never sent a count. It leads to Likes You — the real, blurred tiles — not straight to a price,
+ * carrying `?from=discover_likes` so a purchase that follows is still credited to this prompt.
  * Dismissing it hides it for the rest of the browser session.
  */
 export function LikesYouPrompt({ count, onOpen, onDismiss }: { count: number; onOpen: () => void; onDismiss: () => void }) {
@@ -112,7 +113,7 @@ export function LikesYouPrompt({ count, onOpen, onDismiss }: { count: number; on
         <div className="text-body font-medium text-text">{count === 1 ? "Someone likes you" : `${count} people like you`}</div>
         <div className="text-caption text-text-secondary">See who&apos;s interested with MelloCrush Plus.</div>
       </div>
-      <Link href="/likes" onClick={onOpen} className="inline-flex h-9 shrink-0 items-center rounded-lg bg-primary px-3 text-caption font-medium text-on-primary pressable">See who</Link>
+      <Link href="/likes?from=discover_likes" onClick={onOpen} className="inline-flex h-9 shrink-0 items-center rounded-lg bg-primary px-3 text-caption font-medium text-on-primary pressable">See who</Link>
       <button type="button" onClick={onDismiss} aria-label="Dismiss" className="grid size-9 shrink-0 place-items-center rounded-full border-0 bg-transparent text-text-secondary">
         <CloseIcon size={16} />
       </button>

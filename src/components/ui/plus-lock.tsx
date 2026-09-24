@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogTitle, ResponsiveDialog } from "@/components/ui/dialog";
 import { LockIcon } from "@/components/ui/icons";
 import { membershipHref, type PlusSurface } from "@/lib/plus-surfaces";
+import { trackPlusClick, usePlusPromptView } from "@/components/features/analytics/plus-track";
 
 /**
  * The one lock state for Plus features (docs/ARCHITECTURE.md §12): what the feature is, that it is part of Plus, and
@@ -26,6 +27,8 @@ import { membershipHref, type PlusSurface } from "@/lib/plus-surfaces";
  */
 export function PlusLockSheet({ open, onClose, feature, description, surface, children }: { open: boolean; onClose: () => void; feature: string; description: string; /** Which promotion this is, carried to Membership as `?from=` (a closed list). */ surface?: PlusSurface; children?: ReactNode }) {
   const titleId = useId();
+  // Funnel (§12.19): opening the sheet is seeing the promotion; its one CTA is the tap. Best-effort, never blocking.
+  usePlusPromptView(surface, open);
   return (
     <ResponsiveDialog open={open} onClose={onClose} labelledBy={titleId}>
       <div className="flex items-center gap-3">
@@ -41,7 +44,7 @@ export function PlusLockSheet({ open, onClose, feature, description, surface, ch
           "Not now" is the dismiss, and it stays filled rather than ghost: the sheet is glass, so a transparent
           button at the foot of it puts its label straight over the bottom navigation showing through. */}
       <div className="flex flex-col gap-2 pt-0.5">
-        <Link href={membershipHref(surface)} onClick={onClose} className="inline-flex h-11.5 items-center justify-center rounded-lg bg-primary px-5 text-cta-lg text-on-primary pressable">Get MelloCrush Plus</Link>
+        <Link href={membershipHref(surface)} onClick={() => { if (surface) trackPlusClick(surface); onClose(); }} className="inline-flex h-11.5 items-center justify-center rounded-lg bg-primary px-5 text-cta-lg text-on-primary pressable">Get MelloCrush Plus</Link>
         <Button variant="muted" size="md" onClick={onClose} fullWidth>Not now</Button>
       </div>
     </ResponsiveDialog>

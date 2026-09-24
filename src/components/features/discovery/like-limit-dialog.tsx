@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogTitle, ResponsiveDialog } from "@/components/ui/dialog";
 import { HeartIcon } from "@/components/ui/icons";
 import { formatDuration } from "@/lib/time";
+import { trackPlusClick, usePlusPromptView } from "@/components/features/analytics/plus-track";
 
 /*
  * Like allowance reached (Phase 6 §25–27). The countdown is computed from server time; when it reaches zero the
@@ -31,6 +32,8 @@ export interface LikeLimitDialogProps {
 export function LikeLimitDialog({ open, onClose, limit, plusLimit, tier, resetsAt, serverTime, onCountdownDone, onGetPlus }: LikeLimitDialogProps) {
   const titleId = useId();
   const [remaining, setRemaining] = useState<number | null>(null);
+  // Funnel (§12.19): only the Free dialog is a promotion; the Plus one has nothing to sell.
+  usePlusPromptView(tier === "FREE" ? "daily_limit" : null, open);
 
   useEffect(() => {
     if (!open || !resetsAt) return;
@@ -76,7 +79,7 @@ export function LikeLimitDialog({ open, onClose, limit, plusLimit, tier, resetsA
       </div>
       <div className="flex flex-col gap-2.5 pt-1">
         {tier === "FREE" ? (
-          <Button variant="plus" onClick={onGetPlus} fullWidth>Get Plus</Button>
+          <Button variant="plus" onClick={() => { trackPlusClick("daily_limit"); onGetPlus(); }} fullWidth>Get Plus</Button>
         ) : null}
         <Button variant={tier === "FREE" ? "muted" : "primary"} size="md" onClick={onClose} fullWidth>
           {tier === "FREE" ? "Maybe later" : "Keep browsing"}

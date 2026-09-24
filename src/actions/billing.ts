@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { isDomainError } from "@/lib/errors";
+import { parsePlusSurface } from "@/lib/plus-surfaces";
+import { recordPlusEvent } from "@/server/analytics/plus-funnel";
 import { requireMember } from "@/server/auth/current-user";
 import { cancelOrder, createOrder, submitOrderForActor, type OrderDto } from "@/server/billing/orders";
 
@@ -22,11 +24,16 @@ function failure(e: unknown): BillingFailure {
   return { ok: false, code: "ERROR", message: "Mellocrush couldn't start that right now. Try again." };
 }
 
-export async function startPlusOrder(input: { planId: string }): Promise<BillingFailure | { ok: true; order: OrderDto }> {
+export async function startPlusOrder(input: { planId: string; from?: string }): Promise<BillingFailure | { ok: true; order: OrderDto }> {
   let order: OrderDto;
   try {
     const actor = await requireMember();
     order = await createOrder({ userId: actor.userId }, { planId: String(input?.planId ?? "") });
+    /*
+     * Funnel step, AFTER the order exists and outside its transaction; never throws. Keyed on the order, so resuming
+     * the same open order is not a second checkout. `from` is a closed list; anything else counts as Membership.
+     */
+    await recordPlusEvent({ event: "plus_checkout_started", userId: actor.userId, orderId: order.id, surface: parsePlusSurface(input?.from) ?? "membership", eventKey: `checkout:${order.id}` });
   } catch (e) {
     return failure(e);
   }

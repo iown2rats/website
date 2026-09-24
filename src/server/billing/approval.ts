@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { recordPlusEvent } from "@/server/analytics/plus-funnel";
 import { getDb, type Db, type DbLike, type Tx } from "@/lib/db";
 import { InvalidStateError, NotFoundError, ValidationError } from "@/lib/errors";
 import { getStorageProvider } from "@/lib/storage";
@@ -119,7 +120,7 @@ export async function approveOrder(admin: AdminActor, orderId: string, deps: { d
   const db = deps.db ?? getDb();
   const now = deps.now ?? new Date();
   try {
-    return await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       await lockOrder(tx, orderId);
       const order = await tx.subscriptionOrder.findUnique({ where: { id: orderId }, include: adminInclude });
       if (!order) throw new NotFoundError("Order");
@@ -163,6 +164,11 @@ export async function approveOrder(admin: AdminActor, orderId: string, deps: { d
       });
       return { order: await toAdminDto(updated), alreadyApproved: false };
     });
+    // Funnel step (§12.19), only once the approval has COMMITTED, keyed on the order; never throws.
+    if (!result.alreadyApproved) {
+      await recordPlusEvent({ event: "plus_payment_approved", userId: result.order.user.userId, orderId: result.order.id, eventKey: `approved:${result.order.id}`, now }, { db });
+    }
+    return result;
   } catch (e) {
     // A racing approval committed first and took the unique orderId: report the same idempotent success.
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

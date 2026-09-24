@@ -9,13 +9,15 @@ import type { MembershipDto } from "@/server/entitlements/presentation";
 import { Callout } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { trackPlusClick } from "@/components/features/analytics/plus-track";
+import type { PlusSurface } from "@/lib/plus-surfaces";
 
 /*
  * Plan choice and current-order card on the Membership screen (docs/ARCHITECTURE.md §12.11). Tapping a plan creates
  * (or resumes) an order on the server and moves to the order screen with the bank instructions. Nothing here shows a
  * Plus badge until the entitlement is really active; a pending or rejected order is stated as exactly that.
  */
-export function MembershipPlans({ membership }: { membership: MembershipDto }) {
+export function MembershipPlans({ membership, from }: { membership: MembershipDto; /** The promotion that brought the member here, if any (a closed list, parsed on the server). */ from?: PlusSurface | null }) {
   const toast = useToast();
   const [chosen, setChosen] = useState<string | null>(membership.plans.find((p) => p.forSale)?.id ?? null);
   const [pending, start] = useTransition();
@@ -27,7 +29,9 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
   const buy = () => {
     if (!chosen) return;
     start(async () => {
-      const r = await startPlusOrder({ planId: chosen }).catch(() => null);
+      // A direct visit's tap is counted here; a promotion's tap was already counted where it happened.
+      if (!from) trackPlusClick("membership");
+      const r = await startPlusOrder({ planId: chosen, from: from ?? undefined }).catch(() => null);
       if (r && !r.ok) toast.show(r.message);
     });
   };
@@ -66,7 +70,7 @@ export function MembershipPlans({ membership }: { membership: MembershipDto }) {
           {m.paymentsAvailable && sellable.length > 0 ? (
             <>
               <Button variant="plus" size="lg" fullWidth onClick={buy} loading={pending} disabled={!chosen}>
-                Get Mellocrush Plus
+                Get MelloCrush Plus
               </Button>
               <p className="text-center text-caption leading-relaxed text-text-secondary">You pay by bank transfer. Plus starts after we confirm your payment, usually within a day.</p>
             </>
@@ -115,7 +119,7 @@ export function CurrentOrderCard({ order }: { order: MembershipDto["currentOrder
         </div>
         {o.status === "SUBMITTED" ? <div>Receipt submitted {formatDateTime(o.submittedAt)}. We check transfers within a day; Plus starts the moment it is confirmed.</div> : null}
         {o.status === "APPROVED" ? <div>Confirmed {formatDateTime(o.decidedAt)}.{o.periodEnd ? ` Plus runs until ${formatDate(o.periodEnd)}.` : ""}</div> : null}
-        {o.status === "REJECTED" ? <div>{o.rejectionReason ? `Reason: ${o.rejectionReason}. ` : ""}If you did transfer, check the reference and amount, then start a new order below. Nothing was charged by Mellocrush.</div> : null}
+        {o.status === "REJECTED" ? <div>{o.rejectionReason ? `Reason: ${o.rejectionReason}. ` : ""}If you did transfer, check the reference and amount, then start a new order below. Nothing was charged by MelloCrush.</div> : null}
         {attached ? <div>Open the order to see what we read from your receipt and submit it for review. Nothing has been sent yet.</div> : null}
         {o.status === "AWAITING_PAYMENT" && !attached ? <div>Transfer {o.amountLabel} using the reference above, then upload your receipt.</div> : null}
         {o.status === "AWAITING_PAYMENT" || o.status === "SUBMITTED" ? (

@@ -5,6 +5,8 @@ import { formatDateTime } from "@/lib/format";
 import { requireAdminPage } from "@/server/admin/authz";
 import { maybePurgeExpiredAnalytics } from "@/server/analytics/ingest";
 import { getAnalyticsReport, parseRange, RANGES, type AnalyticsRange } from "@/server/analytics/report";
+import { PlusFunnelPanel } from "@/components/features/admin/plus-funnel-panel";
+import { getPlusFunnelReport } from "@/server/analytics/plus-funnel";
 
 export const metadata = { title: "Analytics" };
 export const dynamic = "force-dynamic";
@@ -57,6 +59,8 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   await requireAdminPage("analytics.view");
   const range = parseRange((await searchParams).range);
   const report = await getAnalyticsReport(range);
+  // Its own switch and its own table: if either is missing the panel says so and the rest of the page is untouched.
+  const plusFunnel = await getPlusFunnelReport(RANGES[range].ms).catch(() => ({ enabled: false }) as const);
   // Retention is enforced by the cron; this is the safety net for a deployment where no scheduler was configured.
   // Gated to once a day, never awaited into the render path's critical work beyond its own bounded batches.
   void maybePurgeExpiredAnalytics().catch(() => {});
@@ -209,6 +213,8 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
           )}
         </Panel>
       </section>
+
+      <PlusFunnelPanel report={plusFunnel} rangeLabel={spec.label} />
 
       <Panel title="What is and is not measured">
         <div className="flex flex-col gap-2 text-body-sm text-text-secondary">

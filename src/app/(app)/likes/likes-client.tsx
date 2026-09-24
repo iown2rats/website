@@ -20,6 +20,7 @@ import { PlusLockSheet } from "@/components/ui/plus-lock";
 import { EmptyState } from "@/components/ui/states";
 import { SegmentedControl } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
+import { usePlusPromptView } from "@/components/features/analytics/plus-track";
 
 /*
  * Likes tab (docs/ARCHITECTURE.md §12.5). Free: the count and anonymised blurhash tiles behind a lock, with one way
@@ -39,6 +40,9 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
   const [lockOpen, setLockOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [match, setMatch] = useState<{ name: string; photo: PhotoRef | null; conversationId: string | null } | null>(null);
+
+  // Funnel (§12.19): the Free "N people like you" card is on screen. Never fires at zero or for Plus.
+  usePlusPromptView("likes_you", tab === "you" && data.tier === "FREE" && data.count > 0);
 
   const remove = (handle: string) => {
     setCards((prev) => prev.filter((c) => c.handle !== handle));

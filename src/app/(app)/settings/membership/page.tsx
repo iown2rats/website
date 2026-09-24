@@ -10,6 +10,7 @@ import { parsePlusSurface, type PlusSurface } from "@/lib/plus-surfaces";
 import { requireActiveUser } from "@/server/auth/current-user";
 import { getMembership } from "@/server/entitlements/presentation";
 import { getLikesTeaser } from "@/server/likes/likes-you";
+import { recordPlusEvent } from "@/server/analytics/plus-funnel";
 import type { ComparisonCell, ComparisonRow } from "@/server/entitlements/presentation";
 
 export const metadata = { title: "Membership" };
@@ -66,6 +67,9 @@ export default async function MembershipPage({ searchParams }: { searchParams: P
   // Personal only when it is true: a Free member with at least one eligible like. Plus members get null.
   const likes = m.tier === "FREE" && teaser && teaser.count > 0 ? teaser.count : 0;
   const highlight = from ? SURFACE_ROW[from] ?? null : null;
+  // Funnel (§12.19): a Free member opening Membership directly has seen Plus's own page. Arrivals from a promotion
+  // were counted where they tapped. No-op unless the switch is on; never fails the page.
+  if (m.tier === "FREE" && !from) await recordPlusEvent({ event: "plus_prompt_viewed", userId: actor.userId, surface: "membership" });
   const periodEnd = m.periodEnd ? new Date(m.periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : null;
   const isPlus = m.tier === "PLUS";
 
@@ -166,7 +170,7 @@ export default async function MembershipPage({ searchParams }: { searchParams: P
         </div>
       </div>
 
-      <MembershipPlans membership={m} />
+      <MembershipPlans membership={m} from={from} />
       <p className="text-center text-micro leading-relaxed text-text-secondary">Billed in MVR by bank transfer. Plus never renews automatically.</p>
     </PageOverlay>
   );

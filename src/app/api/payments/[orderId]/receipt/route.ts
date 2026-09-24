@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isDomainError } from "@/lib/errors";
 import { getStorageProvider } from "@/lib/storage";
 import { getAuthState } from "@/server/auth/current-user";
+import { recordPlusEvent } from "@/server/analytics/plus-funnel";
 import { attachReceiptToOrder } from "@/server/billing/orders";
 import { RECEIPT_RULES } from "@/server/billing/receipts";
 
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ or
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const result = await attachReceiptToOrder({ userId: state.user.id }, orderId, { bytes, size: file.size }, { storage: getStorageProvider() });
+    // After the receipt is safely stored, and once per order however many times it is replaced. Never throws.
+    await recordPlusEvent({ event: "plus_receipt_uploaded", userId: state.user.id, orderId: result.order.id, eventKey: `receipt:${result.order.id}` });
     return NextResponse.json(result, { status: 200 });
   } catch (e) {
     if (isDomainError(e)) return NextResponse.json({ error: e.message }, { status: e.code === "NOT_FOUND" ? 404 : e.code === "VALIDATION" ? 422 : 409 });

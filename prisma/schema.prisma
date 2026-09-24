@@ -373,8 +373,9 @@ model User {
 
   // Analytics (docs/ARCHITECTURE.md §30). SetNull on delete, so deleting an account severs the link without
   // destroying the aggregate history — the rows survive as anonymous traffic, which is what they always were.
-  visitorSessions VisitorSession[]
-  analyticsEvents AnalyticsEvent[]
+  visitorSessions  VisitorSession[]
+  analyticsEvents  AnalyticsEvent[]
+  plusFunnelEvents PlusFunnelEvent[]
 
   @@index([status, onboardingCompletedAt])
   @@index([lastActiveAt])
@@ -1040,12 +1041,13 @@ model SubscriptionOrder {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  user          User                  @relation("OrderUser", fields: [userId], references: [id], onDelete: Restrict)
-  decidedBy     User?                 @relation("OrderDecider", fields: [decidedById], references: [id], onDelete: SetNull)
-  plan          SubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
-  paymentMethod PaymentMethod?        @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
-  subscription  Subscription?
-  verifications ReceiptVerification[]
+  user             User                  @relation("OrderUser", fields: [userId], references: [id], onDelete: Restrict)
+  decidedBy        User?                 @relation("OrderDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  plan             SubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  paymentMethod    PaymentMethod?        @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  subscription     Subscription?
+  verifications    ReceiptVerification[]
+  plusFunnelEvents PlusFunnelEvent[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, submittedAt])
@@ -1675,4 +1677,35 @@ model AnalyticsEvent {
   @@index([sessionId])
   @@index([visitorId])
   @@index([path, createdAt])
+}
+
+/// One step of the Plus funnel (docs/ARCHITECTURE.md §12.19): a promotion seen or tapped, a checkout started, payment
+/// instructions reached, a receipt uploaded, a payment approved.
+///
+/// Deliberately NOT an extension of AnalyticsEvent. That table is visitor-session analytics posted by a browser; half
+/// of these steps happen on the server (an admin approving a payment has no visitor session for the customer), and
+/// every row here belongs to a signed-in member.
+///
+/// `event` and `surface` are TEXT held to a closed list by CHECK constraints, not Postgres enums: a rolled-back
+/// deployment then simply stops writing, instead of meeting enum values its generated client cannot decode.
+///
+/// What is NOT here is the point: no liker ids, no names, no photo URLs, no amounts, no receipt data. The member's
+/// own id (nulled if they delete their account), the step, where it happened, and — for checkout steps — which order.
+model PlusFunnelEvent {
+  id        String   @id @default(cuid(2))
+  /// Duplicate protection: a browser-minted UUID for views and taps, a deterministic key (e.g. `approved:<orderId>`)
+  /// for server steps. Inserts are ON CONFLICT DO NOTHING.
+  eventKey  String   @unique
+  userId    String?
+  event     String
+  surface   String?
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  user  User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order SubscriptionOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([event, createdAt])
+  @@index([orderId])
 }

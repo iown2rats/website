@@ -38,6 +38,10 @@ export interface EligibilityOptions {
   limit?: number;
   /** Restrict to these likers, for callers holding a page of notifications rather than the whole list. */
   onlyLikerIds?: string[];
+  /** Only likes that landed strictly after this instant (the likes digest: "new since the last one"). */
+  likedAfter?: Date;
+  /** Only likes that landed strictly before this instant (the likes digest: "settled"). */
+  likedBefore?: Date;
 }
 
 /**
@@ -53,6 +57,9 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
     ? Prisma.sql`AND u.id IN (${Prisma.join(options.onlyLikerIds)})`
     : Prisma.empty;
   const limit = options.limit != null ? Prisma.sql`LIMIT ${Math.min(options.limit, 100)}` : Prisma.empty;
+  // Time bounds narrow WHICH likes are asked about; they never change what makes a like eligible.
+  const after = options.likedAfter ? Prisma.sql`AND l."createdAt" > ${options.likedAfter}` : Prisma.empty;
+  const before = options.likedBefore ? Prisma.sql`AND l."createdAt" < ${options.likedBefore}` : Prisma.empty;
 
   return db.$queryRaw<EligibleLiker[]>(Prisma.sql`
     SELECT u.id,
@@ -65,6 +72,8 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
     LEFT JOIN "Verification" ver ON ver."userId" = u.id
     WHERE l."toUserId" = ${viewerId}
       ${restrict}
+      ${after}
+      ${before}
       AND ${baseVisibleSql(viewerId, viewer.phoneHash, now)}
       AND NOT EXISTS (SELECT 1 FROM "Like" back WHERE back."fromUserId" = ${viewerId} AND back."toUserId" = u.id)
       AND NOT EXISTS (

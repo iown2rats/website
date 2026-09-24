@@ -11,18 +11,20 @@
  *
  * LIKES ARE NOT. They arrive in bursts, from people the recipient may not be allowed to know about, and an email
  * per like would be the most annoying notification this product could ship. So likes are a DIGEST: at most one a
- * day, counting the unread ones, sent only to somebody who is away and has been for long enough that the count
- * has settled. It names nobody — see `newLikesEmail` for why that holds even for Plus members.
+ * day, counting the eligible likes that are new since the last one, sent only to somebody who is away and has been
+ * for long enough that the count has settled. It names nobody — see `newLikesEmail` for why that holds even for Plus members.
  *
  * NEITHER CREATES A NOTIFICATION. Both read the rows the in-app feed already writes, so a member who has matches
  * or likes switched off has no rows, and therefore no email, without this file knowing anything about it.
  */
+import { Prisma } from "@/generated/prisma/client";
 import { LIKE_EMAIL, MATCH_EMAIL } from "@/config/product";
 import { getDb, type Db, type DbLike } from "@/lib/db";
 import { getEmailProvider } from "@/lib/email";
 import { newLikesEmail, newMatchEmail } from "@/lib/email/templates";
 import { emailDeliveryConfigured, getEnv } from "@/lib/env";
-import { consumeRateLimit } from "@/server/auth/rate-limit";
+import { claimOnce, consumeRateLimit } from "@/server/auth/rate-limit";
+import { listEligibleIncomingLikes } from "@/server/likes/eligibility";
 import { isMemberPresent, isPresent } from "@/server/presence";
 import { logEmailOutcome, resolveEmailRecipient, warnEmailUnconfigured } from "./email-recipient";
 
@@ -56,9 +58,15 @@ async function deliverMatchEmail(db: DbLike, input: { recipientId: string; conve
   // Already opened in the app. Emailing now would be telling somebody something they already know.
   if (notification.readAt !== null) return "no-match";
 
-  // Counted before sending, so a provider failure cannot become a retry storm against a struggling provider.
-  const gate = await consumeRateLimit(db, `email:match:${input.recipientId}:${input.conversationId}`, 1, MATCH_EMAIL.perMatchCooldownMs, input.now);
-  if (!gate.allowed) return "throttled";
+  /*
+   * Claimed before sending, so a provider failure cannot become a retry storm against a struggling provider.
+   *
+   * ONCE PER MATCH, EVER. This used to be a one-per-week windowed limit, and the windows are epoch-aligned: a match
+   * emailed on Wednesday was eligible again at Thursday 00:00 UTC, and the sweep — which keeps unread matches for
+   * three days — sent it again. A claim has no window. Keys the old limit already consumed count as claimed, so
+   * nothing emailed before this change can be emailed a second time because of it.
+   */
+  if (!(await claimOnce(db, `email:match:${input.recipientId}:${input.conversationId}`))) return "throttled";
 
   const message = newMatchEmail(`${getEnv().APP_URL}/chats/${input.conversationId}`);
   try {
@@ -144,25 +152,78 @@ export async function sweepMatchEmails(options: { db?: Db; now?: Date; force?: b
 
 // ─────────────────────────────── Likes digest ───────────────────────────────
 
-/**
- * Counts the likes worth telling somebody about: unread, settled, and not so old that the moment has passed.
+/*
+ * WHAT A DIGEST REPORTS. "You have N new likes" must mean exactly that:
  *
- * The count comes from LIKE_RECEIVED notification rows rather than from the `Like` table, and that is the point —
- * those rows already honour the recipient's preference, already exclude likes they have seen, and are the same
- * thing the in-app badge counts. Two sources would eventually disagree.
+ *   - ELIGIBLE likes, by the same rule Likes You runs (src/server/likes/eligibility.ts). A like from somebody the
+ *     member has since passed, blocked or matched is not on that page, so it is not in the number either;
+ *   - NEW since the previous digest. The digest used to count every unread LIKE_RECEIVED row, so the same likes
+ *     were re-announced every day for a week. Now a like is reported once;
+ *   - still UNREAD in the feed. The notification row is kept as a guard, not as the count: it carries the Likes
+ *     preference (no row when likes are switched off) and "already seen in the bell".
+ *
+ * WHEN THE LAST DIGEST WENT. Each send appends a RateLimitBucket row keyed `email:likes:digest:<member>` whose
+ * `windowStart` is the moment it was sent — a log, not a limit, and it needs no new table. Digests sent before this
+ * change left only a daily bucket (`email:likes:<member>`, windowStart = that UTC day's midnight) and not the time
+ * itself, so those are read as having gone at the END of their day: the conservative reading, which can only err
+ * towards not re-announcing a like. No historical row is changed.
  */
-async function countDigestLikes(db: DbLike, recipientId: string, now: Date): Promise<number> {
-  return db.notification.count({
-    where: {
-      userId: recipientId,
-      type: "LIKE_RECEIVED",
-      readAt: null,
-      createdAt: {
-        lt: new Date(now.getTime() - LIKE_EMAIL.unreadForMs),
-        gt: new Date(now.getTime() - LIKE_EMAIL.giveUpAfterMs),
-      },
-    },
+const DIGEST_LOG_PREFIX = "email:likes:digest:";
+const LEGACY_DIGEST_PREFIX = "email:likes:";
+
+/** The SQL for "when did this member's last digest go", for a member-id expression. NULL when never. */
+function lastDigestSql(memberId: Prisma.Sql, now: Date): Prisma.Sql {
+  return Prisma.sql`GREATEST(
+    (SELECT max(b."windowStart") FROM "RateLimitBucket" b WHERE b.key = ${DIGEST_LOG_PREFIX}::text || (${memberId})::text),
+    -- CASE, not a bare LEAST: LEAST ignores NULL, so "never sent" would otherwise read as "sent just now".
+    (SELECT CASE WHEN max(b."windowStart") IS NULL THEN NULL
+                 ELSE LEAST(max(b."windowStart") + (${LIKE_EMAIL.digestEveryMs}::double precision * interval '1 millisecond'), ${now}::timestamp) END
+       FROM "RateLimitBucket" b WHERE b.key = ${LEGACY_DIGEST_PREFIX}::text || (${memberId})::text)
+  )`;
+}
+
+async function lastDigestAt(db: DbLike, recipientId: string, now: Date): Promise<Date | null> {
+  const rows = await db.$queryRaw<{ at: Date | null }[]>(Prisma.sql`SELECT ${lastDigestSql(Prisma.sql`${recipientId}`, now)} AS at`);
+  return rows[0]?.at ?? null;
+}
+
+/**
+ * Counts the likes worth telling somebody about: eligible, unread, settled, new since the last digest, and not so
+ * old that the moment has passed.
+ */
+async function countDigestLikes(db: DbLike, recipientId: string, now: Date, since: Date | null): Promise<number> {
+  const giveUp = new Date(now.getTime() - LIKE_EMAIL.giveUpAfterMs);
+  const floor = since && since > giveUp ? since : giveUp;
+  const unread = await db.notification.findMany({
+    where: { userId: recipientId, type: "LIKE_RECEIVED", readAt: null, actorId: { not: null } },
+    select: { actorId: true },
   });
+  const likerIds = [...new Set(unread.flatMap((n) => (n.actorId ? [n.actorId] : [])))];
+  if (likerIds.length === 0) return 0;
+  const eligible = await listEligibleIncomingLikes(db, recipientId, now, {
+    onlyLikerIds: likerIds,
+    likedAfter: floor,
+    likedBefore: new Date(now.getTime() - LIKE_EMAIL.unreadForMs),
+  });
+  return eligible.length;
+}
+
+/**
+ * Records that a digest is going, or says it may not. Serialised per member with an advisory lock, so two sweeps
+ * racing on one member cannot both pass the once-a-day check.
+ */
+async function claimDigest(db: DbLike, recipientId: string, now: Date): Promise<boolean> {
+  const run = async (tx: DbLike) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${DIGEST_LOG_PREFIX + recipientId}))`;
+    const last = await lastDigestAt(tx, recipientId, now);
+    if (last && now.getTime() - last.getTime() < LIKE_EMAIL.digestEveryMs) return false;
+    await tx.$executeRaw`
+      INSERT INTO "RateLimitBucket" (key, "windowStart", count) VALUES (${DIGEST_LOG_PREFIX + recipientId}, ${now}, 1)
+      ON CONFLICT (key, "windowStart") DO NOTHING
+    `;
+    return true;
+  };
+  return "$transaction" in db ? (db as Db).$transaction((tx) => run(tx)) : run(db);
 }
 
 /** Sends one digest, or says why it did not. The caller has already established the recipient is away. */
@@ -173,15 +234,16 @@ async function deliverLikeDigest(db: DbLike, input: { recipientId: string; now: 
     return recipient.reason;
   }
 
-  const count = await countDigestLikes(db, input.recipientId, input.now);
+  // At most one a day, measured from the last one actually sent — not from a calendar day, which reset at
+  // midnight UTC and let a digest go at 23:59 and again at 00:01.
+  const since = await lastDigestAt(db, input.recipientId, input.now);
+  if (since && input.now.getTime() - since.getTime() < LIKE_EMAIL.digestEveryMs) return "throttled";
+
+  const count = await countDigestLikes(db, input.recipientId, input.now, since);
   if (count < LIKE_EMAIL.minLikes) return "too-few";
 
-  /*
-   * One digest per member per day. Taken BEFORE sending and keyed on the member alone — not on the likes it
-   * happens to be reporting — so a second like arriving an hour later cannot produce a second email.
-   */
-  const gate = await consumeRateLimit(db, `email:likes:${input.recipientId}`, 1, LIKE_EMAIL.digestEveryMs, input.now);
-  if (!gate.allowed) return "throttled";
+  // Taken BEFORE sending and keyed on the member alone, so a provider failure cannot become a retry storm.
+  if (!(await claimDigest(db, input.recipientId, input.now))) return "throttled";
 
   // The count, and a way back. Never a name, never a photo, never a handle — see newLikesEmail.
   const message = newLikesEmail(count, `${getEnv().APP_URL}/likes`);
@@ -227,29 +289,30 @@ export async function sweepLikeDigests(options: { db?: Db; now?: Date; force?: b
     if (!gate.allowed) return { sent: 0, skipped: 0, throttled: true };
   }
 
-  const candidates = await db.notification.groupBy({
-    by: ["userId"],
-    where: {
-      type: "LIKE_RECEIVED",
-      readAt: null,
-      createdAt: {
-        lt: new Date(now.getTime() - LIKE_EMAIL.unreadForMs),
-        gt: new Date(now.getTime() - LIKE_EMAIL.giveUpAfterMs),
-      },
-      user: { status: "ACTIVE", deletedAt: null, accountType: "MEMBER" },
-    },
-    _count: { _all: true },
-    orderBy: { userId: "asc" },
-    take: LIKE_EMAIL.batchSize,
-  });
-
-  // Presence for the whole batch in one query. `groupBy` cannot join, so the alternative is a lookup per
-  // candidate — twenty-five round trips on a path that runs every minute.
-  const users = await db.user.findMany({
-    where: { id: { in: candidates.map((c) => c.userId) } },
-    select: { id: true, lastActiveAt: true },
-  });
-  const lastActive = new Map(users.map((u) => [u.id, u.lastActiveAt]));
+  /*
+   * Members with unread likes that arrived after their last digest, and whose last digest is more than a day old.
+   * This is only a cheap pre-filter — eligibility is decided per member in `countDigestLikes` — but it keeps members
+   * whose likes were already reported out of the batch, rather than re-checking them every minute for a week.
+   */
+  const candidates = await db.$queryRaw<{ userId: string; lastActiveAt: Date | null }[]>(Prisma.sql`
+    WITH cand AS (
+      SELECT n."userId", u."lastActiveAt", min(n."createdAt") AS first_at, max(n."createdAt") AS last_at
+      FROM "Notification" n
+      JOIN "User" u ON u.id = n."userId"
+      WHERE n.type = 'LIKE_RECEIVED' AND n."readAt" IS NULL
+        AND n."createdAt" < ${new Date(now.getTime() - LIKE_EMAIL.unreadForMs)}
+        AND n."createdAt" > ${new Date(now.getTime() - LIKE_EMAIL.giveUpAfterMs)}
+        AND u.status = 'ACTIVE' AND u."deletedAt" IS NULL AND u."accountType" = 'MEMBER'
+      GROUP BY n."userId", u."lastActiveAt"
+    ), digested AS (
+      SELECT c.*, ${lastDigestSql(Prisma.sql`c."userId"`, now)} AS digested_at FROM cand c
+    )
+    SELECT "userId", "lastActiveAt" FROM digested
+    WHERE digested_at IS NULL OR (digested_at <= ${new Date(now.getTime() - LIKE_EMAIL.digestEveryMs)} AND last_at > digested_at)
+    ORDER BY first_at ASC
+    LIMIT ${LIKE_EMAIL.batchSize}
+  `);
+  const lastActive = new Map(candidates.map((c) => [c.userId, c.lastActiveAt]));
 
   let sent = 0;
   let skipped = 0;

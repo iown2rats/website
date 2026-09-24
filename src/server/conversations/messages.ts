@@ -485,7 +485,7 @@ export async function pollConversation(
 }
 
 /**
- * Marks the conversation read up to its latest message and clears MESSAGE notifications for it. Only called when the
+ * Marks the conversation read up to its latest message and clears its MESSAGE and NEW_MATCH notifications. Only called when the
  * actor views it. `unreadCleared` is true when this call actually changed unread state (incoming messages newer than
  * the previous read pointer, or pending notifications), so the client knows to refresh badges.
  */
@@ -506,7 +506,17 @@ export async function markConversationRead(actor: Actor, conversationId: string,
     where: { userId: actor.userId, type: "MESSAGE", conversationId, readAt: null },
     data: { readAt: now },
   });
-  return { unreadCleared: hadUnread > 0 || cleared.count > 0 };
+  /*
+   * Opening the chat a match created is having seen that match, so its NEW_MATCH notification is read too — THIS
+   * conversation's only, never another match's and never another type. Without it the row stayed unread until the
+   * bell was opened, and the match-email sweep could still mail "you have a new match" about a chat the member had
+   * already opened. The match itself and the read receipts above are untouched.
+   */
+  const clearedMatch = await db.notification.updateMany({
+    where: { userId: actor.userId, type: "NEW_MATCH", conversationId, readAt: null },
+    data: { readAt: now },
+  });
+  return { unreadCleared: hadUnread > 0 || cleared.count > 0 || clearedMatch.count > 0 };
 }
 
 /** Number of conversations with at least one unread incoming message: the Chats badge. Derived from persisted read state. */

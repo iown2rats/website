@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { likeCard, passCard, type ActionFailure } from "@/actions/discovery";
+import { markLikesViewed } from "@/actions/notifications";
+import { useNotifications } from "@/components/layout/notifications-context";
 import type { LikeOutcome } from "@/server/discovery/deck";
 import type { PhotoRef } from "@/lib/photos";
 import { photoBackground } from "@/lib/photos";
@@ -40,6 +42,27 @@ export function LikesClient({ initial, initialTab, myPhoto }: { initial: LikesYo
   const [lockOpen, setLockOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [match, setMatch] = useState<{ name: string; photo: PhotoRef | null; conversationId: string | null } | null>(null);
+
+  /*
+   * Looking at Likes You is seeing those likes: their notifications are marked read (§13) — only when the Likes You
+   * tab is actually on screen, once per page render, up to the render's server time. The bell's count follows at
+   * once and the next navigation brings the nav badge in line.
+   */
+  const notifications = useNotifications();
+  const setUnread = notifications.setUnread;
+  const markedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (tab !== "you" || markedFor.current === initial.serverNow) return;
+    markedFor.current = initial.serverNow;
+    void markLikesViewed({ seenAt: initial.serverNow })
+      .then((r) => {
+        if (r.ok && r.marked > 0) {
+          setUnread(r.unread);
+          router.refresh();
+        }
+      })
+      .catch(() => {});
+  }, [tab, initial.serverNow, setUnread, router]);
 
   // Funnel (§12.19): the Free "N people like you" card is on screen. Never fires at zero or for Plus.
   usePlusPromptView("likes_you", tab === "you" && data.tier === "FREE" && data.count > 0);

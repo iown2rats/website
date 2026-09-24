@@ -405,6 +405,23 @@ export async function markNotificationRead(actor: Actor, id: string, deps: { db?
   return { changed: result.count > 0, unread: await countUnreadNotifications(actor, { db }) };
 }
 
+/**
+ * The member has looked at Likes You: their LIKE_RECEIVED notifications up to `seenAt` are read (docs/ARCHITECTURE.md
+ * §13). Both tiers — a Free member saw the count and the tiles, a Plus member saw the people; either way the news in
+ * those rows has been delivered.
+ *
+ * `seenAt` is the page's own server time, so a like that lands after the page was rendered stays unread; it is never
+ * later than now. Only LIKE_RECEIVED, only the caller's own rows. The likes themselves, their eligibility and every
+ * other notification type are untouched, and nothing is deleted.
+ */
+export async function markLikesSeen(actor: Actor, input: { seenAt: Date }, deps: { db?: Db; now?: Date } = {}): Promise<{ marked: number; unread: number }> {
+  const db = deps.db ?? getDb();
+  const now = deps.now ?? new Date();
+  const upTo = input.seenAt < now ? input.seenAt : now;
+  const result = await db.notification.updateMany({ where: { userId: actor.userId, type: "LIKE_RECEIVED", readAt: null, createdAt: { lte: upTo } }, data: { readAt: now } });
+  return { marked: result.count, unread: await countUnreadNotifications(actor, { db }) };
+}
+
 /** Marks every unread notification read. Nothing is deleted; the history stays. */
 export async function markAllNotificationsRead(actor: Actor, deps: { db?: Db; now?: Date } = {}): Promise<{ marked: number; unread: number }> {
   const db = deps.db ?? getDb();

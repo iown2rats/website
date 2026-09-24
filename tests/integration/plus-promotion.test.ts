@@ -9,7 +9,10 @@ import { CHECKOUT_REMINDER } from "@/config/product";
 import { getEmailProvider, resetEmailProviderCache, type ConsoleEmailProvider } from "@/lib/email";
 import { reminderCutoff, remindOrder, sweepCheckoutReminders } from "@/server/billing/checkout-reminder";
 import { cancelOrder, createOrder, submitReceipt } from "@/server/billing/orders";
-import { getNotificationFeed } from "@/server/notifications/feed";
+import { getNotificationFeed, markLikesSeen } from "@/server/notifications/feed";
+import { getNavBadges } from "@/server/notifications/badges";
+import { sweepMatchEmails } from "@/server/notifications/engagement-email";
+import { markConversationRead } from "@/server/conversations/messages";
 import { getDeck, undoAndRestore } from "@/server/discovery/deck";
 import { EntitlementRequiredError } from "@/lib/errors";
 import { createPaymentMethod } from "@/server/billing/payment-methods";
@@ -473,5 +476,91 @@ describe("Undo button exposure", () => {
     await passUser(me, other.userId, { db, now: T0 });
     await blockUser(other, me.userId, { db, now: at(T0, minutes(1)) });
     expect((await undoAndRestore(me, { db, storage, now: at(T0, minutes(2)) })).card).toBeNull();
+  });
+});
+
+// ───────────────────────────── Notification read semantics ─────────────────────────────
+
+describe("viewing Likes You marks like notifications read", () => {
+  it("marks only this member's LIKE_RECEIVED rows up to the page's render time, and nothing else", async () => {
+    const me = await createUser(db, { gender: "MAN", now: T0 });
+    const likers = await likedBy(me, 2);
+    // A match (NEW_MATCH for me) and another member's like notification, neither of which may be touched.
+    const mutual = await createUser(db, { now: T0 });
+    await likeUser(me, mutual.userId, { db, now: T0 });
+    await likeUser(mutual, me.userId, { db, now: T0 });
+    const other = await createUser(db, { now: T0 });
+    await likeUser(likers[0]!, other.userId, { db, now: T0 });
+
+    const seenAt = at(T0, minutes(5));
+    // A like landing after the page rendered stays unread.
+    const late = await createUser(db, { now: T0 });
+    await likeUser(late, me.userId, { db, now: at(T0, minutes(6)) });
+    const likeRowsBefore = await db.like.findMany({ orderBy: { id: "asc" } });
+    const countBefore = (await getLikesYou(me, { db, now: at(T0, minutes(7)) })).count;
+    const badgesBefore = await getNavBadges(me, { db });
+
+    const result = await markLikesSeen(me, { seenAt }, { db, now: at(T0, minutes(7)) });
+    expect(result.marked).toBe(2);
+
+    const mine = await db.notification.findMany({ where: { userId: me.userId } });
+    const likeRows = mine.filter((n) => n.type === "LIKE_RECEIVED");
+    expect(likeRows.filter((n) => n.readAt !== null).map((n) => n.actorId).sort()).toEqual(likers.map((l) => l.userId).sort());
+    expect(likeRows.find((n) => n.actorId === late.userId)?.readAt).toBeNull();
+    expect(mine.filter((n) => n.type !== "LIKE_RECEIVED").every((n) => n.readAt === null)).toBe(true);
+    expect((await db.notification.findFirstOrThrow({ where: { userId: other.userId } })).readAt).toBeNull();
+
+    // The likes, and what Likes You shows, are unchanged.
+    expect(await db.like.findMany({ orderBy: { id: "asc" } })).toEqual(likeRowsBefore);
+    expect((await getLikesYou(me, { db, now: at(T0, minutes(7)) })).count).toBe(countBefore);
+    // The Likes badge drops by exactly the two rows now read.
+    expect((await getNavBadges(me, { db })).likes).toBe(badgesBefore.likes - 2);
+    expect(result.unread).toBe(await db.notification.count({ where: { userId: me.userId, readAt: null } }));
+  });
+
+  it("cannot mark ahead of the server's clock", async () => {
+    const me = await createUser(db, { now: T0 });
+    const late = await createUser(db, { now: T0 });
+    await likeUser(late, me.userId, { db, now: at(T0, hours(2)) });
+    await markLikesSeen(me, { seenAt: at(T0, hours(10)) }, { db, now: at(T0, hours(1)) });
+    expect((await db.notification.findFirstOrThrow({ where: { userId: me.userId, type: "LIKE_RECEIVED" } })).readAt).toBeNull();
+  });
+});
+
+describe("opening a match's chat marks that match's notification read", () => {
+  it("clears only this conversation's NEW_MATCH, leaves other matches and the match itself alone", async () => {
+    const me = await createUser(db, { gender: "MAN", now: T0 });
+    const [a, b] = [await createUser(db, { now: T0 }), await createUser(db, { now: T0 })];
+    const convs: string[] = [];
+    for (const other of [a, b]) {
+      await likeUser(me, other.userId, { db, now: T0 });
+      const r = await likeUser(other, me.userId, { db, now: T0 });
+      convs.push(r.conversationId!);
+    }
+    const matchesBefore = await db.match.findMany({ orderBy: { id: "asc" } });
+
+    const result = await markConversationRead(me, convs[0]!, { db, now: at(T0, minutes(1)) });
+    expect(result.unreadCleared).toBe(true);
+
+    const rows = await db.notification.findMany({ where: { userId: me.userId, type: "NEW_MATCH" } });
+    expect(rows.find((n) => n.conversationId === convs[0])?.readAt).not.toBeNull();
+    expect(rows.find((n) => n.conversationId === convs[1])?.readAt).toBeNull();
+    // The other member's NEW_MATCH for the same conversation is theirs to read.
+    expect((await db.notification.findFirstOrThrow({ where: { userId: a.userId, type: "NEW_MATCH" } })).readAt).toBeNull();
+    expect(await db.match.findMany({ orderBy: { id: "asc" } })).toEqual(matchesBefore);
+  });
+
+  it("stops the match-email sweep mailing about a chat already opened", async () => {
+    const me = await createUser(db, { gender: "MAN", now: T0 });
+    const other = await createUser(db, { now: T0 });
+    await createIdentity(db, me.userId);
+    await likeUser(me, other.userId, { db, now: T0 });
+    const r = await likeUser(other, me.userId, { db, now: T0 });
+    await markConversationRead(me, r.conversationId!, { db, now: at(T0, minutes(1)) });
+    const later = at(T0, hours(2));
+    await db.user.update({ where: { id: me.userId }, data: { lastActiveAt: at(T0, minutes(1)) } });
+    resetEmailProviderCache();
+    await sweepMatchEmails({ db, now: later, force: true });
+    expect((getEmailProvider() as ConsoleEmailProvider).sent.filter((m) => m.to.startsWith("user"))).toHaveLength(0);
   });
 });

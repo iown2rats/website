@@ -6,6 +6,7 @@ import { requireMember } from "@/server/auth/current-user";
 import {
   getNotificationFeed,
   markAllNotificationsRead,
+  markLikesSeen,
   markNotificationRead,
   type NotificationFeedDto,
 } from "@/server/notifications/feed";
@@ -57,6 +58,19 @@ export async function readAllNotifications(): Promise<{ ok: true; marked: number
   try {
     const actor = await requireMember();
     return { ok: true, ...(await markAllNotificationsRead(actor)) };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+const likesSeenInput = z.object({ seenAt: z.string().datetime() });
+
+/** Likes You was on screen: that member's like notifications up to the page's render time are read. */
+export async function markLikesViewed(input: unknown): Promise<{ ok: true; marked: number; unread: number } | NotificationFailure> {
+  try {
+    const actor = await requireMember();
+    const { seenAt } = likesSeenInput.parse(input ?? {});
+    return { ok: true, ...(await markLikesSeen(actor, { seenAt: new Date(seenAt) })) };
   } catch (e) {
     return failure(e);
   }

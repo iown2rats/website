@@ -128,7 +128,7 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
       {order.status === "AWAITING_PAYMENT" && !attached ? (
         <>
           <Callout tone="ocean" title={`Transfer ${order.amountLabel} for ${order.planName}`}>
-            Send the exact amount from your bank app and put the payment reference in the remark. Plus activates after we confirm the transfer, usually within a day. This order is valid until {formatDate(order.expiresAt)}.
+            Send the exact amount from your bank app and put the payment reference in the remark. Plus activates after we confirm the transfer. This order is valid until {formatDate(order.expiresAt)}.
           </Callout>
           <ListGroup>
             <CopyRow label="Amount" value={order.amountLabel} mono={false} />
@@ -177,7 +177,7 @@ export function OrderClient({ initialOrder }: { initialOrder: OrderDto }) {
 
       {order.status === "SUBMITTED" ? (
         <Callout tone="info" title="Payment under review">
-          Receipt submitted {formatDateTime(order.submittedAt)} for <span className="font-mono font-medium">{order.reference}</span> ({order.amountLabel}, {order.planName}). We check transfers within a day. Plus starts the moment it is confirmed, and you will see it here and in Settings.
+          Receipt submitted {formatDateTime(order.submittedAt)} for <span className="font-mono font-medium">{order.reference}</span> ({order.amountLabel}, {order.planName}). We check every transfer. Plus starts the moment it is confirmed, and you will see it here and in Settings.
         </Callout>
       ) : null}
 

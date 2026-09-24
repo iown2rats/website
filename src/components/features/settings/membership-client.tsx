@@ -72,7 +72,7 @@ export function MembershipPlans({ membership, from }: { membership: MembershipDt
               <Button variant="plus" size="lg" fullWidth onClick={buy} loading={pending} disabled={!chosen}>
                 Get MelloCrush Plus
               </Button>
-              <p className="text-center text-caption leading-relaxed text-text-secondary">You pay by bank transfer. Plus starts after we confirm your payment, usually within a day.</p>
+              <p className="text-center text-caption leading-relaxed text-text-secondary">You pay by bank transfer. Plus starts after we confirm your payment.</p>
             </>
           ) : (
             <Callout tone="info" title="Plus isn't on sale yet">Pricing in MVR and payment details are being finalised. Nothing is charged today, and there are no upgrade prompts elsewhere in the app.</Callout>
@@ -117,7 +117,7 @@ export function CurrentOrderCard({ order }: { order: MembershipDto["currentOrder
         <div>
           {o.planName} · {o.amountLabel} · reference <span className="font-mono font-medium">{o.reference}</span>
         </div>
-        {o.status === "SUBMITTED" ? <div>Receipt submitted {formatDateTime(o.submittedAt)}. We check transfers within a day; Plus starts the moment it is confirmed.</div> : null}
+        {o.status === "SUBMITTED" ? <div>Receipt submitted {formatDateTime(o.submittedAt)}. We check every transfer; Plus starts the moment it is confirmed.</div> : null}
         {o.status === "APPROVED" ? <div>Confirmed {formatDateTime(o.decidedAt)}.{o.periodEnd ? ` Plus runs until ${formatDate(o.periodEnd)}.` : ""}</div> : null}
         {o.status === "REJECTED" ? <div>{o.rejectionReason ? `Reason: ${o.rejectionReason}. ` : ""}If you did transfer, check the reference and amount, then start a new order below. Nothing was charged by MelloCrush.</div> : null}
         {attached ? <div>Open the order to see what we read from your receipt and submit it for review. Nothing has been sent yet.</div> : null}

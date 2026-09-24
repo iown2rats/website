@@ -225,6 +225,8 @@ export interface PurgeResult {
   events: number;
   sessions: number;
   visitors: number;
+  /** Plus funnel events past the same horizon (docs/ARCHITECTURE.md §12.19). */
+  plusFunnelEvents: number;
   /** True when a batch came back full, so there is more to remove on the next pass. */
   more: boolean;
 }
@@ -262,7 +264,40 @@ export async function purgeExpiredAnalytics(options: { db?: Db; now?: Date } = {
       AND NOT EXISTS (SELECT 1 FROM "AnalyticsEvent" ae WHERE ae."visitorId" = v."id")
   `;
 
-  return { events, sessions, visitors, more };
+  const plusFunnelEvents = await purgeExpiredPlusFunnelEvents(db, cutoff);
+
+  return { events, sessions, visitors, plusFunnelEvents, more };
+}
+
+/**
+ * Plus funnel events follow the same 90-day retention as the site analytics, and are purged by the same job rather
+ * than a scheduler of their own. ONLY "PlusFunnelEvent" rows older than the cutoff: never an order, a subscription or
+ * anything billing, and nothing the site-analytics purge above did not already do.
+ *
+ * Tolerant by design, so it can never cost the existing purge its result: the table may not exist yet (the code can
+ * ship before its migration), and any failure is logged and counted as zero rather than thrown. Idempotent — a second
+ * call finds nothing older than the cutoff.
+ */
+async function purgeExpiredPlusFunnelEvents(db: Db, cutoff: Date): Promise<number> {
+  try {
+    const table = await db.$queryRaw<{ t: string | null }[]>`SELECT to_regclass('public."PlusFunnelEvent"')::text AS t`;
+    if (!table[0]?.t) return 0;
+    let deleted = 0;
+    for (let pass = 0; pass < ANALYTICS.purgeMaxBatches; pass += 1) {
+      const n = await db.$executeRaw`
+        DELETE FROM "PlusFunnelEvent"
+        WHERE "id" IN (
+          SELECT "id" FROM "PlusFunnelEvent" WHERE "createdAt" < ${cutoff} ORDER BY "createdAt" LIMIT ${ANALYTICS.purgeBatchSize}
+        )
+      `;
+      deleted += n;
+      if (n < ANALYTICS.purgeBatchSize) break;
+    }
+    return deleted;
+  } catch (e) {
+    console.error("[analytics] Plus funnel retention skipped", e instanceof Error ? e.message : e);
+    return 0;
+  }
 }
 
 /** Rate-limited purge for ordinary admin traffic, so retention holds even if no scheduler ever calls the cron. */

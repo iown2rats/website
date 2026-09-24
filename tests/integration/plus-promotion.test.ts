@@ -13,6 +13,7 @@ import { getNotificationFeed, markLikesSeen } from "@/server/notifications/feed"
 import { getNavBadges } from "@/server/notifications/badges";
 import { sweepMatchEmails } from "@/server/notifications/engagement-email";
 import { markConversationRead } from "@/server/conversations/messages";
+import { purgeExpiredAnalytics } from "@/server/analytics/ingest";
 import { getDeck, undoAndRestore } from "@/server/discovery/deck";
 import { EntitlementRequiredError } from "@/lib/errors";
 import { createPaymentMethod } from "@/server/billing/payment-methods";
@@ -562,5 +563,27 @@ describe("opening a match's chat marks that match's notification read", () => {
     resetEmailProviderCache();
     await sweepMatchEmails({ db, now: later, force: true });
     expect((getEmailProvider() as ConsoleEmailProvider).sent.filter((m) => m.to.startsWith("user"))).toHaveLength(0);
+  });
+});
+
+// ───────────────────────────── Funnel retention ─────────────────────────────
+
+describe("Plus funnel retention", () => {
+  it("keeps an event just inside 90 days, removes an older one, touches nothing else, and is idempotent", async () => {
+    const { customer, plan } = await shop();
+    const order = await createOrder(customer, { planId: plan.id }, { db, now: T0 });
+    const now = at(T0, hours(24 * 120));
+    const day = 86_400_000;
+    await db.plusFunnelEvent.create({ data: { eventKey: "inside", userId: customer.userId, event: "plus_prompt_viewed", surface: "likes_you", createdAt: new Date(now.getTime() - 90 * day + minutes(1)) } });
+    await db.plusFunnelEvent.create({ data: { eventKey: "outside", userId: customer.userId, event: "plus_checkout_started", surface: "likes_you", orderId: order.id, createdAt: new Date(now.getTime() - 90 * day - minutes(1)) } });
+    const orderBefore = await db.subscriptionOrder.findUniqueOrThrow({ where: { id: order.id } });
+
+    const first = await purgeExpiredAnalytics({ db, now });
+    expect(first.plusFunnelEvents).toBe(1);
+    expect((await db.plusFunnelEvent.findMany()).map((e) => e.eventKey)).toEqual(["inside"]);
+    expect(await db.subscriptionOrder.findUniqueOrThrow({ where: { id: order.id } })).toEqual(orderBefore);
+
+    expect((await purgeExpiredAnalytics({ db, now })).plusFunnelEvents).toBe(0);
+    expect(await db.plusFunnelEvent.count()).toBe(1);
   });
 });

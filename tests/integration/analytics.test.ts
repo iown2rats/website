@@ -382,7 +382,7 @@ describe("90-day retention", () => {
     const first = await purgeExpiredAnalytics({ db, now });
     const second = await purgeExpiredAnalytics({ db, now });
     expect(first.events).toBe(1);
-    expect(second).toEqual({ events: 0, sessions: 0, visitors: 0, more: false });
+    expect(second).toEqual({ events: 0, sessions: 0, visitors: 0, plusFunnelEvents: 0, more: false });
     expect(await db.analyticsEvent.count()).toBe(1);
   });
 

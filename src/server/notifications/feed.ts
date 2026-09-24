@@ -202,6 +202,12 @@ const ICONS: Record<NotificationKind, NotificationIcon> = {
   COMMUNITY_COMMENT_REACTION: "community",
 };
 
+/** The order a checkout-reminder row is about (src/server/billing/checkout-reminder.ts), or null for any other row. */
+function checkoutReminderOrder(row: Row): string | null {
+  const data = (row.data ?? {}) as Record<string, unknown>;
+  return data.kind === "CHECKOUT_REMINDER" && typeof data.orderId === "string" && /^[a-z0-9]{8,40}$/.test(data.orderId) ? data.orderId : null;
+}
+
 /**
  * Where a row leads. Null means "no destination": a deleted Community post, or a post that is gone. The row still
  * renders and can still be marked read — it just is not a link, so nothing routes to a page that no longer exists.
@@ -229,8 +235,11 @@ function destinationFor(row: Row): string | null {
       return "/settings/membership";
     case "SAFETY_NOTICE":
       return "/settings/safety";
-    case "ACCOUNT_NOTICE":
-      return "/settings";
+    case "ACCOUNT_NOTICE": {
+      // The checkout reminder leads back into that order's own page, which re-authorises and shows its real status.
+      const reminder = checkoutReminderOrder(row);
+      return reminder ? `/settings/membership/order/${reminder}?from=checkout_recovery` : "/settings";
+    }
     default:
       return null;
   }
@@ -276,7 +285,7 @@ function titleFor(row: Row, name: string | null): string {
     case "SAFETY_NOTICE":
       return "Safety notice";
     case "ACCOUNT_NOTICE":
-      return "Account notice";
+      return checkoutReminderOrder(row) ? "Still interested in MelloCrush Plus?" : "Account notice";
     default:
       return "Notification";
   }
@@ -301,6 +310,9 @@ function detailFor(row: Row, preview: string | null): string | null {
       return "Renew to keep your Plus features";
     case "SUBSCRIPTION_EXPIRED":
       return "Your Plus features have ended";
+    case "ACCOUNT_NOTICE":
+      // No approval-time promise: MelloCrush has no documented SLA, so the reminder does not invent one.
+      return checkoutReminderOrder(row) ? "Your Plus order is waiting for payment." : null;
     default:
       return null;
   }

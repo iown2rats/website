@@ -227,6 +227,27 @@ export const ANALYTICS = {
   listSize: 12,
 } as const;
 
+/**
+ * The abandoned-checkout reminder (docs/ARCHITECTURE.md §12.19). ONE in-app notice for a Plus order left awaiting
+ * payment with no receipt, switched by PLUS_CHECKOUT_REMINDERS (off unless exactly "on").
+ *
+ * `notBefore` is a HARD floor that no configuration can lower: orders created before it are never reminded. It sits
+ * after every order that existed when this feature was written, so the first deployment cannot contact anybody about
+ * an old purchase attempt. PLUS_CHECKOUT_REMINDERS_SINCE (ISO time) can only move the cutoff LATER — set it to the
+ * moment reminders are switched on — and when the switch is on without it, nothing is sent at all.
+ */
+export const CHECKOUT_REMINDER = {
+  notBefore: new Date("2026-09-24T00:00:00Z"),
+  /** How long an order must have been waiting for payment before it is worth a reminder. */
+  afterMs: 24 * 3_600_000,
+  /** One checkout reminder per member in this window, whatever happens to their orders. */
+  memberCooldownMs: 30 * 24 * 3_600_000,
+  sweepEveryMs: 10 * 60_000,
+  batchSize: 10,
+  /** Only between these Maldives-time hours [from, to), so a reminder (and any push it causes) never lands at night. */
+  localHours: { from: 9, to: 21 },
+} as const;
+
 export const PUSH = {
   /**
    * How long after a notification is created it is still worth pushing. A notification found by the sweep hours

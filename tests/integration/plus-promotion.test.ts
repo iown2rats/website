@@ -5,7 +5,11 @@ import { ratio } from "@/components/features/admin/plus-funnel-panel";
 import type { AdminActor } from "@/server/admin/authz";
 import { getPlusFunnelReport, parsePlusPromptBody, recordPlusEvent } from "@/server/analytics/plus-funnel";
 import { approveOrder } from "@/server/billing/approval";
-import { createOrder, submitReceipt } from "@/server/billing/orders";
+import { CHECKOUT_REMINDER } from "@/config/product";
+import { getEmailProvider, resetEmailProviderCache, type ConsoleEmailProvider } from "@/lib/email";
+import { reminderCutoff, remindOrder, sweepCheckoutReminders } from "@/server/billing/checkout-reminder";
+import { cancelOrder, createOrder, submitReceipt } from "@/server/billing/orders";
+import { getNotificationFeed } from "@/server/notifications/feed";
 import { getDeck } from "@/server/discovery/deck";
 import { createPaymentMethod } from "@/server/billing/payment-methods";
 import { createPlan } from "@/server/billing/plans";
@@ -14,7 +18,7 @@ import { likeUser, passUser } from "@/server/likes/like";
 import { getLikesTeaser, getLikesYou } from "@/server/likes/likes-you";
 import { blockUser } from "@/server/safety/block";
 import { disconnectDb, resetDb, testDb } from "../helpers/db";
-import { at, createUser, grantPlus, hours, minutes, type TestUser } from "../helpers/factory";
+import { at, createIdentity, createUser, grantPlus, hours, minutes, type TestUser } from "../helpers/factory";
 
 /*
  * Plus promotion (docs/ARCHITECTURE.md §12.19). Every personalised claim must come from the same server rule the
@@ -252,6 +256,153 @@ describe("Plus funnel analytics", () => {
     expect(ratio(3, 10)).toBe("3 / 10 (30%)");
     expect(ratio(0, 0)).toBe("0");
     expect(ratio(2, 0)).toBe("2");
+  });
+});
+
+// ───────────────────────────── Abandoned checkout reminder ─────────────────────────────
+
+describe("checkout reminder", () => {
+  // Thursday 09:00 UTC = 14:00 in the Maldives: inside the daytime window, after the hard floor.
+  const ORDERED = new Date("2026-09-24T09:00:00Z");
+  const DUE = at(ORDERED, hours(25));
+  const on = (since = "2026-09-24T00:00:00Z") => {
+    process.env.PLUS_CHECKOUT_REMINDERS = "on";
+    process.env.PLUS_CHECKOUT_REMINDERS_SINCE = since;
+  };
+  const reminders = () => db.notification.findMany({ where: { type: "ACCOUNT_NOTICE" } });
+
+  async function waitingOrder(now = ORDERED) {
+    const { admin, customer, plan } = await shop();
+    const order = await createOrder(customer, { planId: plan.id }, { db, now });
+    return { admin, customer, plan, order };
+  }
+
+  afterEach(() => {
+    delete process.env.PLUS_CHECKOUT_REMINDERS_SINCE;
+  });
+
+  it("does nothing at all while switched off — the shipped default", async () => {
+    await waitingOrder();
+    expect(await sweepCheckoutReminders({ db, now: DUE, force: true })).toEqual({ ran: false, reason: "off" });
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("does nothing when switched on without a cutoff", async () => {
+    process.env.PLUS_CHECKOUT_REMINDERS = "on";
+    await waitingOrder();
+    expect(await sweepCheckoutReminders({ db, now: DUE, force: true })).toEqual({ ran: false, reason: "no-cutoff" });
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("never reminds an order from before the hard floor, whatever the configured cutoff says", async () => {
+    on("2020-01-01T00:00:00Z");
+    // Like the four awaiting orders that already exist in production.
+    await waitingOrder(new Date("2026-09-21T06:00:00Z"));
+    expect(reminderCutoff()).toEqual(CHECKOUT_REMINDER.notBefore);
+    const result = await sweepCheckoutReminders({ db, now: new Date("2026-09-25T09:00:00Z"), force: true });
+    expect(result).toEqual({ ran: true, created: 0, skipped: 0 });
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("never reminds an order from before the configured cutoff either", async () => {
+    on("2026-09-24T12:00:00Z");
+    await waitingOrder();
+    expect((await sweepCheckoutReminders({ db, now: DUE, force: true })).ran).toBe(true);
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("sends ONE reminder for an eligible order, however many sweeps run, and changes nothing else", async () => {
+    on();
+    const { customer, order } = await waitingOrder();
+    const before = await db.subscriptionOrder.findUniqueOrThrow({ where: { id: order.id } });
+
+    expect(await sweepCheckoutReminders({ db, now: DUE, force: true })).toEqual({ ran: true, created: 1, skipped: 0 });
+    for (const later of [at(DUE, minutes(10)), at(DUE, hours(2)), at(DUE, hours(26))]) {
+      await sweepCheckoutReminders({ db, now: later, force: true });
+    }
+    const rows = await reminders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ userId: customer.userId, data: { kind: "CHECKOUT_REMINDER", orderId: order.id } });
+    // The order itself is untouched.
+    expect(await db.subscriptionOrder.findUniqueOrThrow({ where: { id: order.id } })).toEqual(before);
+
+    const feed = await getNotificationFeed(customer, {}, { db, now: DUE });
+    expect(feed.items[0]).toMatchObject({
+      title: "Still interested in MelloCrush Plus?",
+      detail: "Your Plus order is waiting for payment.",
+      href: `/settings/membership/order/${order.id}?from=checkout_recovery`,
+    });
+  });
+
+  it("racing sweeps still create one reminder", async () => {
+    on();
+    const { customer, order } = await waitingOrder();
+    const cutoff = reminderCutoff()!;
+    await Promise.all([1, 2, 3, 4].map(() => remindOrder(db, { orderId: order.id, userId: customer.userId }, DUE, cutoff)));
+    expect(await reminders()).toHaveLength(1);
+  });
+
+  it("waits a day before reminding", async () => {
+    on();
+    await waitingOrder();
+    await sweepCheckoutReminders({ db, now: at(ORDERED, hours(23)), force: true });
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("skips an order with a receipt attached", async () => {
+    on();
+    const { customer, order } = await waitingOrder();
+    await db.subscriptionOrder.update({ where: { id: order.id }, data: { receiptKey: "test/receipt.jpg" } });
+    await sweepCheckoutReminders({ db, now: DUE, force: true });
+    expect(await reminders()).toHaveLength(0);
+    expect(customer).toBeTruthy();
+  });
+
+  it("skips a cancelled order and an order superseded by a newer one", async () => {
+    on();
+    const { customer, order, admin } = await waitingOrder();
+    await cancelOrder(customer, order.id, { db, now: at(ORDERED, hours(1)) });
+    const plan2 = await createPlan(admin, { code: "QUARTER", name: "3 months", intervalDays: 90, priceMinor: 39_900, currency: "MVR", active: true, isPlaceholderPrice: false, sortOrder: 2 }, { db, now: ORDERED });
+    // The newer order is too young to remind, and the old one is cancelled: nothing goes.
+    await createOrder(customer, { planId: plan2.id }, { db, now: at(DUE, -hours(2)) });
+    await sweepCheckoutReminders({ db, now: DUE, force: true });
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("skips a member who already has Plus", async () => {
+    on();
+    const { customer } = await waitingOrder();
+    await grantPlus(db, customer.userId, at(ORDERED, hours(1)), at(DUE, hours(24 * 30)));
+    await sweepCheckoutReminders({ db, now: DUE, force: true });
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("never runs at night in the Maldives", async () => {
+    on();
+    await waitingOrder();
+    // 20:30 UTC = 01:30 in the Maldives.
+    expect(await sweepCheckoutReminders({ db, now: new Date("2026-09-25T20:30:00Z"), force: true })).toEqual({ ran: false, reason: "outside-hours" });
+    expect(await reminders()).toHaveLength(0);
+  });
+
+  it("reminds a member at most once in 30 days, even about a later order", async () => {
+    on();
+    const { customer, order, admin } = await waitingOrder();
+    await sweepCheckoutReminders({ db, now: DUE, force: true });
+    await cancelOrder(customer, order.id, { db, now: at(DUE, hours(1)) });
+    const plan2 = await createPlan(admin, { code: "QUARTER", name: "3 months", intervalDays: 90, priceMinor: 39_900, currency: "MVR", active: true, isPlaceholderPrice: false, sortOrder: 2 }, { db, now: ORDERED });
+    await createOrder(customer, { planId: plan2.id }, { db, now: at(DUE, hours(2)) });
+    await sweepCheckoutReminders({ db, now: at(DUE, hours(28)), force: true });
+    expect(await reminders()).toHaveLength(1);
+  });
+
+  it("sends no email", async () => {
+    on();
+    const { customer } = await waitingOrder();
+    await createIdentity(db, customer.userId);
+    resetEmailProviderCache();
+    await sweepCheckoutReminders({ db, now: DUE, force: true });
+    expect((getEmailProvider() as ConsoleEmailProvider).sent).toHaveLength(0);
   });
 });
 

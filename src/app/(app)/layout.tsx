@@ -13,6 +13,7 @@ import { kickEngagementEmailSweeps } from "@/server/notifications/engagement-ema
 import { kickMessageEmailSweep } from "@/server/notifications/message-email";
 import { kickPushSweep } from "@/server/notifications/push";
 import { touchPresence } from "@/server/presence";
+import { kickCheckoutReminderSweep } from "@/server/billing/checkout-reminder";
 
 /**
  * Authenticated shell: only active users with completed onboarding get here (Phase 5 §21). Badges, the unread
@@ -42,6 +43,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
    * without reading it.
    */
   kickPushSweep();
+  /*
+   * The abandoned-checkout reminder (§12.19). Off unless PLUS_CHECKOUT_REMINDERS is "on" — and while off this is a
+   * single environment read, not a query. When on it sits behind its own ten-minute gate and daytime-only window.
+   */
+  kickCheckoutReminderSweep();
   const [badges, aside, unread] = await Promise.all([getNavBadges(actor), getDiscoverAside(actor), countUnreadNotifications(actor)]);
   const now = new Date();
   const discoverAside = (

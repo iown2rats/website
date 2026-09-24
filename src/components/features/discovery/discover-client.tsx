@@ -169,7 +169,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
           toast.show("That profile isn't available any more.");
         } else {
           restore(card);
-          toast.show("Couldn't reach Mellocrush. Try again.");
+          toast.show("Couldn't reach MelloCrush. Try again.");
         }
         return;
       }
@@ -193,7 +193,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         applyFailure(result);
         if (result.code !== "NOT_FOUND") {
           restore(card);
-          toast.show("Couldn't reach Mellocrush. Try again.");
+          toast.show("Couldn't reach MelloCrush. Try again.");
         }
         return;
       }
@@ -211,7 +211,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
       applyFailure(result);
       if (result.code === "ENTITLEMENT") setLock({ feature: "Undo your last pass", description: "Plus brings back the person you just passed on.", surface: "undo" });
       else if (result.code === "UNDO_UNAVAILABLE") toast.show(result.message);
-      else toast.show("Couldn't reach Mellocrush. Try again.");
+      else toast.show("Couldn't reach MelloCrush. Try again.");
       return;
     }
     sync(result.serverNow);

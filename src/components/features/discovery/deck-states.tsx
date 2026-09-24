@@ -63,7 +63,7 @@ export function DeckAwaitingReview({ onRefresh }: { onRefresh: () => void }) {
 }
 
 export function DeckError({ onRetry }: { onRetry: () => void }) {
-  return <ErrorState className="h-full rounded-card bg-surface-muted" title="Couldn't load Discover" description="Mellocrush couldn't reach the server. Check your connection and try again." onRetry={onRetry} />;
+  return <ErrorState className="h-full rounded-card bg-surface-muted" title="Couldn't load Discover" description="MelloCrush couldn't reach the server. Check your connection and try again." onRetry={onRetry} />;
 }
 
 export function DeckLoading() {

@@ -10,7 +10,7 @@ import { buildVisibleProfiles, type VisibleProfile } from "@/server/profiles/vis
 import { listEligibleIncomingLikes } from "./eligibility";
 
 export interface LikesYouPlaceholder {
-  /** Precomputed blurhash of the liker's primary photo, or null when they have none. */
+  /** Blurhash of the liker's first APPROVED photo (never a pending or rejected one), or null when they have none. */
   blurhash: string | null;
   verified: boolean;
 }

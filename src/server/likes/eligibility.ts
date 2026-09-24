@@ -28,7 +28,7 @@ import { baseVisibleSql } from "@/server/discovery/predicate";
 
 export interface EligibleLiker {
   id: string;
-  /** Precomputed blurhash of the liker's primary photo, or null when they have none. */
+  /** Blurhash of the liker's first APPROVED photo, or null when they have none. */
   blurhash: string | null;
   verified: boolean;
 }
@@ -64,8 +64,10 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
   return db.$queryRaw<EligibleLiker[]>(Prisma.sql`
     SELECT u.id,
            (COALESCE(ver.status::text, '') = 'VERIFIED') AS verified,
+           -- APPROVED only, whatever PHOTO_VISIBILITY_POLICY says: a pending or rejected photo must not reach a Free
+           -- viewer even as a 32-pixel colour wash. No approved photo → null → the plain placeholder tile.
            (SELECT ph.blurhash FROM "ProfilePhoto" ph JOIN "Profile" pp ON pp.id = ph."profileId"
-             WHERE pp."userId" = u.id ORDER BY ph.position ASC LIMIT 1) AS blurhash
+             WHERE pp."userId" = u.id AND ph.moderation = 'APPROVED' ORDER BY ph.position ASC LIMIT 1) AS blurhash
     FROM "Like" l
     JOIN "User" u ON u.id = l."fromUserId"
     JOIN "PrivacySettings" ps ON ps."userId" = u.id

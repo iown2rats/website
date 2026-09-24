@@ -139,6 +139,8 @@ export function pushUrlFor(input: {
   kind: PushKind;
   conversationId?: string | null;
   postId?: string | null;
+  /** The notification's own payload. Read for exactly one case: the checkout reminder's order (§12.19). */
+  data?: unknown;
 }): string {
   switch (input.kind) {
     case "MESSAGE":
@@ -162,9 +164,20 @@ export function pushUrlFor(input: {
       return "/settings/membership";
     case "SAFETY_NOTICE":
       return "/settings/safety";
-    case "ACCOUNT_NOTICE":
-      return "/settings";
+    case "ACCOUNT_NOTICE": {
+      // The checkout reminder returns the member to that order's own payment screen, which re-authorises on arrival
+      // like every destination here. Every other account notice keeps its existing destination.
+      const order = checkoutReminderOrderId(input.data);
+      return order ? `/settings/membership/order/${order}?from=checkout_recovery` : "/settings";
+    }
   }
+}
+
+/** The order id of a checkout-reminder payload (`{ kind: "CHECKOUT_REMINDER", orderId }`), or null for anything else. */
+function checkoutReminderOrderId(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  return d.kind === "CHECKOUT_REMINDER" && typeof d.orderId === "string" && /^[a-z0-9]{8,40}$/.test(d.orderId) ? d.orderId : null;
 }
 
 /** Which preference decides whether this kind may be pushed. */

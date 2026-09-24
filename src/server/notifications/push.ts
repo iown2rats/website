@@ -213,7 +213,7 @@ export async function pushNotification(db: DbLike, notificationId: string, now: 
   const copy = pushCopyFor({ kind, actorName, emoji: readEmoji(row.data) });
   const payload: PushPayload = {
     ...copy,
-    url: pushUrlFor({ kind, conversationId: row.conversationId, postId: row.postId }),
+    url: pushUrlFor({ kind, conversationId: row.conversationId, postId: row.postId, data: row.data }),
     /*
      * One live notification per conversation / post / category, so a member who has been away does not come back
      * to eleven separate buzzes about the same chat — the newest replaces the older one on the lock screen.

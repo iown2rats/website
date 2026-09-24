@@ -782,3 +782,28 @@ describe("message text can never reach a push payload", () => {
     expect(everything).not.toContain(b.userId);
   });
 });
+
+describe("checkout reminder push destination (§12.19)", () => {
+  it("opens that order's payment screen, not generic settings", async () => {
+    const member = await createUser(db, { now: T0 });
+    await enablePush(member, { pushAccount: true });
+    await addDevice(member, "phone");
+    await goAway(member);
+    await db.notification.create({ data: { userId: member.userId, type: "ACCOUNT_NOTICE", data: { kind: "CHECKOUT_REMINDER", orderId: "ordr1234abcd5678" }, createdAt: T0 } });
+
+    expect(await pushForRecipient(member.userId, { db, now: T0 })).toEqual(["sent"]);
+    expect(transport.sent[0]!.payload.url).toBe("/settings/membership/order/ordr1234abcd5678?from=checkout_recovery");
+    // Still says nothing about money, plans or orders on a lock screen.
+    expect(transport.sent[0]!.payload.title).toBe("Account notice");
+  });
+
+  it("leaves every other destination exactly as it was", () => {
+    expect(pushUrlFor({ kind: "ACCOUNT_NOTICE" })).toBe("/settings");
+    expect(pushUrlFor({ kind: "ACCOUNT_NOTICE", data: { kind: "SOMETHING_ELSE", orderId: "ordr1234abcd5678" } })).toBe("/settings");
+    // A malformed id is never put into a URL.
+    expect(pushUrlFor({ kind: "ACCOUNT_NOTICE", data: { kind: "CHECKOUT_REMINDER", orderId: "../../admin" } })).toBe("/settings");
+    expect(pushUrlFor({ kind: "PAYMENT_APPROVED", data: { kind: "CHECKOUT_REMINDER", orderId: "ordr1234abcd5678" } })).toBe("/settings/membership");
+    expect(pushUrlFor({ kind: "LIKE_RECEIVED", data: { kind: "CHECKOUT_REMINDER", orderId: "ordr1234abcd5678" } })).toBe("/likes");
+    expect(pushUrlFor({ kind: "SAFETY_NOTICE" })).toBe("/settings/safety");
+  });
+});

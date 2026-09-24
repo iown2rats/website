@@ -295,6 +295,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
         open={limitOpen}
         onClose={() => setLimitOpen(false)}
         limit={allowance.limit}
+        plusLimit={capabilities.plusDailyLikeLimit}
         tier={allowance.tier}
         resetsAt={allowance.resetsAt}
         serverTime={serverTime}

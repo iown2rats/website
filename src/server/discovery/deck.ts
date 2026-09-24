@@ -2,7 +2,7 @@
  * The Discover deck as the client sees it: bounded batches of safe cards plus the like allowance and server time.
  * Actions accept public handles and resolve them here; the acting user always comes from the session.
  */
-import { DISCOVERY } from "@/config/product";
+import { DISCOVERY, PRODUCT_RULES } from "@/config/product";
 import { getDb, type Db, type DbLike } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import { displayablePhotoWhere } from "@/lib/photo-policy";
@@ -35,6 +35,8 @@ export interface DeckCapabilities {
   canUndo: boolean;
   canUseAdvancedFilters: boolean;
   tier: "FREE" | "PLUS";
+  /** Plus's daily like allowance, from the product rules, for the Free like-limit copy. Never hard-coded in the UI. */
+  plusDailyLikeLimit: number;
 }
 
 /** Boost state for the Discover header (docs/ARCHITECTURE.md §12.8). Free: limit 0. */
@@ -122,7 +124,12 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
   return {
     cards,
     allowance: toAllowanceDto(allowance),
-    capabilities: { canUndo: entitlements.rules.canUndoPass, canUseAdvancedFilters: entitlements.rules.canUseAdvancedFilters, tier: entitlements.tier },
+    capabilities: {
+      canUndo: entitlements.rules.canUndoPass,
+      canUseAdvancedFilters: entitlements.rules.canUseAdvancedFilters,
+      tier: entitlements.tier,
+      plusDailyLikeLimit: PRODUCT_RULES.PLUS.dailyLikeLimit,
+    },
     boost: { limit: boost.limit, remaining: boost.remaining, activeEndsAt: boost.activeBoostEndsAt?.toISOString() ?? null, resetsAt: boost.resetsAt?.toISOString() ?? null },
     serverNow: now.toISOString(),
     emptyReason,

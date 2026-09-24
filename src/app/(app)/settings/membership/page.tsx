@@ -68,7 +68,8 @@ export default async function MembershipPage() {
             <p className="text-body-sm leading-normal text-text-secondary">
               {isPlus
                 ? periodEnd
-                  ? `${m.cancelAtPeriodEnd ? "Plus ends" : "Renews"} on ${periodEnd}${m.planName ? ` · ${m.planName}` : ""}.`
+                  ? // Never "Renews": Plus is bought by bank transfer and never renews automatically (see the footer).
+                    `Plus active until ${periodEnd}${m.planName ? ` · ${m.planName}` : ""}.`
                   : "Plus is active on your account."
                 : "Dating on Mellocrush stays free. Plus adds a few quiet advantages."}
             </p>

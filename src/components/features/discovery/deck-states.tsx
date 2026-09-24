@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { EyeOffIcon, FilterIcon, HeartIcon, ImageIcon, WavesIcon } from "@/components/ui/icons";
+import { CloseIcon, EyeOffIcon, FilterIcon, HeartIcon, ImageIcon, WavesIcon } from "@/components/ui/icons";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { formatDuration } from "@/lib/time";
 
@@ -93,5 +93,29 @@ export function DeckPaused() {
       description="You're hidden from Discover and won't see new people. Your matches and chats keep working."
       actions={<Link href="/settings/privacy" className="inline-flex h-11 items-center rounded-lg bg-primary px-5 text-body-sm font-medium text-on-primary">Resume in Privacy &amp; Safety</Link>}
     />
+  );
+}
+
+/**
+ * The Discover Likes You prompt — Option A (docs/ARCHITECTURE.md §12.19): shown ONLY inside an empty or out-of-likes
+ * deck state, never over, beside or near a live card, so it cannot touch a swipe or the swipe lesson.
+ *
+ * `count` is the server's eligible-likes count for a Free member, and the owner renders this only when it is at least
+ * one; Plus members are never sent a count. It leads to Likes You — the real, blurred tiles — not straight to a price.
+ * Dismissing it hides it for the rest of the browser session.
+ */
+export function LikesYouPrompt({ count, onOpen, onDismiss }: { count: number; onOpen: () => void; onDismiss: () => void }) {
+  return (
+    <div className="relative flex items-center gap-3 rounded-2xl glass-card px-4 py-3" role="region" aria-label="People who like you">
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-aqua-soft text-primary-ink" aria-hidden="true"><HeartIcon size={18} filled strokeWidth={0} /></span>
+      <div className="min-w-0 flex-1">
+        <div className="text-body font-medium text-text">{count === 1 ? "Someone likes you" : `${count} people like you`}</div>
+        <div className="text-caption text-text-secondary">See who&apos;s interested with MelloCrush Plus.</div>
+      </div>
+      <Link href="/likes" onClick={onOpen} className="inline-flex h-9 shrink-0 items-center rounded-lg bg-primary px-3 text-caption font-medium text-on-primary pressable">See who</Link>
+      <button type="button" onClick={onDismiss} aria-label="Dismiss" className="grid size-9 shrink-0 place-items-center rounded-full border-0 bg-transparent text-text-secondary">
+        <CloseIcon size={16} />
+      </button>
+    </div>
   );
 }

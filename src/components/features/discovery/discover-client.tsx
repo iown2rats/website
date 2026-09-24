@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { likeCard, loadDeck, passCard, refreshAllowance, saveFilters, undoLastCard, type ActionFailure } from "@/actions/discovery";
 import { DISCOVERY } from "@/config/product";
 import { membershipHref, type PlusSurface } from "@/lib/plus-surfaces";
@@ -16,7 +16,8 @@ import { TabHeader } from "@/components/layout/screen-header";
 import type { AllowanceDto, BoostDto, DeckCapabilities, DeckPage, EmptyReason } from "@/server/discovery/deck";
 import { BoostControl } from "./boost-control";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
-import { DeckAwaitingReview, DeckError, DeckExhausted, DeckFiltered, DeckLoading, LikesExhaustedNote, DeckPaused } from "./deck-states";
+import { DeckAwaitingReview, DeckError, DeckExhausted, DeckFiltered, DeckLoading, LikesExhaustedNote, LikesYouPrompt, DeckPaused } from "./deck-states";
+import { trackPlusClick, usePlusPromptView } from "@/components/features/analytics/plus-track";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "./filters-sheet";
 import { FullProfile } from "./full-profile";
 import { LikeLimitDialog } from "./like-limit-dialog";
@@ -44,6 +45,24 @@ export interface DiscoverClientProps {
 
 type DeckStatus = "ready" | "loading" | "error";
 
+/** Dismissing the Discover Likes You prompt lasts for the browser session. Storage failures just mean it can reappear. */
+const PROMPT_DISMISSED_KEY = "mc:discover-likes-prompt-dismissed";
+const noopSubscribe = () => () => {};
+function readPromptDismissed(): boolean {
+  try {
+    return window.sessionStorage.getItem(PROMPT_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writePromptDismissed(): void {
+  try {
+    window.sessionStorage.setItem(PROMPT_DISMISSED_KEY, "1");
+  } catch {
+    /* Private mode or storage disabled: the in-memory flag still hides it for this visit. */
+  }
+}
+
 const dedupe = (cards: DeckCard[]) => {
   const seen = new Set<string>();
   return cards.filter((c) => (seen.has(c.handle) ? false : (seen.add(c.handle), true)));
@@ -69,6 +88,9 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
   const [match, setMatch] = useState<{ name: string; photo: PhotoRef | null; conversationId: string | null } | null>(null);
   const [undoBusy, setUndoBusy] = useState(false);
   const [boost, setBoost] = useState<BoostDto>(initial.boost);
+  const [likesTeaser, setLikesTeaser] = useState(initial.likesTeaser);
+  const [promptDismissed, setPromptDismissed] = useState(false);
+  const promptDismissedStored = useSyncExternalStore(noopSubscribe, readPromptDismissed, () => false);
   const [lock, setLock] = useState<{ feature: string; description: string; surface?: PlusSurface } | null>(null);
   const loadingMore = useRef(false);
   const cardsRef = useRef<DeckCard[]>(cards);
@@ -102,6 +124,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
       }
       sync(result.serverNow);
       setAllowance(result.allowance);
+      setLikesTeaser(result.likesTeaser);
       const fresh = result.cards.map(toDeckCard);
       setCards((prev) => dedupe([...prev, ...fresh]));
       if (fresh.length === 0) {
@@ -229,7 +252,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
   const likesExhausted = allowance.remaining <= 0 && allowance.resetsAt != null && Date.parse(allowance.resetsAt) > serverTime();
   const msUntilReset = allowance.resetsAt ? Date.parse(allowance.resetsAt) - serverTime() : null;
 
-  const empty =
+  const emptyState =
     status === "loading" ? <DeckLoading /> :
     status === "error" ? <DeckError onRetry={() => void loadMore("retry")} /> :
     likesExhausted && emptyReason === "EXHAUSTED" ? <LikesExhaustedNote limit={allowance.limit} msUntilReset={msUntilReset} /> :
@@ -237,6 +260,28 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     emptyReason === "FILTERS" ? <DeckFiltered onAdjustFilters={() => setFiltersOpen(true)} /> :
     emptyReason === "REVIEW" ? <DeckAwaitingReview onRefresh={() => void loadMore("retry")} /> :
     <DeckExhausted onAdjustFilters={() => setFiltersOpen(true)} onRefresh={() => void loadMore("retry")} />;
+  /*
+   * Option A (§12.19): the Likes You prompt lives only inside a settled empty deck — nobody new, out of likes, or
+   * waiting on review — where there is no card to swipe and no swipe lesson running. Never while loading, on an
+   * error, while paused or when the member's own filters are the fix. The server sends a count only for a Free
+   * member with at least one eligible like, and only while PLUS_DISCOVER_PROMPT is on.
+   */
+  const promptState = status === "ready" && cards.length === 0 && (emptyReason === "NONE" || emptyReason === "EXHAUSTED" || emptyReason === "REVIEW");
+  const showLikesPrompt = likesTeaser != null && likesTeaser.count > 0 && promptState && !promptDismissed && !promptDismissedStored;
+  usePlusPromptView("discover_likes", showLikesPrompt);
+  const empty = showLikesPrompt && likesTeaser ? (
+    <div className="flex h-full flex-col gap-2.5">
+      <div className="min-h-0 flex-1">{emptyState}</div>
+      <LikesYouPrompt
+        count={likesTeaser.count}
+        onOpen={() => trackPlusClick("discover_likes")}
+        onDismiss={() => {
+          setPromptDismissed(true);
+          writePromptDismissed();
+        }}
+      />
+    </div>
+  ) : emptyState;
 
   return (
     <AppScreen aria-label="Discover" className="wide:mx-auto wide:w-full wide:max-w-[var(--deck-wide)]">

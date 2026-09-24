@@ -6,6 +6,7 @@ import type { AdminActor } from "@/server/admin/authz";
 import { getPlusFunnelReport, parsePlusPromptBody, recordPlusEvent } from "@/server/analytics/plus-funnel";
 import { approveOrder } from "@/server/billing/approval";
 import { createOrder, submitReceipt } from "@/server/billing/orders";
+import { getDeck } from "@/server/discovery/deck";
 import { createPaymentMethod } from "@/server/billing/payment-methods";
 import { createPlan } from "@/server/billing/plans";
 import { setOcrEngine, textEngine } from "@/server/ocr/engine";
@@ -251,5 +252,37 @@ describe("Plus funnel analytics", () => {
     expect(ratio(3, 10)).toBe("3 / 10 (30%)");
     expect(ratio(0, 0)).toBe("0");
     expect(ratio(2, 0)).toBe("2");
+  });
+});
+
+// ───────────────────────────── Discover (Option A) and Undo ─────────────────────────────
+
+describe("Discover Likes You prompt (Option A)", () => {
+  it("is not sent while PLUS_DISCOVER_PROMPT is off", async () => {
+    const me = await createUser(db, { now: T0 });
+    await likedBy(me, 2);
+    expect((await getDeck(me, {}, { db, storage, now: T0 })).likesTeaser).toBeNull();
+  });
+
+  it("carries the real eligible count for a Free member with likes", async () => {
+    process.env.PLUS_DISCOVER_PROMPT = "on";
+    const me = await createUser(db, { now: T0 });
+    const [, passed] = await likedBy(me, 3);
+    await passUser(me, passed!.userId, { db, now: at(T0, minutes(1)) });
+    expect((await getDeck(me, {}, { db, storage, now: at(T0, minutes(2)) })).likesTeaser).toEqual({ count: 2 });
+  });
+
+  it("says nothing when nobody likes the member", async () => {
+    process.env.PLUS_DISCOVER_PROMPT = "on";
+    const me = await createUser(db, { now: T0 });
+    expect((await getDeck(me, {}, { db, storage, now: T0 })).likesTeaser).toBeNull();
+  });
+
+  it("is never sent to a Plus member", async () => {
+    process.env.PLUS_DISCOVER_PROMPT = "on";
+    const me = await createUser(db, { now: T0 });
+    await grantPlus(db, me.userId, at(T0, -hours(1)), at(T0, hours(24)));
+    await likedBy(me, 2);
+    expect((await getDeck(me, {}, { db, storage, now: T0 })).likesTeaser).toBeNull();
   });
 });

@@ -10,6 +10,8 @@ import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
 import { getBoostAllowance, getEntitlements, getLikeAllowance, type LikeAllowance } from "@/server/entitlements";
+import { flagEnabled } from "@/server/flags";
+import { countEligibleIncomingLikes } from "@/server/likes/eligibility";
 import { likeUser, passUser, undoLastPass, type LikeResult } from "@/server/likes/like";
 import { kickMatchEmail } from "@/server/notifications/engagement-email";
 import { kickPush } from "@/server/notifications/push";
@@ -64,6 +66,12 @@ export interface DeckPage {
    * new; PAUSED = the viewer paused dating. REVIEW carries no count and no identities.
    */
   emptyReason: EmptyReason;
+  /**
+   * The Discover Likes You prompt (Option A, §12.19): the eligible incoming-likes count for a FREE member while
+   * PLUS_DISCOVER_PROMPT is on and the count is at least one; otherwise null. Never for Plus, never zero, and never an
+   * identity — the client shows it only inside an empty deck state.
+   */
+  likesTeaser: { count: number } | null;
   /** The viewer's own primary photo for the match screen. */
   me: { name: string; photo: { url: string | null; demoKey: string | null; blurhash: string } | null };
 }
@@ -112,6 +120,8 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
     getBoostAllowance(db, actor.userId, now),
   ]);
   const cards = await buildDiscoveryCards(db, actor.userId, ids, now, storage);
+  // The same count Likes You shows (src/server/likes/eligibility.ts). Only asked for when it could be shown.
+  const teaserCount = flagEnabled("PLUS_DISCOVER_PROMPT") && !entitlements.rules.canSeeIncomingLikes ? await countEligibleIncomingLikes(db, actor.userId, now) : 0;
   let emptyReason: EmptyReason = "NONE";
   if (paused) emptyReason = "PAUSED";
   else if (cards.length === 0 && excludeIds.length === 0) {
@@ -133,6 +143,7 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
     boost: { limit: boost.limit, remaining: boost.remaining, activeEndsAt: boost.activeBoostEndsAt?.toISOString() ?? null, resetsAt: boost.resetsAt?.toISOString() ?? null },
     serverNow: now.toISOString(),
     emptyReason,
+    likesTeaser: teaserCount > 0 ? { count: teaserCount } : null,
     me,
   };
 }

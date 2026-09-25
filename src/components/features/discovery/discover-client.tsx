@@ -14,11 +14,13 @@ import { useToast } from "@/components/ui/toast";
 import { AppScreen, DiscoveryFrame } from "@/components/layout/page";
 import { TabHeader } from "@/components/layout/screen-header";
 import type { AllowanceDto, BoostDto, DeckCapabilities, DeckPage, EmptyReason } from "@/server/discovery/deck";
+import type { VerificationReminderDto } from "@/server/verification/reminder";
 import { BoostControl } from "./boost-control";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
 import { DeckAwaitingReview, DeckError, DeckExhausted, DeckFiltered, DeckLoading, DeckUnavailable, LikesExhaustedNote, LikesYouPrompt, DeckPaused } from "./deck-states";
 import { trackPlusClick, usePlusPromptView } from "@/components/features/analytics/plus-track";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "./filters-sheet";
+import { VerificationReminder } from "./verification-reminder";
 import { FullProfile } from "./full-profile";
 import { LikeLimitDialog } from "./like-limit-dialog";
 import { MatchOverlay } from "./match-overlay";
@@ -41,6 +43,8 @@ export interface DiscoverClientProps {
   initial: DeckPage;
   filters: DiscoveryFiltersDto;
   locations: LocationOption[];
+  /** Present only when the server decided this member should be reminded to verify (src/server/verification/reminder.ts). */
+  verificationReminder?: VerificationReminderDto | null;
 }
 
 type DeckStatus = "ready" | "loading" | "error";
@@ -68,7 +72,7 @@ const dedupe = (cards: DeckCard[]) => {
   return cards.filter((c) => (seen.has(c.handle) ? false : (seen.add(c.handle), true)));
 };
 
-export function DiscoverClient({ initial, filters: initialFilters, locations }: DiscoverClientProps) {
+export function DiscoverClient({ initial, filters: initialFilters, locations, verificationReminder }: DiscoverClientProps) {
   const router = useRouter();
   const toast = useToast();
   const { sync, serverTime } = useServerClock(initial.serverNow);
@@ -300,6 +304,8 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
           </>
         }
       />
+      {/* Above the deck, never over it: the deck frame is the flexible part and simply gives up the reminder's height. */}
+      {verificationReminder ? <VerificationReminder dismissKey={verificationReminder.dismissKey} /> : null}
       <DiscoveryFrame>
         <SwipeDeck
           profiles={cards}

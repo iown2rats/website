@@ -440,6 +440,24 @@ Authorization is re-derived from the message, never taken from the request: the 
 
 **Photo changes after verification (decision pending)**: no rule exists in the product specification, and none was invented. Today the badge persists when a verified member changes profile photos. Recommended policy for the owner to approve before it is built: keep the badge while at least one photo present at verification time remains; when every photo from that set has been replaced, move the member back to NONE with a notice ("Your photos changed, verify again to keep the badge") rather than silently. Implementing it needs the verified photo set to be recorded at decision time (one new nullable JSON column or a small table), so it is a schema change and waits for approval.
 
+
+### 11.1 Discover verification reminder (2026-09-25)
+
+A dismissible "Get verified ✨" card above the Discover deck. Tests: `tests/integration/verification-reminder.test.ts`
+(who sees it), `tests/unit/verification-reminder.test.ts` (the snooze).
+
+- **Who** is decided on the server, read-only, by `getVerificationReminder` (`src/server/verification/reminder.ts`): an
+  ordinary member (`accountType` MEMBER, role USER) who is active, onboarded, not deleted, and for whom
+  `submitBlocker` is null — i.e. could start verifying right now. So NONE / legacy PHONE_VERIFIED: shown;
+  SELFIE_SUBMITTED / UNDER_REVIEW: hidden (the verification page shows "Under review"); VERIFIED: hidden;
+  REJECTED: hidden during the 24 h retry window, shown after it. Staff never reach Discover, and are excluded anyway.
+- **Verify now** links to `/settings/verification`, the existing flow (`VERIFY_HREF`).
+- **×** hides it at once and snoozes it for 7 days in `localStorage`, under a key the server derives per member
+  (`mc:verify-reminder:` + a hash of the member id — no id reaches the browser), so accounts sharing a browser do not
+  hide each other's reminder. The snooze is a courtesy only: once a member is verified the server stops sending the
+  reminder, whatever the browser remembers. No table was added.
+- It sits between the Discover header and the deck; the deck frame is the flexible element and gives up the card's
+  ~90 px. Nothing overlays the cards, the swipe controls, the filters button or the navigation.
 ## 12. Monetization: Mellocrush Plus, entitlements and usage limits (approved 2026-09-17)
 
 This section supersedes every earlier statement about like caps, incognito mode, rewind and plan pricing in this document and in the prototype audit. Registration is free and the core dating loop stays usable without paying.

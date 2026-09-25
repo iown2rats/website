@@ -9,10 +9,11 @@ import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { PHOTO_URL_TTL_SECONDS, type StorageProvider } from "@/lib/storage/provider";
 import type { Actor } from "@/server/actor";
-import { getBoostAllowance, getEntitlements, getLikeAllowance, type LikeAllowance } from "@/server/entitlements";
+import { getBoostAllowance, getEntitlements, getLikeAllowance, getSuperLikeAllowance, type LikeAllowance, type SuperLikeAllowance } from "@/server/entitlements";
+import { recordPlusEvent } from "@/server/analytics/plus-funnel";
 import { flagEnabled } from "@/server/flags";
 import { countEligibleIncomingLikes } from "@/server/likes/eligibility";
-import { likeUser, passUser, undoLastPass, type LikeResult } from "@/server/likes/like";
+import { likeUser, passUser, superLikeUser, undoLastPass, type LikeResult } from "@/server/likes/like";
 import { kickMatchEmail } from "@/server/notifications/engagement-email";
 import { kickPush } from "@/server/notifications/push";
 import { buildDiscoveryCards, isDemoKey, type DiscoveryCardDto } from "./dto";
@@ -56,6 +57,21 @@ export interface BoostDto {
   resetsAt: string | null;
 }
 
+/**
+ * Super Likes for the Discover control and composer (§12.20). Informational: the server re-reads the entitlement and
+ * the counter inside the sending transaction, so nothing here is ever trusted. `limit` 0 means no Plus.
+ */
+export interface SuperLikeAllowanceDto {
+  limit: number;
+  remaining: number;
+  /** ISO end of the current 7-day window, or null when none is open (the full allowance is available). */
+  resetsAt: string | null;
+}
+
+export function toSuperLikeAllowanceDto(a: SuperLikeAllowance): SuperLikeAllowanceDto {
+  return { limit: a.limit, remaining: a.remaining, resetsAt: a.resetsAt ? a.resetsAt.toISOString() : null };
+}
+
 export type EmptyReason = "NONE" | "FILTERS" | "REVIEW" | "EXHAUSTED" | "UNAVAILABLE" | "PAUSED";
 
 export interface DeckPage {
@@ -63,6 +79,7 @@ export interface DeckPage {
   allowance: AllowanceDto;
   capabilities: DeckCapabilities;
   boost: BoostDto;
+  superLikes: SuperLikeAllowanceDto;
   /** Authoritative server time; the client renders countdowns relative to this, never to its own clock alone. */
   serverNow: string;
   /**
@@ -118,12 +135,13 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
   const excludeIds = await resolveHandles(db, input.excludeHandles ?? []);
   const privacy = await db.privacySettings.findUnique({ where: { userId: actor.userId }, select: { visibility: true, pausedAt: true } });
   const paused = privacy?.visibility === "HIDDEN" || Boolean(privacy?.pausedAt);
-  const [ids, allowance, entitlements, me, boost] = await Promise.all([
+  const [ids, allowance, entitlements, me, boost, superLikes] = await Promise.all([
     paused ? Promise.resolve([] as string[]) : getDeckCandidateIds(db, actor, { now, limit: input.limit, excludeIds }),
     getLikeAllowance(db, actor.userId, now),
     getEntitlements(db, actor.userId, now),
     loadMe(db, actor, storage),
     getBoostAllowance(db, actor.userId, now),
+    getSuperLikeAllowance(db, actor.userId, now),
   ]);
   const cards = await buildDiscoveryCards(db, actor.userId, ids, now, storage);
   // The same count Likes You shows (src/server/likes/eligibility.ts). Only asked for when it could be shown.
@@ -152,6 +170,7 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
       showUndo: entitlements.rules.canUndoPass || flagEnabled("PLUS_UNDO_UI"),
     },
     boost: { limit: boost.limit, remaining: boost.remaining, activeEndsAt: boost.activeBoostEndsAt?.toISOString() ?? null, resetsAt: boost.resetsAt?.toISOString() ?? null },
+    superLikes: toSuperLikeAllowanceDto(superLikes),
     serverNow: now.toISOString(),
     emptyReason,
     likesTeaser: teaserCount > 0 ? { count: teaserCount } : null,
@@ -200,7 +219,54 @@ export async function likeByHandle(actor: Actor, handle: string, deps: DeckDeps 
     if (card) match = { matchId: result.matchId, conversationId: result.conversationId, card };
   }
   const allowance = await getLikeAllowance(db, actor.userId, now);
+  // A like back to a Super Like that made the match (§12.20 analytics). Best-effort, after the commit, once per match.
+  if (result.matched && result.matchId && result.created) void recordSuperLikeMatch(db, actor.userId, targetId, result.matchId, now);
   return { created: result.created, matched: result.matched && match != null, match, allowance: toAllowanceDto(allowance), serverNow: now.toISOString() };
+}
+
+export interface SuperLikeOutcome extends LikeOutcome {
+  superLikes: SuperLikeAllowanceDto;
+}
+
+/**
+ * Super Like by public handle (§12.20). Throws the domain errors from superLikeUser: EntitlementRequired (no Plus),
+ * SuperLikeLimitReached, Validation (message), InvalidState (already liked, paused, other pool), NotFound. Push,
+ * match email and analytics follow the commit exactly as they do for a like; nothing is kicked for a retry.
+ */
+export async function superLikeByHandle(actor: Actor, handle: string, message: string | null, deps: DeckDeps = {}): Promise<SuperLikeOutcome> {
+  const db = deps.db ?? getDb();
+  const storage = deps.storage ?? getStorageProvider();
+  const now = deps.now ?? new Date();
+  const targetId = await resolveHandle(db, handle);
+  const result: LikeResult = await superLikeUser(actor, targetId, { db, now, message });
+  if (result.created) {
+    kickPush(targetId, { db });
+    if (result.matched && result.conversationId) kickMatchEmail({ recipientId: targetId, conversationId: result.conversationId }, { db });
+    const hasMessage = (await db.like.findUnique({ where: { fromUserId_toUserId: { fromUserId: actor.userId, toUserId: targetId } }, select: { introId: true } }))?.introId != null;
+    void recordPlusEvent({ event: "super_like_sent", userId: actor.userId, surface: "super_like", now }, { db });
+    if (hasMessage) void recordPlusEvent({ event: "super_like_with_message_sent", userId: actor.userId, surface: "super_like", now }, { db });
+    if (result.matched && result.matchId) void recordSuperLikeMatch(db, actor.userId, targetId, result.matchId, now);
+  }
+  let match: MatchDto | null = null;
+  if (result.matched && result.matchId) {
+    const [card] = await buildDiscoveryCards(db, actor.userId, [targetId], now, storage);
+    if (card) match = { matchId: result.matchId, conversationId: result.conversationId, card };
+  }
+  const [allowance, superLikes] = await Promise.all([getLikeAllowance(db, actor.userId, now), getSuperLikeAllowance(db, actor.userId, now)]);
+  return {
+    created: result.created,
+    matched: result.matched && match != null,
+    match,
+    allowance: toAllowanceDto(allowance),
+    superLikes: toSuperLikeAllowanceDto(superLikes),
+    serverNow: now.toISOString(),
+  };
+}
+
+/** "super_like_matched", once per match (a deterministic event key), when either like in the pair is a Super Like. */
+async function recordSuperLikeMatch(db: DbLike, a: string, b: string, matchId: string, now: Date): Promise<void> {
+  const superLike = await db.like.findFirst({ where: { kind: "SUPER", OR: [{ fromUserId: a, toUserId: b }, { fromUserId: b, toUserId: a }] }, select: { fromUserId: true } });
+  if (superLike) await recordPlusEvent({ event: "super_like_matched", userId: superLike.fromUserId, surface: "super_like", eventKey: `super_like_matched:${matchId}`, now }, { db });
 }
 
 export async function passByHandle(actor: Actor, handle: string, deps: DeckDeps & { dismissIncomingLike?: boolean } = {}): Promise<{ created: boolean; serverNow: string }> {
@@ -229,8 +295,9 @@ export async function undoAndRestore(actor: Actor, deps: DeckDeps = {}): Promise
   return { card: card ?? null, serverNow: now.toISOString() };
 }
 
-export async function getAllowance(actor: Actor, deps: DeckDeps = {}): Promise<{ allowance: AllowanceDto; serverNow: string }> {
+export async function getAllowance(actor: Actor, deps: DeckDeps = {}): Promise<{ allowance: AllowanceDto; superLikes: SuperLikeAllowanceDto; serverNow: string }> {
   const db = deps.db ?? getDb();
   const now = deps.now ?? new Date();
-  return { allowance: toAllowanceDto(await getLikeAllowance(db, actor.userId, now)), serverNow: now.toISOString() };
+  const [likes, superLikes] = await Promise.all([getLikeAllowance(db, actor.userId, now), getSuperLikeAllowance(db, actor.userId, now)]);
+  return { allowance: toAllowanceDto(likes), superLikes: toSuperLikeAllowanceDto(superLikes), serverNow: now.toISOString() };
 }

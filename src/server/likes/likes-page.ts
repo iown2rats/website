@@ -24,24 +24,52 @@ export interface LikesMatchDto {
   photo: { url: string | null; demoKey: string | null; blurhash: string } | null;
 }
 
+/**
+ * Super Likes among a list of cards, keyed by the card's public handle (§12.20). Handles with no entry are ordinary
+ * likes. Kept beside the cards rather than inside them, so the Discover card DTO and its allow-list stay unchanged.
+ */
+export type SuperLikeMarks = Record<string, { message: string | null }>;
+
 /** The viewer's own pending likes. Same card DTO as Discover: they have already seen these people and chosen them. */
 export interface SentLikesDto {
   count: number;
   cards: DiscoveryCardDto[];
+  /** Which of these the viewer Super Liked, with the message they wrote. Their own words, shown back to them. */
+  superLikes: SuperLikeMarks;
 }
 
 export type LikesYouPageDto =
-  | { tier: "FREE"; count: number; cards: null; sent: SentLikesDto; matches: LikesMatchDto[]; serverNow: string }
-  | { tier: "PLUS"; count: number; cards: DiscoveryCardDto[]; sent: SentLikesDto; matches: LikesMatchDto[]; serverNow: string };
+  | {
+      tier: "FREE";
+      count: number;
+      cards: null;
+      /** Counts only (see LikesYouResult). The Free page is told a Super Like exists, never whose or what it says. */
+      superLikes: { count: number; withMessage: number };
+      sent: SentLikesDto;
+      matches: LikesMatchDto[];
+      serverNow: string;
+    }
+  | { tier: "PLUS"; count: number; cards: DiscoveryCardDto[]; superLikes: SuperLikeMarks; sent: SentLikesDto; matches: LikesMatchDto[]; serverNow: string };
 
 export async function getLikesPage(actor: Actor, deps: { db?: Db; storage?: StorageProvider; now?: Date } = {}): Promise<LikesYouPageDto> {
   const db = deps.db ?? getDb();
   const storage = deps.storage ?? getStorageProvider();
   const now = deps.now ?? new Date();
   const [likes, sent, matches] = await Promise.all([getLikesYou(actor, { db, now }), getSentLikes(actor, db, storage, now), listMatches(actor, db, storage)]);
-  if (likes.tier === "FREE") return { tier: "FREE", count: likes.count, cards: null, sent, matches, serverNow: now.toISOString() };
+  if (likes.tier === "FREE") {
+    return { tier: "FREE", count: likes.count, cards: null, superLikes: { count: likes.superLikes, withMessage: likes.superLikesWithMessage }, sent, matches, serverNow: now.toISOString() };
+  }
   const cards = await Promise.all(likes.profiles.map((p) => toDiscoveryCard(p, storage)));
-  return { tier: "PLUS", count: likes.count, cards, sent, matches, serverNow: now.toISOString() };
+  return { tier: "PLUS", count: likes.count, cards, superLikes: marksFor(likes.profiles, likes.superLikes), sent, matches, serverNow: now.toISOString() };
+}
+
+function marksFor(profiles: { userId: string; handle: string }[], supers: Map<string, { message: string | null }>): SuperLikeMarks {
+  const marks: SuperLikeMarks = {};
+  for (const p of profiles) {
+    const s = supers.get(p.userId);
+    if (s) marks[p.handle] = { message: s.message };
+  }
+  return marks;
 }
 
 /**
@@ -52,7 +80,8 @@ export async function getLikesPage(actor: Actor, deps: { db?: Db; storage?: Stor
 async function getSentLikes(actor: Actor, db: Db, storage: StorageProvider, now: Date): Promise<SentLikesDto> {
   const [rows, count] = await Promise.all([listSentLikes(db, actor.userId, now, { limit: LIKES_PAGE_SIZE }), countSentLikes(db, actor.userId, now)]);
   const profiles = await buildVisibleProfiles(db, actor.userId, rows.map((r) => r.id), now);
-  return { count, cards: await Promise.all(profiles.map((p) => toDiscoveryCard(p, storage))) };
+  const supers = new Map(rows.filter((r) => r.superLike).map((r) => [r.id, { message: r.message }] as const));
+  return { count, cards: await Promise.all(profiles.map((p) => toDiscoveryCard(p, storage))), superLikes: marksFor(profiles, supers) };
 }
 
 async function listMatches(actor: Actor, db: Db, storage: StorageProvider): Promise<LikesMatchDto[]> {

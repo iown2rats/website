@@ -386,7 +386,7 @@ the audit found the model disagreeing with itself elsewhere). Tests: `tests/inte
 - `blockUser` (domain function; UI in Phase 10): under the pair lock, inserts the Block, sets an ACTIVE Match to BLOCKED and its Conversation to LOCKED, and deletes the pair's likes in both directions.
 - Like allowance: 30 per rolling 24 hours for Free, 90 for Plus, enforced inside the like transaction (§12.3). The deck payload carries `limit, used, remaining, resetsAt` and `serverNow`; the client renders "You've used today's 30 likes." with a countdown from server time and refreshes the allowance when it reaches zero. Pass and browsing are never blocked by an exhausted allowance.
 - Match screen: the prototype's ocean overlay ("It's a Match", "You and {name} liked each other.", Say hello / Keep swiping). "Say hello" opens `/chats/<conversationId>`, an authorised conversation shell until messaging lands in Phase 8.
-- Intros (Free 1 per ISO week, Plus unlimited; `INTRO` message in a `PENDING` conversation) remain scheduled for Phase 7; the intro control is not shown on the deck until then.
+- Intros as first planned (Free 1 per ISO week, a `PENDING` conversation) were never built. The message-with-a-like shipped instead as the Super Like (§12.20): Plus only, no pre-match conversation.
 
 ## 9. Messaging (as built in Phase 7)
 
@@ -488,7 +488,7 @@ This section supersedes every earlier statement about like caps, incognito mode,
 | Profile Boosts | none | 2 per rolling 7-day window |
 | Advanced filters | basic filters only | enabled |
 | Undo last Pass | not available | enabled |
-| Intro with a like | 1 per ISO week (prototype rule, unchanged) | unlimited |
+| Super Likes (optional ≤150-character message) | none | 5 per 7-day window (§12.20) |
 
 Subscription pricing: **not yet approved**. Payment provider: **not yet selected**. Development pricing is placeholder data flagged as such in the database and the UI.
 
@@ -500,13 +500,13 @@ All numbers live in one typed module, `src/config/product.ts`:
 export const PRODUCT_RULES = {
   FREE: { dailyLikeLimit: 30, canSeeIncomingLikes: false,
           canUseInvisibleMode: false, boostsPerWindow: 0, canUseAdvancedFilters: false,
-          canUndoPass: false, introsPerWeek: 1 },
+          canUndoPass: false, superLikesPerWindow: 0 },
   PLUS: { dailyLikeLimit: 90, canSeeIncomingLikes: true,
           canUseInvisibleMode: true, boostsPerWindow: 2, canUseAdvancedFilters: true,
-          canUndoPass: true, introsPerWeek: null /* unlimited */ },
+          canUndoPass: true, superLikesPerWindow: 5 },
 } as const satisfies Record<Tier, TierRules>;
 
-export const USAGE_WINDOWS = { LIKES: 24 * 3_600_000, BOOSTS: 7 * 24 * 3_600_000 } as const;
+export const USAGE_WINDOWS = { LIKES: 24 * 3_600_000, BOOSTS: 7 * 24 * 3_600_000, SUPER_LIKES: 7 * 24 * 3_600_000 } as const;
 export const BOOST = { durationMs: 30 * 60_000, rankingWeight: 1 } as const;
 export const UNDO = { maxAgeMs: 60 * 60_000 } as const;
 export const MESSAGE_SPAM_CEILING = { perMinute: 30 } as const;
@@ -573,8 +573,8 @@ What still guards the send path, unchanged:
 Because the advisory lock still serialises a sender's concurrent sends, six simultaneous sends now all commit
 (they queue, they do not contend for a quota), and each one's spam-ceiling count sees every committed predecessor.
 
-The one messaging limit that is still tier-dependent is the **Intro** (`introsPerWeek`), and it applies *before*
-a match exists — an intro is a note attached to a like, not a message in a conversation.
+The one tier-dependent thing near messaging is the **Super Like** message (§12.20), and it applies *before* a match
+exists — it is a note attached to a like, not a message in a conversation, until a like back delivers it.
 
 ### 12.5 Likes You and Sent
 
@@ -1585,6 +1585,66 @@ Plus appears where a member already has a reason to want it, and every personal 
 - **Funnel analytics.** `PlusFunnelEvent` (own table, TEXT + CHECK rather than enums, RLS on, no policies): promotion seen / tapped from the browser via `/api/analytics/plus` (UUID key, known surface, active members, rate-limited, always 204), checkout / instructions / receipt / approval recorded by the server after its own write commits, keyed once per order. `recordPlusEvent` never throws. The admin Analytics page shows raw counts per surface and never a rate without its counts. Funnel rows follow the 90-day analytics retention: `purgeExpiredAnalytics` deletes them with the site events. The Discover prompt links to `/likes?from=discover_likes`, and Likes You passes that surface on, so a purchase keeps the prompt's credit.
 - **Read semantics (2026-09-24).** Viewing the Likes You tab marks the member's LIKE_RECEIVED notifications read up to the page's render time; opening a conversation marks that conversation's NEW_MATCH read along with its MESSAGE rows. Nothing else is marked, and no like, match or read receipt changes.
 - **Checkout reminder push** opens `/settings/membership/order/<id>?from=checkout_recovery` — the one case `pushUrlFor` reads a payload for. No Plus copy promises an approval time.
+
+## 12.20 Super Likes (2026-09-26)
+
+Two ways to say yes: ❤️ Like and ⭐ Super Like. A Super Like is a like that stands out and may carry one short
+message. Plus only; everything that decides *whether* a like may happen is shared with the ordinary like.
+
+**Rules** (`src/config/product.ts`): `superLikesPerWindow` is 0 for Free and 5 for Plus; `USAGE_WINDOWS.SUPER_LIKES`
+is 7 days; `SUPER_LIKE.messageMaxLength` is 150. No rollover, no packs, no price change.
+
+**Data model — extend, do not fork.**
+- `Like.kind` (`LikeKind`: `NORMAL` | `SUPER`, default `NORMAL`). One `Like` row per pair, as ever; every existing row
+  reads as `NORMAL` through the default and nothing is ever converted.
+- The message is an `Intro` row (the table existed, unused) linked by the existing `Like.introId`. `Intro.messageId`
+  is unique and set only from null, which is what makes "delivered once" a database fact.
+- The allowance is a `UsageCounter` row of kind `SUPER_LIKES`: the same lazily-reset window as likes and Boosts, opened
+  by the first Super Like and lasting 7 days. It lives on the server, so devices, logout and local storage change nothing.
+
+**Sending** (`superLikeUser` in `src/server/likes/like.ts`, via `superLikeByHandle` and the `superLikeCard` action).
+The message is cleaned like a chat message (line endings normalised, control characters removed, trimmed); empty
+means none; over 150 code points is refused before anything is locked. Then it is `likeUser`'s own transaction with
+three differences, all inside it: the `SUPER_LIKES` row is locked (usage row, then pair lock — the global order), the
+entitlement is read *in the transaction* (a Plus that lapsed while the composer was open is Free here, and Free is
+refused with `EntitlementRequired`), and what an existing like means:
+- existing `SUPER` → idempotent success, nothing spent (retries, double taps, second tabs);
+- existing `NORMAL` → refused ("You've already liked them."), nothing spent. A pending like is never "upgraded":
+  that would be a second, louder alert about the same interest, and a way to re-spam somebody who has not answered.
+
+Block, pool, Invisible Mode, pause, staff isolation and account state are the ordinary like's checks, in the same
+places. Any refusal rolls back the whole transaction, so a failed send spends nothing and leaves no counter row.
+
+**Receiving.** Likes You uses the one eligibility rule (§12.5.1) and orders `SUPER` first, then newest first, then
+id. Free gets `superLikes: { count, withMessage }` — two numbers — and never the list; the page shows "⭐ Someone Super
+Liked you" / "They sent you a message" and the first `count` locked tiles carry a star, decided by position alone.
+Plus gets `superLikes: { [handle]: { message } }` beside the unchanged card DTO. Sent shows the sender their own
+Super Likes and messages, and nothing about whether they were seen or dismissed. Pass on Likes You sets
+`Like.dismissedAt` exactly as for a like: no refund, no notification, nothing visible to the sender.
+
+**Like back.** `createMatchIfMutual` is unchanged apart from `deliverIntros`: after the canonical match and
+conversation exist, each undelivered intro between the pair (normally one) becomes an `INTRO` message from its
+author, dated when it was written, and is claimed with `updateMany … where messageId IS NULL`. Callers hold the pair
+lock, so repeats, retries and a like back racing the Super Like all end with one match, one conversation, one message.
+
+**Notifications.** The existing single `LIKE_RECEIVED` row per (recipient, liker), with `data: { superLike: true,
+withMessage }` — two booleans, never the text. The bell reads "Someone Super Liked you ⭐" (and "… and sent a message"),
+naming the sender only where a like is already nameable (Plus viewer, eligible liker). Push never names a liker and
+never carries the message. On a match the intro is **not** a `MESSAGE` notification: NEW_MATCH (its push and email)
+announces the moment, and the intro is what the recipient finds in the chat; a second alert would be a duplicate.
+
+**Analytics** (`PlusFunnelEvent`, `PLUS_FUNNEL_ANALYTICS`): `super_like_composer_opened` (browser, UUID key),
+`super_like_sent`, `super_like_with_message_sent`, `super_like_matched` (server, after commit; matched keyed once per
+match), and the Free paywall as `plus_prompt_viewed` / `plus_prompt_clicked` on surface `super_like`. Event and surface
+only — no recipient, no text.
+
+**Reporting.** A pre-match Super Like has no report surface of its own, as a like has none; once matched the message
+is an ordinary chat message and is included in `reportConversationPartner`'s snapshot. Blocking removes it from
+both lists at once, and blocked pairs can never match.
+
+**Migration** `20260926100000_super_likes`: `CREATE TYPE "LikeKind"`, `ADD COLUMN "kind" … DEFAULT 'NORMAL'`
+(metadata-only), `ALTER TYPE "UsageKind" ADD VALUE 'SUPER_LIKES'`, and the two `PlusFunnelEvent` CHECKs replaced by
+supersets. No row changes. Rollback is in the file.
 
 ## 30. Website analytics (2026-09-22)
 

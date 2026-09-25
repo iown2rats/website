@@ -12,7 +12,7 @@ import type { ReactionKey } from "@/lib/reactions";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
 import { ActionSheet, BottomSheet, ConfirmationDialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeftIcon, LockIcon, MoreIcon, VerifiedBadge } from "@/components/ui/icons";
+import { ChevronLeftIcon, LockIcon, MoreIcon, StarIcon, VerifiedBadge } from "@/components/ui/icons";
 import { useLongPress, useSwipeToReply } from "@/components/ui/long-press";
 import { ReactionPicker, ReactionSummary, ReactorSheet, type ReactorRow } from "@/components/ui/reactions";
 import { useToast } from "@/components/ui/toast";
@@ -698,6 +698,13 @@ function Bubble({ message, now, seen = false, otherName, flash, editingNow, regi
           )}
         >
           {message.replyTo ? <Quote quote={message.replyTo} mine={me} otherName={otherName} onJump={onJumpToQuoted} /> : null}
+          {/* The message a Super Like carried, delivered as the first line of the chat on the match (§12.20). */}
+          {message.kind === "INTRO" ? (
+            <span className={cn("mb-1 inline-flex items-center gap-1 text-tag", me ? "text-on-primary/85" : "text-text-secondary")}>
+              <StarIcon size={12} filled strokeWidth={0} className={me ? undefined : "text-sand"} />
+              Super Like
+            </span>
+          ) : null}
           <span className="self-stretch">{message.body}</span>
         </div>
       </div>

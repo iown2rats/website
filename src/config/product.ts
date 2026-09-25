@@ -25,8 +25,11 @@ export interface TierRules {
   readonly canUseAdvancedFilters: boolean;
   /** Undo the most recent Pass. */
   readonly canUndoPass: boolean;
-  /** Intros sent with a like per ISO week. null = unlimited. */
-  readonly introsPerWeek: number | null;
+  /**
+   * Super Likes per rolling 7-day window (§12.20). 0 = none. A Super Like may carry an optional message. This
+   * replaces the never-built "intro with a like" rule, which the Membership table advertised but nothing enforced.
+   */
+  readonly superLikesPerWindow: number;
 }
 
 export const PRODUCT_RULES = {
@@ -38,7 +41,7 @@ export const PRODUCT_RULES = {
     boostsPerWindow: 0,
     canUseAdvancedFilters: false,
     canUndoPass: false,
-    introsPerWeek: 1,
+    superLikesPerWindow: 0,
   },
   PLUS: {
     dailyLikeLimit: 90,
@@ -48,7 +51,7 @@ export const PRODUCT_RULES = {
     boostsPerWindow: 2,
     canUseAdvancedFilters: true,
     canUndoPass: true,
-    introsPerWeek: null,
+    superLikesPerWindow: 5,
   },
 } as const satisfies Record<Tier, TierRules>;
 
@@ -56,6 +59,11 @@ export const PRODUCT_RULES = {
 export const USAGE_WINDOWS = {
   LIKES: 24 * 3_600_000,
   BOOSTS: 7 * 24 * 3_600_000,
+  /**
+   * Opens at the first Super Like and lasts seven days; the next Super Like after it ends opens a fresh window with
+   * the full allowance. Unused Super Likes do not roll over (§12.20).
+   */
+  SUPER_LIKES: 7 * 24 * 3_600_000,
 } as const;
 
 export type UsageKindKey = keyof typeof USAGE_WINDOWS;
@@ -128,7 +136,8 @@ export const COMMUNITY = {
 
 /** Message body limits. */
 export const MESSAGE_LIMITS = { minLength: 1, maxLength: 2000 } as const;
-export const INTRO_LIMITS = { maxLength: 140 } as const;
+/** The optional message on a Super Like (§12.20). Counted in characters as a person sees them (code points). */
+export const SUPER_LIKE = { messageMaxLength: 150 } as const;
 
 /** Photo limits from the prototype. */
 export const PHOTO_LIMITS = { min: 2, max: 6 } as const;

@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { intentLower, INTENT_LABELS } from "@/constants/labels";
 import { cn } from "@/lib/cn";
 import { photoBackground } from "@/lib/photos";
 import { LockedPhoto } from "@/components/ui/locked-photo";
-import { ChevronLeftIcon, CloseIcon, HeartIcon, VerifiedBadge } from "@/components/ui/icons";
+import { PlusTag } from "@/components/ui/badge";
+import { ChevronLeftIcon, CloseIcon, HeartIcon, StarIcon, VerifiedBadge } from "@/components/ui/icons";
 import type { DeckCard } from "./types";
 
 /*
@@ -23,6 +24,12 @@ export interface FullProfileProps {
   /** When provided the floating Pass/Like controls are shown (the card is the current deck head). */
   onPass?: () => void;
   onLike?: () => void;
+  /** With Pass/Like, the Super Like star beside them (Discover's deck head, §12.20). */
+  onSuperLike?: () => void;
+  /** Free (or lapsed Plus): the star carries the PLUS tag and a tap explains Plus. */
+  superLikeLocked?: boolean;
+  /** Shown first, above the bio: e.g. the Super Like and its message on Likes You or Sent (§12.20). */
+  note?: ReactNode;
   /** Opens the existing Plus sheet. Tapping any locked photo leads here (docs/ARCHITECTURE.md §12.18). */
   onUnlockPhotos?: () => void;
 }
@@ -38,7 +45,7 @@ function Photo({ photo, alt, className, priority = false, onUnlock, lockedTitle 
   );
 }
 
-export function FullProfile({ profile, onClose, onPass, onLike, onUnlockPhotos }: FullProfileProps) {
+export function FullProfile({ profile, onClose, onPass, onLike, onSuperLike, superLikeLocked = false, note, onUnlockPhotos }: FullProfileProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -96,6 +103,7 @@ export function FullProfile({ profile, onClose, onPass, onLike, onUnlockPhotos }
           </div>
 
           <div className="flex flex-col gap-3.5 px-4 py-3.5">
+            {note}
             {profile.bio ? (
               <section className="flex flex-col gap-2">
                 <h3 className="text-tag uppercase tracking-[.08em] text-text-secondary">About me</h3>
@@ -154,6 +162,12 @@ export function FullProfile({ profile, onClose, onPass, onLike, onUnlockPhotos }
             <button type="button" onClick={onLike} aria-label="Like" className="pointer-events-auto grid size-16.5 place-items-center rounded-full border-0 like-gradient text-on-primary shadow-like pressable-round">
               <HeartIcon size={30} filled strokeWidth={0} />
             </button>
+            {onSuperLike ? (
+              <button type="button" onClick={onSuperLike} aria-label={superLikeLocked ? "Super Like (Plus)" : "Super Like"} className="pointer-events-auto relative grid size-13 self-center place-items-center rounded-full glass-card text-sand pressable-round">
+                <StarIcon size={22} filled strokeWidth={0} />
+                {superLikeLocked ? <PlusTag size="xs" className="absolute -right-1.5 -top-1" /> : null}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -27,11 +27,19 @@ export const PLUS_EVENTS = [
   "plus_payment_instructions_viewed",
   "plus_receipt_uploaded",
   "plus_payment_approved",
+  // Super Likes (§12.20). Counts of acts, surface "super_like"; never a recipient, never message text.
+  "super_like_composer_opened",
+  "super_like_sent",
+  "super_like_with_message_sent",
+  "super_like_matched",
 ] as const;
 export type PlusEvent = (typeof PLUS_EVENTS)[number];
 
-/** The two steps a browser may report. Everything from checkout onwards is recorded by the server itself. */
-export const CLIENT_PLUS_EVENTS = ["plus_prompt_viewed", "plus_prompt_clicked"] as const satisfies readonly PlusEvent[];
+/**
+ * The steps a browser may report. Everything from checkout onwards, and every Super Like that was actually sent or
+ * matched, is recorded by the server itself; a browser can only say that it opened the composer.
+ */
+export const CLIENT_PLUS_EVENTS = ["plus_prompt_viewed", "plus_prompt_clicked", "super_like_composer_opened"] as const satisfies readonly PlusEvent[];
 
 export interface PlusEventInput {
   event: PlusEvent;

@@ -113,6 +113,25 @@ export async function getLikeAllowance(db: DbLike, userId: string, now: Date = n
   return { limit, used: usage.used, remaining: Math.max(0, limit - usage.used), resetsAt: usage.windowEnd, tier: e.tier };
 }
 
+/** The Super Like allowance as the UI shows it ("3 of 5 Super Likes left · Resets in 4 days"). Does not consume. */
+export interface SuperLikeAllowance {
+  /** 0 for Free, and for anybody whose Plus has lapsed: a remaining count is never usable without Plus. */
+  limit: number;
+  used: number;
+  remaining: number;
+  /** When the current 7-day window ends. Null until the first Super Like of a window opens it. */
+  resetsAt: Date | null;
+  tier: Tier;
+}
+
+export async function getSuperLikeAllowance(db: DbLike, userId: string, now: Date = new Date()): Promise<SuperLikeAllowance> {
+  const e = await getEntitlements(db, userId, now);
+  const limit = e.rules.superLikesPerWindow;
+  if (limit === 0) return { limit: 0, used: 0, remaining: 0, resetsAt: null, tier: e.tier };
+  const usage = await peekUsage(db, userId, "SUPER_LIKES", now);
+  return { limit, used: usage.used, remaining: Math.max(0, limit - usage.used), resetsAt: usage.windowEnd, tier: e.tier };
+}
+
 export interface BoostAllowance {
   limit: number;
   used: number;

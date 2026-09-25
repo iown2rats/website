@@ -101,7 +101,7 @@ describe("a Discover pass made AFTER the like", () => {
     await passUser(me, her.userId, { db, now: at(T0, -minutes(30)) });
 
     // Free: the notification says "Someone liked you" and the page agrees — one like, locked.
-    expect(await getLikesYou(me, { db, now: T0 })).toEqual({ tier: "FREE", count: 1 });
+    expect(await getLikesYou(me, { db, now: T0 })).toEqual({ tier: "FREE", count: 1, superLikes: 0, superLikesWithMessage: 0 });
     const feed = await getNotificationFeed(me, {}, deps);
     expect(feed.items.find((i) => i.type === "LIKE_RECEIVED")?.title).toBe("Someone liked you");
 

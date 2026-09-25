@@ -3,7 +3,7 @@ import { MembershipPlans } from "@/components/features/settings/membership-clien
 import { cn } from "@/lib/cn";
 import { PlusLockup, PlusMark } from "@/components/brand/logo";
 import { PlusHeroTag } from "@/components/ui/badge";
-import { BoltIcon, EyeIcon, FilterIcon, HeartIcon, PeopleIcon, SendIcon, ShieldIcon, UndoIcon } from "@/components/ui/icons";
+import { BoltIcon, EyeIcon, FilterIcon, HeartIcon, PeopleIcon, ShieldIcon, StarIcon, UndoIcon } from "@/components/ui/icons";
 import { OceanCard } from "@/components/ui/surface";
 import { PageOverlay } from "@/components/layout/page-overlay";
 import { parsePlusSurface, type PlusSurface } from "@/lib/plus-surfaces";
@@ -11,7 +11,7 @@ import { requireActiveUser } from "@/server/auth/current-user";
 import { getMembership } from "@/server/entitlements/presentation";
 import { getLikesTeaser } from "@/server/likes/likes-you";
 import { recordPlusEvent } from "@/server/analytics/plus-funnel";
-import type { ComparisonCell, ComparisonRow } from "@/server/entitlements/presentation";
+import type { ComparisonCell, ComparisonRow, MembershipDto } from "@/server/entitlements/presentation";
 
 export const metadata = { title: "Membership" };
 export const dynamic = "force-dynamic";
@@ -35,6 +35,7 @@ const SURFACE_ROW: Partial<Record<PlusSurface, ComparisonRow["key"]>> = {
   discover_likes: "incoming-likes",
   daily_limit: "likes",
   undo: "undo",
+  super_like: "super-likes",
 };
 
 /** One icon per row, keyed on the row's identity rather than its label, so rewording copy cannot silently drop it. */
@@ -45,7 +46,7 @@ const ROW_ICONS: Record<ComparisonRow["key"], ReactNode> = {
   boosts: <BoltIcon size={18} />,
   filters: <FilterIcon size={18} />,
   undo: <UndoIcon size={18} />,
-  intro: <SendIcon size={18} />,
+  "super-likes": <StarIcon size={18} />,
 };
 
 /**
@@ -134,7 +135,10 @@ export default async function MembershipPage({ searchParams }: { searchParams: P
                     <th scope="row" className={cn("px-3.5 py-3 text-left font-medium text-text", !last && "border-b border-border")}>
                       <span className="flex items-center gap-2.5">
                         <span aria-hidden="true" className="shrink-0 text-primary">{ROW_ICONS[row.key]}</span>
-                        <span className="min-w-0 text-caption">{row.capability}</span>
+                        <span className="flex min-w-0 flex-col">
+                          <span className="text-caption">{row.capability}</span>
+                          {row.detail ? <span className="text-micro font-normal leading-snug text-text-secondary">{row.detail}</span> : null}
+                        </span>
                       </span>
                     </th>
                     <td className={cn("px-1 py-3 text-center", !last && "border-b border-border")}>
@@ -160,6 +164,8 @@ export default async function MembershipPage({ searchParams }: { searchParams: P
         </div>
       </section>
 
+      {m.superLikes ? <SuperLikeStatus allowance={m.superLikes} /> : null}
+
       <div className="flex items-center gap-3.5 rounded-3xl glass-card px-4 py-3.5">
         <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-full bg-primary-soft text-primary">
           <ShieldIcon size={21} />
@@ -173,5 +179,24 @@ export default async function MembershipPage({ searchParams }: { searchParams: P
       <MembershipPlans membership={m} from={from} />
       <p className="text-center text-micro leading-relaxed text-text-secondary">Billed in MVR by bank transfer. Plus never renews automatically.</p>
     </PageOverlay>
+  );
+}
+
+/** A Plus member's Super Likes this window (§12.20): what they get, and how many are left until when. */
+function SuperLikeStatus({ allowance }: { allowance: NonNullable<MembershipDto["superLikes"]> }) {
+  const { left, reset } = allowance;
+  return (
+    <section aria-label="Your Super Likes" className="flex items-center gap-3.5 rounded-3xl glass-card px-4 py-3.5">
+      <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-full bg-sand text-on-sand">
+        <StarIcon size={20} filled strokeWidth={0} />
+      </span>
+      <div className="min-w-0">
+        <div className="text-body font-medium text-text">⭐ {allowance.limit} Super Likes every 7 days</div>
+        <p className="text-caption leading-relaxed text-text-secondary">Send a message with your Super Like.</p>
+        <p className="text-caption font-medium text-text tabular-nums" data-testid="super-like-status">
+          {left}{reset ? <span className="font-normal text-text-secondary"> · {reset}</span> : null}
+        </p>
+      </div>
+    </section>
   );
 }

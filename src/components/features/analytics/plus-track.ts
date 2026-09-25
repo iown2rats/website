@@ -13,7 +13,7 @@ import type { PlusSurface } from "@/lib/plus-surfaces";
  */
 const ENDPOINT = "/api/analytics/plus";
 
-function send(event: "plus_prompt_viewed" | "plus_prompt_clicked", surface: PlusSurface, eventKey: string): void {
+function send(event: "plus_prompt_viewed" | "plus_prompt_clicked" | "super_like_composer_opened", surface: PlusSurface, eventKey: string): void {
   try {
     void fetch(ENDPOINT, {
       method: "POST",
@@ -31,6 +31,11 @@ function send(event: "plus_prompt_viewed" | "plus_prompt_clicked", surface: Plus
 /** A tap on a promotion's way forward. */
 export function trackPlusClick(surface: PlusSurface): void {
   send("plus_prompt_clicked", surface, crypto.randomUUID());
+}
+
+/** A Plus member opened the Super Like composer (§12.20). The act only: never who it was for, never any text. */
+export function trackSuperLikeComposerOpened(): void {
+  send("super_like_composer_opened", "super_like", crypto.randomUUID());
 }
 
 /**

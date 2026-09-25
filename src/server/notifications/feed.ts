@@ -253,8 +253,15 @@ function titleFor(row: Row, name: string | null): string {
       return name ? `You matched with ${name}` : "You have a new match";
     case "MESSAGE":
       return name ? `${name} sent you a message` : "New message";
-    case "LIKE_RECEIVED":
+    case "LIKE_RECEIVED": {
+      // A Super Like is this same row with two flags (§12.20). The message itself is never in a notification; saying
+      // that one exists is all a row does, named only under the usual Likes You rule.
+      if (data.superLike === true) {
+        const extra = data.withMessage === true ? " and sent a message" : "";
+        return name ? `${name} Super Liked you${extra} ⭐` : `Someone Super Liked you${extra} ⭐`;
+      }
       return name ? `${name} liked you` : "Someone liked you";
+    }
     case "INTRO_RECEIVED":
       return name ? `${name} sent you an intro` : "Someone sent you an intro";
     case "COMMUNITY_LIKE": {

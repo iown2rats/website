@@ -230,6 +230,15 @@ enum ReceiptOutcome {
 enum UsageKind {
   LIKES
   BOOSTS
+  /// Super Likes, 7-day rolling window (§12.20).
+  SUPER_LIKES
+}
+
+/// A like is ordinary or a Super Like (§12.20). One Like row per sender→recipient either way: a Super Like is a
+/// kind of like, not a second record, so it can never exist beside a normal like to the same person.
+enum LikeKind {
+  NORMAL
+  SUPER
 }
 
 enum NotificationType {
@@ -767,6 +776,9 @@ model Like {
   fromUserId  String
   toUserId    String
   introId     String?   @unique
+  /// NORMAL for every like before Super Likes existed (the column default); SUPER only through `likeUser` with a
+  /// Super Like, which also spends the SUPER_LIKES allowance. The optional message is the linked Intro.
+  kind        LikeKind  @default(NORMAL)
   createdAt   DateTime  @default(now())
   /// The RECIPIENT's explicit "no" on Likes You (a Pass tapped there). Hides the like from their Likes You and
   /// nowhere else: the sender's Sent list is unaffected, and a Discover pass never sets it (§12.5).
@@ -920,6 +932,8 @@ model MessageReaction {
   @@index([userId])
 }
 
+/// The optional message carried by a Super Like (§12.20): owned by the like until a match, then copied once into the
+/// new conversation as an INTRO message (`messageId`, unique, is what makes "once" a database fact).
 model Intro {
   id         String   @id @default(cuid(2))
   fromUserId String

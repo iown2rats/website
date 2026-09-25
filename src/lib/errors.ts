@@ -12,7 +12,8 @@ export type DomainErrorCode =
   | "MESSAGE_RATE_LIMIT"
   | "BOOST_LIMIT_REACHED"
   | "BOOST_ALREADY_ACTIVE"
-  | "UNDO_UNAVAILABLE";
+  | "UNDO_UNAVAILABLE"
+  | "SUPER_LIKE_LIMIT_REACHED";
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;
@@ -60,6 +61,18 @@ export class LikeLimitReachedError extends DomainError {
   constructor(limit: number, resetsAt: Date) {
     super("LIKE_LIMIT_REACHED", `You've used today's ${limit} likes`);
     this.name = "LikeLimitReachedError";
+    this.limit = limit;
+    this.resetsAt = resetsAt;
+  }
+}
+
+/** A Plus member has used this window's Super Likes. Never thrown for Free: that is EntitlementRequiredError. */
+export class SuperLikeLimitReachedError extends DomainError {
+  readonly limit: number;
+  readonly resetsAt: Date;
+  constructor(limit: number, resetsAt: Date) {
+    super("SUPER_LIKE_LIMIT_REACHED", `You've used your ${limit} Super Likes`);
+    this.name = "SuperLikeLimitReachedError";
     this.limit = limit;
     this.resetsAt = resetsAt;
   }

@@ -94,9 +94,9 @@ describe("4–5 · Sent, and what a match does to both lists", () => {
     expect(outcome.matched).toBe(true);
 
     const [pa, pb] = [await page(a, at(T0, minutes(2))), await page(b, at(T0, minutes(2)))];
-    expect(pa.sent).toEqual({ count: 0, cards: [] });
+    expect(pa.sent).toEqual({ count: 0, cards: [], superLikes: {} });
     expect(pa.count).toBe(0);
-    expect(pb.sent).toEqual({ count: 0, cards: [] });
+    expect(pb.sent).toEqual({ count: 0, cards: [], superLikes: {} });
     expect(pb.count).toBe(0);
     expect(pa.matches.map((m) => m.handle)).toEqual([b.handle]);
     expect(pb.matches.map((m) => m.handle)).toEqual([a.handle]);
@@ -164,7 +164,7 @@ describe("7–8 · safety overrides both lists", () => {
       const [pa, pb] = [await page(a, at(T0, minutes(2))), await page(b, at(T0, minutes(2)))];
       expect(pb.count).toBe(0);
       expect(pb.cards).toEqual([]);
-      expect(pa.sent).toEqual({ count: 0, cards: [] });
+      expect(pa.sent).toEqual({ count: 0, cards: [], superLikes: {} });
     }
   });
 

@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { likeCard, loadDeck, passCard, refreshAllowance, saveFilters, undoLastCard, type ActionFailure } from "@/actions/discovery";
-import { DISCOVERY } from "@/config/product";
+import { likeCard, loadDeck, passCard, refreshAllowance, saveFilters, superLikeCard, undoLastCard, type ActionFailure } from "@/actions/discovery";
+import { DISCOVERY, PRODUCT_RULES } from "@/config/product";
 import { membershipHref, type PlusSurface } from "@/lib/plus-surfaces";
 import { formatDuration } from "@/lib/time";
 import type { PhotoRef } from "@/lib/photos";
@@ -13,17 +13,18 @@ import { PlusLockSheet } from "@/components/ui/plus-lock";
 import { useToast } from "@/components/ui/toast";
 import { AppScreen, DiscoveryFrame } from "@/components/layout/page";
 import { TabHeader } from "@/components/layout/screen-header";
-import type { AllowanceDto, BoostDto, DeckCapabilities, DeckPage, EmptyReason } from "@/server/discovery/deck";
+import type { AllowanceDto, BoostDto, DeckCapabilities, DeckPage, EmptyReason, SuperLikeAllowanceDto } from "@/server/discovery/deck";
 import type { VerificationReminderDto } from "@/server/verification/reminder";
 import { BoostControl } from "./boost-control";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
 import { DeckAwaitingReview, DeckError, DeckExhausted, DeckFiltered, DeckLoading, DeckUnavailable, LikesExhaustedNote, LikesYouPrompt, DeckPaused } from "./deck-states";
-import { trackPlusClick, usePlusPromptView } from "@/components/features/analytics/plus-track";
+import { trackPlusClick, trackSuperLikeComposerOpened, usePlusPromptView } from "@/components/features/analytics/plus-track";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "./filters-sheet";
 import { VerificationReminder } from "./verification-reminder";
 import { FullProfile } from "./full-profile";
 import { LikeLimitDialog } from "./like-limit-dialog";
 import { MatchOverlay } from "./match-overlay";
+import { SuperLikeComposer, SuperLikesUsedDialog } from "./super-like";
 import { SwipeDeck } from "./swipe-deck";
 import { toDeckCard, type CardProfile, type DeckCard } from "./types";
 import { useServerClock } from "./use-server-clock";
@@ -95,7 +96,12 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
   const [likesTeaser, setLikesTeaser] = useState(initial.likesTeaser);
   const [promptDismissed, setPromptDismissed] = useState(false);
   const promptDismissedStored = useSyncExternalStore(noopSubscribe, readPromptDismissed, () => false);
-  const [lock, setLock] = useState<{ feature: string; description: string; surface?: PlusSurface } | null>(null);
+  const [lock, setLock] = useState<{ feature: string; description: string; surface?: PlusSurface; detail?: string } | null>(null);
+  const [superLikes, setSuperLikes] = useState<SuperLikeAllowanceDto>(initial.superLikes);
+  const [composeFor, setComposeFor] = useState<DeckCard | null>(null);
+  const [superSending, setSuperSending] = useState(false);
+  const [superError, setSuperError] = useState<string | null>(null);
+  const [superUsedOpen, setSuperUsedOpen] = useState(false);
   const loadingMore = useRef(false);
   const cardsRef = useRef<DeckCard[]>(cards);
   useEffect(() => {
@@ -108,6 +114,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
     (f: ActionFailure) => {
       sync(f.serverNow);
       if (f.allowance) setAllowance(f.allowance);
+      if (f.superLikes) setSuperLikes(f.superLikes);
     },
     [sync],
   );
@@ -128,6 +135,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
       }
       sync(result.serverNow);
       setAllowance(result.allowance);
+      setSuperLikes(result.superLikes);
       setLikesTeaser(result.likesTeaser);
       const fresh = result.cards.map(toDeckCard);
       setCards((prev) => dedupe([...prev, ...fresh]));
@@ -206,6 +214,83 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
     [applyFailure, sync, toast],
   );
 
+  /*
+   * Super Like (§12.20). The star is on every card for everybody; what a tap does depends on the allowance the server
+   * last reported: no Plus → the Plus sheet (nothing is sent), none left → when they reset (no upgrade: they already
+   * have Plus), otherwise the composer. The server decides again on send, so a stale view only changes which of
+   * these the member sees after the refusal.
+   */
+  const superLikesUsed = superLikes.limit > 0 && superLikes.remaining <= 0 && superLikes.resetsAt != null && Date.parse(superLikes.resetsAt) > serverTime();
+  const onSuperLike = useCallback(
+    (profile: CardProfile) => {
+      const card = profile as DeckCard;
+      setOpenProfile(null);
+      if (superLikes.limit <= 0) {
+        setLock({ feature: "Super Like ⭐", description: "Stand out and send a message with your like.", detail: `${PRODUCT_RULES.PLUS.superLikesPerWindow} Super Likes every 7 days with Plus`, surface: "super_like" });
+        return;
+      }
+      if (superLikesUsed) {
+        setSuperUsedOpen(true);
+        return;
+      }
+      setSuperError(null);
+      setComposeFor(card);
+      trackSuperLikeComposerOpened();
+    },
+    [superLikes.limit, superLikesUsed],
+  );
+
+  const onSendSuperLike = useCallback(
+    async (message: string) => {
+      const card = composeFor;
+      if (!card || superSending) return;
+      setSuperSending(true);
+      setSuperError(null);
+      const result = await superLikeCard({ handle: card.handle, message }).catch((): ActionFailure => ({ ok: false, code: "ERROR", message: "", serverNow: new Date().toISOString() }));
+      setSuperSending(false);
+      if (!result.ok) {
+        applyFailure(result);
+        switch (result.code) {
+          case "VALIDATION":
+            // The composer stays open with their text so they can shorten it.
+            setSuperError(result.message || "Keep your message to 150 characters.");
+            return;
+          case "ENTITLEMENT":
+            setComposeFor(null);
+            setLock({ feature: "Super Like ⭐", description: "Stand out and send a message with your like.", detail: `${PRODUCT_RULES.PLUS.superLikesPerWindow} Super Likes every 7 days with Plus`, surface: "super_like" });
+            return;
+          case "SUPER_LIKE_LIMIT":
+            setComposeFor(null);
+            setSuperUsedOpen(true);
+            return;
+          case "NOT_FOUND":
+            setComposeFor(null);
+            removeHead(card.handle);
+            toast.show("That profile isn't available any more.");
+            return;
+          case "UNAVAILABLE":
+            // Already liked (a normal like is never turned into a Super Like), paused, or no longer in their pool.
+            setComposeFor(null);
+            toast.show(result.message || "You can't Super Like them right now.");
+            return;
+          default:
+            setSuperError("Couldn't reach MelloCrush. Try again.");
+            return;
+        }
+      }
+      sync(result.serverNow);
+      setAllowance(result.allowance);
+      setSuperLikes(result.superLikes);
+      setComposeFor(null);
+      removeHead(card.handle);
+      if (result.matched && result.match) {
+        const them = toDeckCard(result.match.card);
+        setMatch({ name: them.name, photo: them.photos[0] ?? null, conversationId: result.match.conversationId });
+      } else toast.show(`Super Like sent to ${card.name} ⭐`);
+    },
+    [applyFailure, composeFor, superSending, sync, toast],
+  );
+
   const onUndo = useCallback(async () => {
     if (undoBusy) return;
     setUndoBusy(true);
@@ -249,6 +334,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
     if (result && result.ok) {
       sync(result.serverNow);
       setAllowance(result.allowance);
+      setSuperLikes(result.superLikes);
       if (result.allowance.remaining > 0) setLimitOpen(false);
     }
   }, [sync]);
@@ -311,12 +397,14 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
           profiles={cards}
           onLike={onLike}
           onPass={onPass}
+          onSuperLike={onSuperLike}
+          superLikeLocked={superLikes.limit <= 0}
           onOpen={(p) => setOpenProfile(p as DeckCard)}
           onUndo={capabilities.showUndo ? onUndo : undefined}
           undoLocked={!capabilities.canUndo}
           undoDisabled={undoBusy}
           empty={empty}
-          disabled={limitOpen || match != null}
+          disabled={limitOpen || match != null || composeFor != null}
           guide
           remainingHint={likesExhausted ? `You've used today's ${allowance.limit} likes. Passing still works.` : `${allowance.remaining} likes left today.`}
         />
@@ -328,6 +416,8 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
           onClose={() => setOpenProfile(null)}
           onPass={cards[0]?.handle === openProfile.handle ? () => void onPass(openProfile) : undefined}
           onLike={cards[0]?.handle === openProfile.handle ? () => void onLike(openProfile) : undefined}
+          onSuperLike={cards[0]?.handle === openProfile.handle ? () => onSuperLike(openProfile) : undefined}
+          superLikeLocked={superLikes.limit <= 0}
           onUnlockPhotos={() => setLock({ feature: "See all their photos", description: "Plus opens the rest of their photos before you match.", surface: "photo_lock" })}
         />
       ) : null}
@@ -367,7 +457,25 @@ export function DiscoverClient({ initial, filters: initialFilters, locations, ve
         onApply={onApplyFilters}
         onLockedAdvanced={() => setLock({ feature: "Advanced filters", description: "Plus adds height and education to your filters." })}
       />
-      <PlusLockSheet open={lock != null} onClose={() => setLock(null)} feature={lock?.feature ?? ""} description={lock?.description ?? ""} surface={lock?.surface} />
+      <SuperLikeComposer
+        open={composeFor != null}
+        onClose={() => setComposeFor(null)}
+        name={composeFor?.name ?? ""}
+        allowance={superLikes}
+        nowMs={serverTime}
+        sending={superSending}
+        error={superError}
+        onSend={(m) => void onSendSuperLike(m)}
+      />
+      <SuperLikesUsedDialog
+        open={superUsedOpen}
+        onClose={() => setSuperUsedOpen(false)}
+        limit={superLikes.limit || PRODUCT_RULES.PLUS.superLikesPerWindow}
+        resetsInMs={superLikes.resetsAt ? Date.parse(superLikes.resetsAt) - serverTime() : null}
+      />
+      <PlusLockSheet open={lock != null} onClose={() => setLock(null)} feature={lock?.feature ?? ""} description={lock?.description ?? ""} surface={lock?.surface}>
+        {lock?.detail ? <p className="flex items-center gap-1.5 text-body-sm font-medium text-text">{lock.detail}</p> : null}
+      </PlusLockSheet>
     </AppScreen>
   );
 }

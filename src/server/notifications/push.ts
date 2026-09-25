@@ -210,7 +210,7 @@ export async function pushNotification(db: DbLike, notificationId: string, now: 
 
   const actorName = await resolveActorName(db, row, now);
   const kind = row.type as PushKind;
-  const copy = pushCopyFor({ kind, actorName, emoji: readEmoji(row.data) });
+  const copy = pushCopyFor({ kind, actorName, emoji: readEmoji(row.data), superLike: readSuperLike(row.data) });
   const payload: PushPayload = {
     ...copy,
     url: pushUrlFor({ kind, conversationId: row.conversationId, postId: row.postId, data: row.data }),
@@ -268,6 +268,12 @@ export async function pushNotification(db: DbLike, notificationId: string, now: 
   if (sent > 0) return "sent";
   if (claimed === 0) return "already-delivered";
   return "failed";
+}
+
+/** Whether a LIKE_RECEIVED is a Super Like, and whether it has a message. Two booleans; there is no text to read. */
+function readSuperLike(data: unknown): { withMessage: boolean } | null {
+  const d = data as { superLike?: unknown; withMessage?: unknown } | null;
+  return d?.superLike === true ? { withMessage: d.withMessage === true } : null;
 }
 
 /** The emoji a reaction notification carries, if any. Never anything else out of `data`. */

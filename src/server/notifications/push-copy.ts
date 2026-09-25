@@ -48,6 +48,8 @@ export interface PushCopyInput {
   actorName: string | null;
   /** For reaction copy. Never rendered as the glyph on its own — the sentence has to make sense read aloud. */
   emoji?: ReactionKey | null;
+  /** A LIKE_RECEIVED that is a Super Like, and whether it carries a message (never the message itself). */
+  superLike?: { withMessage: boolean } | null;
 }
 
 export interface PushCopy {
@@ -79,6 +81,10 @@ export function pushCopyFor(input: PushCopyInput): PushCopy {
     // would hand a Plus feature to every Free member's lock screen.
     case "LIKE_RECEIVED":
     case "INTRO_RECEIVED":
+      // A Super Like is still a like: anonymous for everybody on a lock screen, and never its message (§12.20).
+      if (input.kind === "LIKE_RECEIVED" && input.superLike) {
+        return { title: input.superLike.withMessage ? "Someone Super Liked you and sent a message ⭐" : "Someone Super Liked you ⭐", body: "Open MelloCrush to find out who" };
+      }
       return { title: "Someone likes you ❤️", body: "Open MelloCrush to find out who" };
 
     case "NEW_MATCH":

@@ -32,6 +32,13 @@ import { baseVisibleSql } from "@/server/discovery/predicate";
 
 export interface EligibleLiker {
   id: string;
+  /** A Super Like (§12.20). */
+  superLike: boolean;
+  /**
+   * The Super Like's message, or null. Server-side only until a caller decides the viewer may have it: the Plus
+   * Likes You page, the sender's own Sent list. The Free Likes You path never reads this list at all.
+   */
+  message: string | null;
 }
 
 export interface EligibilityOptions {
@@ -57,12 +64,12 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
   const eligible = await eligibleLikesSql(db, viewerId, now, options);
   const limit = options.limit != null ? Prisma.sql`LIMIT ${Math.min(options.limit, 100)}` : Prisma.empty;
 
-  // Ids only. Nothing about a liker leaves this module except that they are eligible: the Free page carries no
-  // per-person data at all (src/server/likes/likes-you.ts), and the Plus page hydrates profiles separately.
+  // Super Likes first (§12.20), then newest; `u.id` makes the order total, so repeated loads never reshuffle.
+  // The Free page never calls this: it carries no per-person data at all (src/server/likes/likes-you.ts).
   return db.$queryRaw<EligibleLiker[]>(Prisma.sql`
-    SELECT u.id
+    SELECT u.id, (l.kind = 'SUPER') AS "superLike", i.body AS message
     ${eligible}
-    ORDER BY l."createdAt" DESC, u.id
+    ORDER BY (l.kind = 'SUPER') DESC, l."createdAt" DESC, u.id
     ${limit}
   `);
 }
@@ -72,9 +79,24 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
  * The list is limited to what one page renders; the number a member is told ("4 people like you") must not be.
  */
 export async function countEligibleIncomingLikes(db: DbLike, viewerId: string, now: Date): Promise<number> {
+  return (await countEligibleIncomingLikesByKind(db, viewerId, now)).total;
+}
+
+/**
+ * The same count split by kind, for the Free page's locked Super Like tiles ("Someone Super Liked you ⭐", "They sent
+ * you a message"). Three numbers about the viewer's own inbox — nothing about who, and nothing that appears in any
+ * other payload, so there is nothing to correlate.
+ */
+export async function countEligibleIncomingLikesByKind(db: DbLike, viewerId: string, now: Date): Promise<{ total: number; superLikes: number; superLikesWithMessage: number }> {
   const eligible = await eligibleLikesSql(db, viewerId, now, {});
-  const rows = await db.$queryRaw<{ n: bigint | number }[]>(Prisma.sql`SELECT count(*) AS n ${eligible}`);
-  return Number(rows[0]?.n ?? 0);
+  const rows = await db.$queryRaw<{ n: bigint | number; s: bigint | number; m: bigint | number }[]>(Prisma.sql`
+    SELECT count(*) AS n,
+           count(*) FILTER (WHERE l.kind = 'SUPER') AS s,
+           count(*) FILTER (WHERE l.kind = 'SUPER' AND i.id IS NOT NULL) AS m
+    ${eligible}
+  `);
+  const r = rows[0];
+  return { total: Number(r?.n ?? 0), superLikes: Number(r?.s ?? 0), superLikesWithMessage: Number(r?.m ?? 0) };
 }
 
 /**
@@ -91,6 +113,7 @@ async function eligibleLikesSql(db: DbLike, viewerId: string, now: Date, options
   const before = options.likedBefore ? Prisma.sql`AND l."createdAt" < ${options.likedBefore}` : Prisma.empty;
   return Prisma.sql`
     FROM "Like" l
+    LEFT JOIN "Intro" i ON i.id = l."introId"
     JOIN "User" u ON u.id = l."fromUserId"
     -- Profile is joined so the count can only ever include people the page can render (buildVisibleProfiles needs one).
     JOIN "Profile" p ON p."userId" = u.id
@@ -148,7 +171,8 @@ export async function nameableLikers(db: DbLike, viewerId: string, likerIds: str
 export async function listSentLikes(db: DbLike, viewerId: string, now: Date, options: { limit?: number } = {}): Promise<EligibleLiker[]> {
   const sent = await sentLikesSql(db, viewerId, now);
   const limit = options.limit != null ? Prisma.sql`LIMIT ${Math.min(options.limit, 100)}` : Prisma.empty;
-  return db.$queryRaw<EligibleLiker[]>(Prisma.sql`SELECT u.id ${sent} ORDER BY l."createdAt" DESC, u.id ${limit}`);
+  // Newest first; the message is the sender's own, so returning it here is returning them their own words.
+  return db.$queryRaw<EligibleLiker[]>(Prisma.sql`SELECT u.id, (l.kind = 'SUPER') AS "superLike", i.body AS message ${sent} ORDER BY l."createdAt" DESC, u.id ${limit}`);
 }
 
 export async function countSentLikes(db: DbLike, viewerId: string, now: Date): Promise<number> {
@@ -161,6 +185,7 @@ async function sentLikesSql(db: DbLike, viewerId: string, now: Date): Promise<Pr
   const viewer = await db.user.findUniqueOrThrow({ where: { id: viewerId }, select: { phoneHash: true } });
   return Prisma.sql`
     FROM "Like" l
+    LEFT JOIN "Intro" i ON i.id = l."introId"
     JOIN "User" u ON u.id = l."toUserId"
     JOIN "Profile" p ON p."userId" = u.id
     JOIN "PrivacySettings" ps ON ps."userId" = u.id

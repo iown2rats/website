@@ -26,7 +26,10 @@ export interface SwipeDeckProps {
   onLike: (profile: CardProfile) => void;
   onPass: (profile: CardProfile) => void;
   onOpen?: (profile: CardProfile) => void;
-  onIntro?: (profile: CardProfile) => void;
+  /** Super Like the current card (§12.20). */
+  onSuperLike?: (profile: CardProfile) => void;
+  /** Draw the star locked (PLUS tag): Free or lapsed Plus. The tap still reaches `onSuperLike`, which explains Plus. */
+  superLikeLocked?: boolean;
   /** Rendered as the far-left control when provided (Plus). */
   onUndo?: () => void;
   undoDisabled?: boolean;
@@ -63,7 +66,7 @@ export function useReducedMotion(): boolean {
   return useSyncExternalStore(subscribeMotion, () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => false);
 }
 
-export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, undoDisabled = false, undoLocked = false, empty, showPlaceholderLabels = false, disabled = false, remainingHint, guide = false, className }: SwipeDeckProps) {
+export function SwipeDeck({ profiles, onLike, onPass, onOpen, onSuperLike, superLikeLocked = false, onUndo, undoDisabled = false, undoLocked = false, empty, showPlaceholderLabels = false, disabled = false, remainingHint, guide = false, className }: SwipeDeckProps) {
   const reducedMotion = useReducedMotion();
   const [photo, setPhoto] = useState<{ id: string; idx: number } | null>(null);
   const [drag, setDrag] = useState({ dx: 0, dy: 0, dragging: false });
@@ -215,7 +218,8 @@ export function SwipeDeck({ profiles, onLike, onPass, onOpen, onIntro, onUndo, u
           onPass={() => swipe("pass")}
           onLike={() => swipe("like")}
           onOpen={onOpen ? open : undefined}
-          onIntro={onIntro ? () => onIntro(current) : undefined}
+          onSuperLike={onSuperLike ? () => onSuperLike(current) : undefined}
+          superLikeLocked={superLikeLocked}
           onUndo={onUndo}
           undoDisabled={undoDisabled}
           undoLocked={undoLocked}

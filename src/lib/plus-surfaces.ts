@@ -5,7 +5,7 @@
  *
  * Client-safe: no server imports.
  */
-export const PLUS_SURFACES = ["likes_you", "discover_likes", "daily_limit", "photo_lock", "undo", "membership", "checkout_recovery"] as const;
+export const PLUS_SURFACES = ["likes_you", "discover_likes", "daily_limit", "photo_lock", "undo", "membership", "checkout_recovery", "super_like"] as const;
 
 export type PlusSurface = (typeof PLUS_SURFACES)[number];
 

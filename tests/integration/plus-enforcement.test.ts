@@ -73,7 +73,7 @@ describe("Plus-only capabilities are server-enforced", () => {
     await createSubscription(db, u.userId, { periodStart: T0, periodEnd: at(T0, days(30)) });
     const active = await getEntitlements(db, u.userId, at(T0, days(10)));
     expect(active.tier).toBe("PLUS");
-    expect(active.rules).toMatchObject({ dailyLikeLimit: 90, canSeeIncomingLikes: true, canUseInvisibleMode: true, boostsPerWindow: 2, canUseAdvancedFilters: true, canUndoPass: true, introsPerWeek: null });
+    expect(active.rules).toMatchObject({ dailyLikeLimit: 90, canSeeIncomingLikes: true, canUseInvisibleMode: true, boostsPerWindow: 2, canUseAdvancedFilters: true, canUndoPass: true, superLikesPerWindow: 5 });
     await setInvisibleMode(u, true, { db, now: at(T0, days(10)) });
     await passUser(u, other.userId, { db, now: at(T0, days(10)) });
     expect((await undoLastPass(u, { db, now: at(T0, days(10) + 1000) })).restoredUserId).toBe(other.userId);
@@ -110,9 +110,11 @@ describe("Likes You privacy boundary", () => {
     expect(free.tier).toBe("FREE");
     expect(free.count).toBe(2);
     expect(free.cards).toBeNull();
-    expect(Object.keys(free).sort()).toEqual(["cards", "count", "matches", "sent", "serverNow", "tier"]);
+    expect(Object.keys(free).sort()).toEqual(["cards", "count", "matches", "sent", "serverNow", "superLikes", "tier"]);
+    // Super Likes on the Free page are two numbers (§12.20), never a person.
+    if (free.tier === "FREE") expect(free.superLikes).toEqual({ count: 0, withMessage: 0 });
     const json = JSON.stringify(free);
-    for (const leak of ["Ahmed", "Bashir", a.handle, b.handle, a.userId, b.userId, "handle", "url", "storageKey", "thumbKey", "age"]) expect(json).not.toContain(leak);
+    for (const leak of ["Ahmed", "Bashir", a.handle, b.handle, a.userId, b.userId, "handle", "url", "storageKey", "thumbKey", '"age"']) expect(json).not.toContain(leak);
     await grantPlus(db, viewer.userId, T0, at(T0, hours(24)));
     const plus = await getLikesPage(viewer, { db, storage, now: at(T0, 3000) });
     expect(plus.tier).toBe("PLUS");

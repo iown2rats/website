@@ -49,6 +49,12 @@ export const HeartIcon = ({ filled, ...p }: IconProps & { filled?: boolean }) =>
     <path d="M12 21s-7.5-4.6-9.5-9.3C1 7.6 3.6 4 7.2 4c2 0 3.6 1 4.8 2.6C13.2 5 14.8 4 16.8 4c3.6 0 6.2 3.6 4.7 7.7C19.5 16.4 12 21 12 21z" />
   </Base>
 );
+/** Super Like (§12.20). Outline by default; `filled` for the active control and the badges. */
+export const StarIcon = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
+  <Base {...p} fill={filled ? "currentColor" : "none"}>
+    <path d="M12 3.2l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.5l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" />
+  </Base>
+);
 export const ChatIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M21 12a8 8 0 01-11.6 7.2L4 21l1.8-5A8 8 0 1121 12z" />

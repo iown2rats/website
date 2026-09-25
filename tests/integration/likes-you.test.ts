@@ -21,7 +21,7 @@ describe("Likes You", () => {
     expect(result.count).toBe(2);
     // Exactly these keys: the blurhash and verified flag the tiles used to carry are gone, because Discover ships the
     // same blurhash for every candidate and a Free member could match the two strings to learn who liked them.
-    expect(result).toEqual({ tier: "FREE", count: 2 });
+    expect(result).toEqual({ tier: "FREE", count: 2, superLikes: 0, superLikesWithMessage: 0 });
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain("Hassan");
     expect(serialized).not.toContain("Zara");

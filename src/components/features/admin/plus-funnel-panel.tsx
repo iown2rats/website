@@ -14,6 +14,7 @@ const SURFACE_LABELS: Record<FunnelRow["surface"], string> = {
   undo: "Undo",
   membership: "Membership page",
   checkout_recovery: "Checkout reminder",
+  super_like: "Super Like",
   unattributed: "Unattributed",
 };
 

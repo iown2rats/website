@@ -90,7 +90,7 @@ describe("Free Likes You: no per-person data, whatever the photos are", () => {
     await setPhotos(likers[2]!, [{ moderation: "REJECTED", blurhash: "REJECTEDHASH0" }, { moderation: "REJECTED", blurhash: "REJECTEDHASH1" }]);
 
     const result = await getLikesYou(me, { db, now: T0 });
-    expect(result).toEqual({ tier: "FREE", count: 3 });
+    expect(result).toEqual({ tier: "FREE", count: 3, superLikes: 0, superLikesWithMessage: 0 });
     expect(JSON.stringify(result)).not.toMatch(/HASH/);
   });
 });

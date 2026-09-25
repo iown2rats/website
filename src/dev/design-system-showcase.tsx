@@ -381,7 +381,7 @@ function ShowcaseDeck({ cards }: { cards: CardProfile[] }) {
       onLike={(p) => { toast.show(`Liked ${p.name}`); advance(); }}
       onPass={advance}
       onOpen={(p) => toast.show(`Open ${p.name}`)}
-      onIntro={(p) => toast.show(`Intro to ${p.name}`)}
+      onSuperLike={(p) => toast.show(`Super Like ${p.name}`)}
       empty={
         <EmptyState
           framed

@@ -5,6 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { DbLike } from "@/lib/db";
+import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
 
 export interface AccountRecord {
   id: string;
@@ -25,7 +26,8 @@ export async function createAccount(db: DbLike, now: Date = new Date()): Promise
       lastActiveAt: now,
       createdAt: now,
       privacy: { create: {} },
-      discoveryPreferences: { create: {} },
+      // The age range is written explicitly from the one canonical default, never left to the column default.
+      discoveryPreferences: { create: { ...DEFAULT_AGE_PREFERENCES } },
       notificationSettings: { create: {} },
       verification: { create: { status: "NONE" } },
     },

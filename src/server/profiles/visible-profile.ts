@@ -6,6 +6,7 @@ import type { DbLike } from "@/lib/db";
 import { displayablePhotoWhere } from "@/lib/photo-policy";
 import { ageFromDateOfBirth } from "@/lib/age";
 import { applyPhotoLock, resolvePhotoAccess, type VisiblePhoto } from "@/server/photos/visibility";
+import { datingFieldsApply } from "@/server/preferences/intent-policy";
 
 /**
  * A photo as this viewer is allowed to receive it (docs/ARCHITECTURE.md §12.18). An unlocked photo carries its
@@ -26,6 +27,7 @@ export interface VisibleProfile {
   languages: string[];
   heightCm: number | null;
   bio: string | null;
+  /** The member's Dating answer ("Looking for …"). Always null for a Friendship member, whatever is stored. */
   intent: string | null;
   interests: string[];
   prompts: { prompt: string; answer: string }[];
@@ -65,6 +67,7 @@ export async function buildVisibleProfiles(db: DbLike, viewerId: string, userIds
       lastActiveAt: true,
       privacy: { select: { hideAge: true, hideLocation: true, hideActiveStatus: true } },
       verification: { select: { status: true } },
+      discoveryPreferences: { select: { connectionIntent: true } },
       profile: {
         select: {
           handle: true,
@@ -105,7 +108,10 @@ export async function buildVisibleProfiles(db: DbLike, viewerId: string, userIds
       languages: p.languages,
       heightCm: p.heightCm,
       bio: p.bio,
-      intent: p.intent,
+      // Dating only (src/server/preferences/intent-policy.ts `datingFieldsApply`). A Friendship member keeps a stored
+      // dating answer for a switch back, but it is theirs to keep, not anybody's to read: no card, full profile, Likes
+      // You tile or match screen is sent it, because every one of them is built here.
+      intent: datingFieldsApply(u.discoveryPreferences?.connectionIntent ?? "DATING") ? p.intent : null,
       interests: p.interests.map((i) => i.interest.label),
       prompts: p.prompts.map((pr) => ({ prompt: pr.prompt.text, answer: pr.answer })),
       photos,

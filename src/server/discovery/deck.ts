@@ -16,7 +16,7 @@ import { likeUser, passUser, undoLastPass, type LikeResult } from "@/server/like
 import { kickMatchEmail } from "@/server/notifications/engagement-email";
 import { kickPush } from "@/server/notifications/push";
 import { buildDiscoveryCards, isDemoKey, type DiscoveryCardDto } from "./dto";
-import { countAwaitingPhotoReview, countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate } from "./query";
+import { countAwaitingPhotoReview, countRelaxedCandidates, countSwipedCompatible, getDeckCandidateIds, isDeckCandidate } from "./query";
 
 export interface DeckDeps {
   db?: Db;
@@ -56,7 +56,7 @@ export interface BoostDto {
   resetsAt: string | null;
 }
 
-export type EmptyReason = "NONE" | "FILTERS" | "REVIEW" | "EXHAUSTED" | "PAUSED";
+export type EmptyReason = "NONE" | "FILTERS" | "REVIEW" | "EXHAUSTED" | "UNAVAILABLE" | "PAUSED";
 
 export interface DeckPage {
   cards: DiscoveryCardDto[];
@@ -67,8 +67,9 @@ export interface DeckPage {
   serverNow: string;
   /**
    * Only meaningful when `cards` is empty. FILTERS = relaxing your filters would show people; REVIEW = people are
-   * waiting on photo moderation, so the deck will refill without the viewer changing anything; EXHAUSTED = nobody
-   * new; PAUSED = the viewer paused dating. REVIEW carries no count and no identities.
+   * waiting on photo moderation, so the deck will refill without the viewer changing anything; EXHAUSTED = the viewer
+   * has already acted on everybody compatible; UNAVAILABLE = nobody compatible is here right now at all; PAUSED = the
+   * viewer paused dating. None of them carries a count, an identity, or anything about another member's preferences.
    */
   emptyReason: EmptyReason;
   /**
@@ -132,9 +133,13 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
   else if (cards.length === 0 && excludeIds.length === 0) {
     // Order matters: the viewer's own filters come first because they are the only thing the viewer can act on.
     // "Awaiting moderation" is asked only when relaxing the filters would not help, so a moderation backlog is
-    // never reported as "you have seen everyone".
+    // never reported as "you have seen everyone". And "seen everyone" is said only when it is true — when there
+    // are compatible people and the viewer has acted on all of them. Otherwise nobody compatible is here: a neutral
+    // state that names no reason, because the reason may be somebody else's preferences (their age range, their
+    // "Show me"), and those are never the viewer's to learn.
     if ((await countRelaxedCandidates(db, actor, now)) > 0) emptyReason = "FILTERS";
-    else emptyReason = (await countAwaitingPhotoReview(db, actor, now)) > 0 ? "REVIEW" : "EXHAUSTED";
+    else if ((await countAwaitingPhotoReview(db, actor, now)) > 0) emptyReason = "REVIEW";
+    else emptyReason = (await countSwipedCompatible(db, actor, now)) > 0 ? "EXHAUSTED" : "UNAVAILABLE";
   }
   return {
     cards,

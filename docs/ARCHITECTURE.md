@@ -309,7 +309,7 @@ One SQL predicate, built from fragments in `src/server/discovery/predicate.ts` a
 
 `viewerFilterSql` (V's own filters, stored on `DiscoveryPreferences`):
 
-7. U's age (`date_part('year', age(now, dob))`) within V's `ageMin–ageMax`; optional intent; location scope `ANYWHERE` | `GREATER_MALE` (`Location.isGreaterMale`) | `MY_ATOLL` (V's own `atollCode`) | `SPECIFIC` (`locationId`). Island/atoll only: there are no coordinates or distances anywhere in the schema or the API.
+7. U's age (`date_part('year', age(now, dob))`) within V's `ageMin–ageMax`; the Dating-only "Looking for" (`p.intent = V.intent`, applied **only when V is on Dating** — §7.6); location scope `ANYWHERE` | `GREATER_MALE` (`Location.isGreaterMale`) | `MY_ATOLL` (V's own `atollCode`) | `SPECIFIC` (`locationId`; an `ATOLL` row also matches every island and city with that `atollCode`). Island/atoll only: there are no coordinates or distances anywhere in the schema or the API.
 8. Advanced filters (height range, education substring) are applied **only when V holds `canUseAdvancedFilters`**; stored values are inert otherwise, and `saveDiscoveryFilters` refuses to store them for Free users in the first place.
 
 `notSwipedSql`: no Like from V to U, no unexpired un-undone Pass (30 days, `PASS_TTL_MS`), and no Match row between the pair in any status.
@@ -322,12 +322,45 @@ The browser receives `DiscoveryCardDto` (`src/server/discovery/dto.ts`) built fr
 
 - A deck request returns at most `DISCOVERY.batchSize` (12, clamped to 30) cards. The client asks for the next batch when `refillThreshold` (4) cards remain and sends the handles it still holds as `excludeHandles`; combined with the persisted swipe history this guarantees adjacent batches never overlap without exposing a numeric or predictable cursor.
 - Order: active Boost first, then verified, then most recently active, then `md5(candidateId || viewerId)` (a per-viewer stable shuffle), then id. Every key is deterministic for a given viewer and time. Boosted profiles cannot starve the rest: a swiped profile leaves the deck, and a batch is bounded. Boost promises ordering priority only, never a multiplier.
-- `countRelaxedCandidates` (count only, no identities) distinguishes "filters too restrictive" from "nobody new" when a deck comes back empty. It applies the photo rule, so on its own it cannot tell "nobody new" from "everybody is still waiting for moderation" — both look like zero. `countAwaitingPhotoReview` (also a count only) asks the complementary question: how many otherwise-eligible people have enough photos but not enough *displayable* ones. `getDeck` resolves an empty deck in that order — `FILTERS` first because the viewer's filters are the only thing the viewer can act on, then `REVIEW`, then `EXHAUSTED` — and the client shows "New profiles are being checked" rather than "that's everyone for now". The signal reaching the member is the reason alone: no count, no handle, no photo, and a profile counted this way is still in nobody's deck. Under a policy where PENDING is displayable the two counts coincide and `REVIEW` can never occur.
+- `countRelaxedCandidates` (count only, no identities) distinguishes "filters too restrictive" from "nobody new" when a deck comes back empty. It applies the photo rule, so on its own it cannot tell "nobody new" from "everybody is still waiting for moderation" — both look like zero. `countAwaitingPhotoReview` (also a count only) asks the complementary question: how many otherwise-eligible people have enough photos but not enough *displayable* ones. `getDeck` resolves an empty deck in that order — `FILTERS` first because the viewer's filters are the only thing the viewer can act on, then `REVIEW`, then `EXHAUSTED` only when `countSwipedCompatible` shows the viewer has acted on everybody compatible, otherwise the neutral `UNAVAILABLE` ("No one new is here right now"), which deliberately names no cause because the cause may be another member's preferences — and the client shows "New profiles are being checked" rather than "that's everyone for now". The signal reaching the member is the reason alone: no count, no handle, no photo, and a profile counted this way is still in nobody's deck. Under a policy where PENDING is displayable the two counts coincide and `REVIEW` can never occur.
 - The deck query was reviewed with `EXPLAIN (ANALYZE, BUFFERS)` against the seeded development data (41 users): every per-candidate lookup uses an existing index (`Block(blockerId, blockedId)`, `Like(fromUserId, toUserId)`, `Pass(fromUserId, toUserId)`, `Match(userAId, userBId)` via the OR form, `Boost(endsAt)`, `EntitlementOverride(userId, endsAt)`, `Subscription(status, currentPeriodEnd)`, `ProfilePhoto(profileId, position)`). Sequential scans appear only on tables small enough that the planner prefers them. No index was added; none was missing.
 
 ### 7.4 Filters UI
 
 The prototype's Filters sheet (age range sliders, Show me, Location chips, Looking for chips, Premium "Advanced filters" group, Apply) is a `ResponsiveDialog` (sheet on phones, modal on desktop) and persists to `DiscoveryPreferences` through `saveFilters`. Advanced filters offered are Height and Education, the two the profile stores; the prototype also lists Occupation and Interests, which have no filterable data model yet and are not shown.
+
+### 7.6 Discovery ↔ onboarding consistency (2026-09-25)
+
+Written after a production diagnosis (a Friendship member could not see a member who was on Dating — correctly — but
+the audit found the model disagreeing with itself elsewhere). Tests: `tests/integration/discovery-consistency.test.ts`.
+
+- **Pools.** `connectionIntent` is a hard mutual boundary for the deck **and for new likes**: `likeUser` refuses a
+  like across pools inside its transaction (neutral error, no pool named). Existing likes, matches and conversations
+  are never touched by a later switch. Likes You shows a like only while both members are in the same pool; the like
+  stays stored and reappears if they are again (`src/server/likes/eligibility.ts`, THE POOL RULE).
+- **Dating-only fields.** `DiscoveryPreferences.intent` ("Looking for") and `Profile.intent` (the member's own
+  answer) mean something only on Dating (`datingFieldsApply`). On Friendship both are kept as stored, for a switch
+  back, and are inert: `loadViewerContext` returns no intent, `viewerFilterSql` refuses to apply one (second lock),
+  `saveDiscoveryFilters` ignores a submitted one and keeps the stored one, the Filters sheet and Settings summary do
+  not draw the section, Edit profile neither shows nor requires it, and `buildVisibleProfiles` — the one place every
+  card, full profile, Likes You tile and match screen is built — sends `intent: null` for a Friendship member.
+- **Friendship → Dating** needs the member's own answer: the sheet asks "What are you looking for?" inline (`myIntent`)
+  and the server refuses the switch without one. It never overwrites an existing answer (Edit profile does that).
+- **"Show me" per mode.** The sheet restores `friendshipInterestedIn` on a switch into Friendship and the gender-derived
+  value on Dating (`src/lib/discovery-filters.ts`); it previously saved the Dating-derived value as the Friendship answer.
+- **"Prefer not to say".** Dating needs a woman and a man. The Dating choice is disabled with an explanation in
+  onboarding and in the sheet; a Dating member cannot change their gender to "Prefer not to say" (Edit profile, or the
+  onboarding GENDER step once Dating was chosen). Existing rows in that state are not rewritten.
+- **Age.** Still reciprocal in both pools. The default range is `DISCOVERY.defaultAgeRange` (18–60, the whole slider)
+  — the only place it is written. Every row the app creates writes it explicitly, Reset uses it, the no-row fallback
+  uses it, and the database column default is pinned to it by migration `20260925100000_discovery_default_age_range`
+  plus a test. The old 22–34 hid members over 34 from their own age group. Existing rows were **not** backfilled:
+  a deliberate 22–34 cannot be told apart from the old default. The sheet and Settings show a non-blocking warning
+  when a member's range excludes their own age.
+- **Admin.** User detail has a read-only Discovery preferences panel (pool, both Show me values, age range and whether
+  it excludes their own age, scope, Dating Looking for only on Dating, discoverability).
+- **QA cohort.** `scripts/qa-visibility-sql.ts` is the hand-written matrix; a test runs it beside the real deck query
+  and fails on any pair where they disagree.
 
 ### 7.5 Caching
 

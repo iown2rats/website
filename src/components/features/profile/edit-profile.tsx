@@ -16,6 +16,7 @@ import { PillTabs } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { PageOverlay } from "@/components/layout/page-overlay";
 import type { EditProfileData } from "@/server/profiles/edit";
+import { GENDER_NEEDS_FRIENDSHIP } from "@/server/preferences/intent-policy";
 import { LocationPicker, type LocationOption } from "./location-picker";
 import { PhotoManager } from "./photo-manager";
 
@@ -74,6 +75,8 @@ export function EditProfile({ initial, section: initialSection, locations, inter
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The relationship intention is a Dating question (src/server/preferences/intent-policy.ts `datingFieldsApply`).
+  const dating = profile.connectionIntent === "DATING";
   const answered = Object.entries(answers).filter(([, a]) => a.trim().length > 0);
   const locationName = (id: string | null) => locations.find((l) => l.id === id)?.name ?? null;
 
@@ -85,8 +88,9 @@ export function EditProfile({ initial, section: initialSection, locations, inter
       const height = info.heightCm.trim();
       result = await saveInfo({ gender: info.gender, locationId: info.locationId, homeLocationId: info.homeLocationId, occupation: info.occupation, education: info.education, heightCm: height ? Number(height) : null }).catch(() => null);
     } else {
-      if (!intent) { setSaving(false); setError("Choose what you're looking for."); setSection("about"); return; }
-      result = await saveAboutSection({ bio, intent, interestIds: selected, prompts: answered.map(([promptId, answer]) => ({ promptId, answer: answer.trim() })) }).catch(() => null);
+      // Dating only: a Friendship member is neither asked nor made to answer, and their stored answer is left alone.
+      if (dating && !intent) { setSaving(false); setError("Choose what you're looking for."); setSection("about"); return; }
+      result = await saveAboutSection({ bio, intent: dating ? intent : null, interestIds: selected, prompts: answered.map(([promptId, answer]) => ({ promptId, answer: answer.trim() })) }).catch(() => null);
     }
     setSaving(false);
     if (!result) { setError("Mellocrush couldn't reach the server. Check your connection and try again."); return; }
@@ -160,6 +164,7 @@ export function EditProfile({ initial, section: initialSection, locations, inter
               </span>
             </label>
           </div>
+          {dating && info.gender === "UNSPECIFIED" ? <p role="status" className="text-caption font-medium leading-relaxed text-warning">{GENDER_NEEDS_FRIENDSHIP}</p> : null}
           <p className="text-caption leading-relaxed text-text-secondary">Name and date of birth can&apos;t be changed after verification. Home island is optional and never shown unless you allow it.</p>
         </>
       ) : null}
@@ -169,12 +174,16 @@ export function EditProfile({ initial, section: initialSection, locations, inter
           <SectionLabel>About me</SectionLabel>
           <label htmlFor="edit-bio" className="sr-only">About me</label>
           <Textarea id="edit-bio" value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={300} placeholder="A line or two about you" className="-mt-2" />
-          <SectionLabel>Relationship intention</SectionLabel>
-          <RadioGroup label="Relationship intention" className="-mt-2 gap-2">
-            {INTENTS.map(([value, label]) => (
-              <RadioCard key={value} selected={intent === value} onSelect={() => setIntent(value)} label={label} className="h-12" />
-            ))}
-          </RadioGroup>
+          {dating ? (
+            <>
+              <SectionLabel>Relationship intention</SectionLabel>
+              <RadioGroup label="Relationship intention" className="-mt-2 gap-2">
+                {INTENTS.map(([value, label]) => (
+                  <RadioCard key={value} selected={intent === value} onSelect={() => setIntent(value)} label={label} className="h-12" />
+                ))}
+              </RadioGroup>
+            </>
+          ) : null}
         </>
       ) : null}
 

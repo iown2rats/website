@@ -17,6 +17,7 @@ import { ROUTES } from "@/server/auth/route-access";
 import { getOnboardingData } from "@/server/onboarding/onboarding";
 import { DONE_META, STAGE_META, hasReached, isOnPath, previousStage, resumeSlug, slugForStage, stageFromSlug, stepNumber, type StageOrComplete } from "@/server/onboarding/stages";
 import { listPhotos } from "@/server/photos/photos";
+import { canDate, DATING_NEEDS_GENDER } from "@/server/preferences/intent-policy";
 import { CONNECTION_INTENT_LABELS, GENDER_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
 
 export default async function OnboardingStagePage({ params }: { params: Promise<{ stage: string }> }) {
@@ -63,7 +64,14 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
     case "CONNECTION":
       return (
         <StepFrame {...frame}>
-          <ChoiceForm name="connectionIntent" label="What brings you here" action={submitConnectionIntent} initial={data.connectionIntent} options={Object.entries(CONNECTION_INTENT_LABELS).map(([value, label]) => ({ value, label }))} />
+          {/* Dating is woman ↔ man, so "Prefer not to say" is shown why instead of being let into a Dating state that can never match. */}
+          <ChoiceForm
+            name="connectionIntent"
+            label="What brings you here"
+            action={submitConnectionIntent}
+            initial={data.connectionIntent}
+            options={Object.entries(CONNECTION_INTENT_LABELS).map(([value, label]) => (value === "DATING" && !canDate(data.gender) ? { value, label, disabled: true, description: DATING_NEEDS_GENDER } : { value, label }))}
+          />
         </StepFrame>
       );
     case "MEET":

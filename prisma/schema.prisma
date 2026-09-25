@@ -587,8 +587,10 @@ model DiscoveryPreferences {
   /// The member's own Friendship answer, kept while they are on Dating so switching back does not re-ask, and so
   /// the derived Dating value is never mistaken for a choice they made.
   friendshipInterestedIn InterestedIn?
-  ageMin                 Int                 @default(22)
-  ageMax                 Int                 @default(34)
+  /// Pinned to DISCOVERY.defaultAgeRange (src/config/product.ts) by tests/integration/discovery-consistency.test.ts.
+  /// Every row the app creates writes the range explicitly; this default is only the database's own fallback.
+  ageMin                 Int                 @default(18)
+  ageMax                 Int                 @default(60)
   locationScope          LocationScope       @default(ANYWHERE)
   locationId             String?
   intent                 RelationshipIntent?

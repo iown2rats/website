@@ -31,7 +31,7 @@ export const RadioCard = forwardRef<HTMLButtonElement, RadioCardProps>(function 
       aria-checked={selected}
       onClick={onSelect}
       className={cn(
-        "w-full min-h-11.5 px-3.5 py-2 rounded-lg text-left flex items-center justify-between gap-3 text-text",
+        "w-full min-h-11.5 px-3.5 py-2 rounded-lg text-left flex items-center justify-between gap-3 text-text disabled:cursor-not-allowed disabled:opacity-70",
         selected ? "bg-primary-soft" : "bg-surface-muted",
         className,
       )}

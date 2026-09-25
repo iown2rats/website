@@ -140,6 +140,9 @@ export const PHOTO_LIMITS = { min: 2, max: 6 } as const;
  *  - Batches are bounded; the client asks for more before the deck runs dry and sends the handles it is
  *    still holding so adjacent batches never overlap.
  */
+/** The age slider's bounds. Also THE default age range: see `DISCOVERY.defaultAgeRange`. */
+const FILTER_AGE = { min: 18, max: 60 } as const;
+
 export const DISCOVERY = {
   batchSize: 12,
   maxBatchSize: 30,
@@ -147,8 +150,18 @@ export const DISCOVERY = {
   refillThreshold: 4,
   minDisplayablePhotos: PHOTO_LIMITS.min,
   /** Filter slider bounds from the prototype. */
-  filterAgeMin: 18,
-  filterAgeMax: 60,
+  filterAgeMin: FILTER_AGE.min,
+  filterAgeMax: FILTER_AGE.max,
+  /**
+   * THE default age range, and the only place it is written down (docs/ARCHITECTURE.md §7.4). A new member's
+   * preferences row, the Filters sheet's Reset and every "no row" fallback read it from here, and the database
+   * column defaults are pinned to it by tests/integration/discovery-consistency.test.ts.
+   *
+   * It is the whole slider on purpose. The age check is reciprocal (a candidate appears only when each person's age
+   * is inside the other's range), so a narrow default is not a neutral starting point: the old 22–34 silently hid
+   * every member older than 34 from their own age group until they happened to open Filters.
+   */
+  defaultAgeRange: FILTER_AGE,
   /** Maximum handles a client may pass as "already in my deck". */
   maxExcludeHandles: 60,
 } as const;

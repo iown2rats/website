@@ -16,7 +16,7 @@ import { TabHeader } from "@/components/layout/screen-header";
 import type { AllowanceDto, BoostDto, DeckCapabilities, DeckPage, EmptyReason } from "@/server/discovery/deck";
 import { BoostControl } from "./boost-control";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
-import { DeckAwaitingReview, DeckError, DeckExhausted, DeckFiltered, DeckLoading, LikesExhaustedNote, LikesYouPrompt, DeckPaused } from "./deck-states";
+import { DeckAwaitingReview, DeckError, DeckExhausted, DeckFiltered, DeckLoading, DeckUnavailable, LikesExhaustedNote, LikesYouPrompt, DeckPaused } from "./deck-states";
 import { trackPlusClick, usePlusPromptView } from "@/components/features/analytics/plus-track";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "./filters-sheet";
 import { FullProfile } from "./full-profile";
@@ -259,6 +259,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
     emptyReason === "PAUSED" ? <DeckPaused /> :
     emptyReason === "FILTERS" ? <DeckFiltered onAdjustFilters={() => setFiltersOpen(true)} /> :
     emptyReason === "REVIEW" ? <DeckAwaitingReview onRefresh={() => void loadMore("retry")} /> :
+    emptyReason === "UNAVAILABLE" ? <DeckUnavailable onAdjustFilters={() => setFiltersOpen(true)} onRefresh={() => void loadMore("retry")} /> :
     <DeckExhausted onAdjustFilters={() => setFiltersOpen(true)} onRefresh={() => void loadMore("retry")} />;
   /*
    * Option A (§12.19): the Likes You prompt lives only inside a settled empty deck — nobody new, out of likes, or
@@ -266,7 +267,7 @@ export function DiscoverClient({ initial, filters: initialFilters, locations }: 
    * error, while paused or when the member's own filters are the fix. The server sends a count only for a Free
    * member with at least one eligible like, and only while PLUS_DISCOVER_PROMPT is on.
    */
-  const promptState = status === "ready" && cards.length === 0 && (emptyReason === "NONE" || emptyReason === "EXHAUSTED" || emptyReason === "REVIEW");
+  const promptState = status === "ready" && cards.length === 0 && (emptyReason === "NONE" || emptyReason === "EXHAUSTED" || emptyReason === "UNAVAILABLE" || emptyReason === "REVIEW");
   const showLikesPrompt = likesTeaser != null && likesTeaser.count > 0 && promptState && !promptDismissed && !promptDismissedStored;
   usePlusPromptView("discover_likes", showLikesPrompt);
   const empty = showLikesPrompt && likesTeaser ? (

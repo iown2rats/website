@@ -9,7 +9,8 @@ import { InvalidStateError, ValidationError } from "@/lib/errors";
 import { getStorageProvider } from "@/lib/storage";
 import { aboutEditSchema, infoSchema } from "@/lib/validation/profile";
 import type { Actor } from "@/server/actor";
-import { getOnboardingData, reconcilePreferencesForGender, saveAbout, saveIntent } from "@/server/onboarding/onboarding";
+import { assertGenderFitsChosenIntent, getOnboardingData, reconcilePreferencesForGender, saveAbout, saveIntent } from "@/server/onboarding/onboarding";
+import { datingFieldsApply, type ConnectionIntent } from "@/server/preferences/intent-policy";
 import { listPhotos, type PhotoDto } from "@/server/photos/photos";
 import type { CompletionResult } from "./completion";
 
@@ -27,7 +28,10 @@ export interface EditProfileData {
   education: string;
   heightCm: number | null;
   bio: string;
+  /** The member's own dating answer ("how serious?"). Kept while on Friendship, but only shown and edited on Dating. */
   intent: "SERIOUS_RELATIONSHIP" | "DATING" | "MARRIAGE" | "FIGURING_OUT" | null;
+  /** Decides whether Edit profile shows and requires the relationship intention (src/server/preferences/intent-policy.ts). */
+  connectionIntent: ConnectionIntent;
   interestIds: string[];
   prompts: { promptId: string; answer: string }[];
   verified: boolean;
@@ -68,6 +72,7 @@ export async function getEditProfileData(actor: Actor, deps: { db?: Db } = {}): 
     heightCm: user.profile?.heightCm ?? null,
     bio: data.bio,
     intent: data.intent,
+    connectionIntent: data.connectionIntent ?? "DATING",
     interestIds: data.interestIds,
     prompts: data.prompts,
     verified: user.verification?.status === "VERIFIED",
@@ -85,6 +90,8 @@ export async function updateInfo(actor: Actor, input: unknown, deps: { db?: Db }
   if (found.length !== new Set(ids).size) throw new ValidationError("Choose an island or atoll from the list");
   const profile = await db.profile.findUnique({ where: { userId: actor.userId }, select: { id: true } });
   if (!profile) throw new InvalidStateError("Add your name first");
+  // Refused before anything is written: a Dating member cannot become a gender Dating cannot match.
+  await assertGenderFitsChosenIntent(db, actor.userId, info.gender);
   await db.$transaction([
     db.user.update({ where: { id: actor.userId }, data: { gender: info.gender } }),
     db.profile.update({
@@ -97,10 +104,20 @@ export async function updateInfo(actor: Actor, input: unknown, deps: { db?: Db }
   await reconcilePreferencesForGender(db, actor.userId, info.gender);
 }
 
-/** Edit profile → About / Interests / Prompts and relationship intention, through the onboarding save functions. */
+/**
+ * Edit profile → About / Interests / Prompts and relationship intention, through the onboarding save functions.
+ *
+ * The relationship intention follows the member's connection intent (src/server/preferences/intent-policy.ts): on
+ * Dating it is required, exactly as the Dating onboarding asks it; on Friendship it is neither asked nor written —
+ * a submitted value is ignored and a stored one is left untouched, so it is still there if they go back to Dating.
+ */
 export async function updateAbout(actor: Actor, input: unknown, deps: { db?: Db } = {}): Promise<void> {
   const db = deps.db ?? getDb();
   const about = parse(aboutEditSchema.safeParse(input));
-  await saveIntent(actor, { intent: about.intent }, { db });
+  const prefs = await db.discoveryPreferences.findUnique({ where: { userId: actor.userId }, select: { connectionIntent: true } });
+  if (datingFieldsApply(prefs?.connectionIntent ?? "DATING")) {
+    if (!about.intent) throw new ValidationError("Choose what you're looking for.");
+    await saveIntent(actor, { intent: about.intent }, { db });
+  }
   await saveAbout(actor, { bio: about.bio, interestIds: about.interestIds, prompts: about.prompts }, { db });
 }

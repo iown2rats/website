@@ -8,7 +8,9 @@ import { formatDuration } from "@/lib/time";
 
 /*
  * The intentional deck states (Phase 6 §24). They are different situations and say different things:
- *  - exhausted: nobody new right now (prototype copy)
+ *  - exhausted: the viewer has already acted on everybody compatible — "seen everyone" is said only when it is true
+ *  - unavailable: nobody compatible is here right now at all. Neutral on purpose: the cause can be other members'
+ *    preferences (their age range, their "Show me"), and those are never the viewer's to learn
  *  - filters: relaxing the viewer's own filters would show people
  *  - review: people are waiting on photo moderation, so the deck refills on its own — never a count, never a name
  *  - error: the load failed (network / server), retryable
@@ -20,8 +22,27 @@ export function DeckExhausted({ onAdjustFilters, onRefresh }: { onAdjustFilters:
       framed
       className="h-full"
       icon={<WavesIcon strokeWidth={2} />}
-      title="That's everyone for now."
-      description="Check back later or adjust your preferences."
+      title="You've seen everyone for now."
+      description="New people join all the time. Check back later, or widen your filters to see more."
+      actions={
+        <>
+          <Button variant="secondary" size="md" onClick={onAdjustFilters}>Adjust filters</Button>
+          <Button size="md" onClick={onRefresh}>Check again</Button>
+        </>
+      }
+    />
+  );
+}
+
+/** Nobody compatible is here right now. Says nothing about why, and never names a count or a person. */
+export function DeckUnavailable({ onAdjustFilters, onRefresh }: { onAdjustFilters: () => void; onRefresh: () => void }) {
+  return (
+    <EmptyState
+      framed
+      className="h-full"
+      icon={<WavesIcon strokeWidth={2} />}
+      title="No one new is here right now."
+      description="Mellocrush is growing island by island. Check back soon — new members appear here as they join."
       actions={
         <>
           <Button variant="secondary" size="md" onClick={onAdjustFilters}>Adjust filters</Button>
@@ -39,7 +60,7 @@ export function DeckFiltered({ onAdjustFilters }: { onAdjustFilters: () => void 
       className="h-full"
       icon={<FilterIcon strokeWidth={2} />}
       title="Your filters are hiding everyone."
-      description="There are people who match you. Widen your age range or location to see them."
+      description="There are people here for the same thing as you. Widen your age range, location or other filters to see them."
       actions={<Button size="md" onClick={onAdjustFilters}>Adjust filters</Button>}
     />
   );

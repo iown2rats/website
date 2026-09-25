@@ -24,6 +24,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { hashPassword } from "../src/server/auth/password";
+import { visibilityMatrixSql } from "./qa-visibility-sql";
 
 const GUARD = "MELLOCRUSH_QA_COHORT";
 if (process.env[GUARD] !== "i-understand") {
@@ -219,59 +220,12 @@ WITH cohort AS (
     AND EXISTS (SELECT 1 FROM "AuthIdentity" i WHERE i."userId" = u.id AND i.provider = 'EMAIL' AND i.email LIKE '%@${EMAIL_DOMAIN}')
 )`;
 
-/** The full visibility matrix, exactly as the discovery predicate computes it. */
+/**
+ * The full visibility matrix, as the discovery predicate computes it. The SQL lives in scripts/qa-visibility-sql.ts,
+ * where a test runs it beside the real deck query so the two cannot drift apart again.
+ */
 function verify(): string {
-  return `${COHORT_CTE}
-, viewers AS (
-  SELECT u.id vid, p.handle vh, u.gender vg, u."phoneHash" vph,
-         date_part('year', age(now(), u."dateOfBirth"))::int va,
-         cp."interestedIn" vi, cp."ageMin" vmin, cp."ageMax" vmax, cp.intent vint,
-         cp."locationScope" vscope, cp."locationId" vloc, vl."atollCode" vatoll
-  FROM cohort c JOIN "User" u ON u.id = c.id
-  JOIN "Profile" p ON p."userId" = u.id
-  JOIN "PrivacySettings" ps ON ps."userId" = u.id
-  JOIN "DiscoveryPreferences" cp ON cp."userId" = u.id
-  LEFT JOIN "Location" vl ON vl.id = p."locationId"
-), cands AS (
-  SELECT u.id cid, p.handle ch, p.id pid, u.gender cg,
-         date_part('year', age(now(), u."dateOfBirth"))::int ca,
-         u.status cstatus, u."onboardingCompletedAt" conb,
-         ps.visibility cvis, ps."pausedAt" cpaused, ps."invisibleMode" cinv,
-         cp."interestedIn" ci, cp."ageMin" cmin, cp."ageMax" cmax,
-         p.intent cintent, p."locationId" cloc, cl."atollCode" catoll, cl."isGreaterMale" cgm
-  FROM cohort c JOIN "User" u ON u.id = c.id
-  JOIN "Profile" p ON p."userId" = u.id
-  JOIN "PrivacySettings" ps ON ps."userId" = u.id
-  JOIN "DiscoveryPreferences" cp ON cp."userId" = u.id
-  LEFT JOIN "Location" cl ON cl.id = p."locationId"
-)
-SELECT v.vh AS viewer,
-       coalesce(string_agg(c.ch, ' ' ORDER BY c.ch), '(empty deck)') AS deck,
-       count(c.ch) AS n
--- LEFT JOIN, so a viewer whose deck is empty still appears as a row. That is a result, not an absence:
--- qa-13 (22-24 band) and qa-15 (My atoll, Lh) are supposed to see nobody.
-FROM viewers v LEFT JOIN cands c ON c.cid <> v.vid
-  AND c.cstatus = 'ACTIVE' AND c.conb IS NOT NULL
-  AND c.cvis = 'EVERYONE' AND c.cpaused IS NULL
-  AND (c.cinv = false OR EXISTS (SELECT 1 FROM "Like" l WHERE l."fromUserId" = c.cid AND l."toUserId" = v.vid))
-  AND (SELECT count(*) FROM "ProfilePhoto" ph WHERE ph."profileId" = c.pid AND ph.moderation = 'APPROVED') >= 2
-  AND NOT EXISTS (SELECT 1 FROM "Block" b WHERE (b."blockerId" = v.vid AND b."blockedId" = c.cid) OR (b."blockerId" = c.cid AND b."blockedId" = v.vid))
-  AND (v.vi = 'EVERYONE' OR (c.cg = 'WOMAN' AND v.vi = 'WOMEN') OR (c.cg = 'MAN' AND v.vi = 'MEN'))
-  AND (c.ci = 'EVERYONE' OR (v.vg = 'WOMAN' AND c.ci = 'WOMEN') OR (v.vg = 'MAN' AND c.ci = 'MEN'))
-  AND v.va BETWEEN c.cmin AND c.cmax
-  AND c.ca BETWEEN v.vmin AND v.vmax
-  AND (v.vint IS NULL OR c.cintent = v.vint)
-  AND (CASE v.vscope
-         WHEN 'ANYWHERE' THEN true
-         WHEN 'GREATER_MALE' THEN c.cgm IS true
-         WHEN 'MY_ATOLL' THEN c.catoll = coalesce(v.vatoll, '')
-         WHEN 'SPECIFIC' THEN c.cloc = coalesce(v.vloc, '')
-       END)
-  AND NOT EXISTS (SELECT 1 FROM "Like" l WHERE l."fromUserId" = v.vid AND l."toUserId" = c.cid)
-  AND NOT EXISTS (SELECT 1 FROM "Pass" pa WHERE pa."fromUserId" = v.vid AND pa."toUserId" = c.cid AND pa."undoneAt" IS NULL AND pa."expiresAt" > now())
-  AND NOT EXISTS (SELECT 1 FROM "Match" m WHERE (m."userAId" = v.vid AND m."userBId" = c.cid) OR (m."userAId" = c.cid AND m."userBId" = v.vid))
-GROUP BY v.vh
-ORDER BY v.vh;`;
+  return visibilityMatrixSql(COHORT_CTE);
 }
 
 /**

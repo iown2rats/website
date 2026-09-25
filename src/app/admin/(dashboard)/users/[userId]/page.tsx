@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminPage, KeyValueList, Panel, RowLink, RowList, StatusPill } from "@/components/features/admin/admin-ui";
 import { UserActions } from "@/components/features/admin/user-actions";
-import { REPORT_REASON_LABELS } from "@/constants/labels";
+import { CONNECTION_INTENT_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS, REPORT_REASON_LABELS } from "@/constants/labels";
 import { formatDateTime, formatShortDate } from "@/lib/format";
 import { requireAdminPage } from "@/server/admin/authz";
 import { getUserDetail } from "@/server/admin/users";
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 /** Never shows a password hash or a token hash: the DTO does not carry them (src/server/admin/users.ts). */
 const PROVIDER_LABELS = { GOOGLE: "Google", TELEGRAM: "Telegram", EMAIL: "Email" } as const;
+const LOCATION_SCOPE_LABELS: Record<string, string> = { ANYWHERE: "Anywhere in Maldives", GREATER_MALE: "Greater Malé", MY_ATOLL: "My atoll" };
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ userId: string }> }) {
   const admin = await requireAdminPage("users.view");
@@ -69,6 +70,23 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             />
           ) : (
             <p className="text-body-sm text-text-secondary">No profile row yet.</p>
+          )}
+        </Panel>
+        <Panel title="Discovery preferences" description="Read-only. What this member is here for and who they have asked to see — for diagnosing who can see whom.">
+          {d.discovery ? (
+            <KeyValueList
+              items={[
+                { label: "I'm here for", value: CONNECTION_INTENT_LABELS[d.discovery.connectionIntent] },
+                { label: "Show me", value: `${INTERESTED_IN_LABELS[d.discovery.showMe]}${d.discovery.connectionIntent === "DATING" ? " (derived from gender)" : ""}` },
+                { label: "Friendship preference", value: d.discovery.friendshipShowMe ? `${INTERESTED_IN_LABELS[d.discovery.friendshipShowMe]}${d.discovery.connectionIntent === "DATING" ? " (remembered, not in use)" : ""}` : "Not answered" },
+                { label: "Age range", value: `${d.discovery.ageMin}–${d.discovery.ageMax}${d.discovery.ownAgeOutsideRange ? " · excludes their own age" : ""}` },
+                { label: "Location scope", value: d.discovery.locationScope === "SPECIFIC" ? `Specific · ${d.discovery.specificLocation ?? "—"}` : LOCATION_SCOPE_LABELS[d.discovery.locationScope] ?? d.discovery.locationScope },
+                ...(d.discovery.connectionIntent === "DATING" ? [{ label: "Dating Looking for", value: d.discovery.datingLookingFor ? INTENT_LABELS[d.discovery.datingLookingFor as keyof typeof INTENT_LABELS] ?? d.discovery.datingLookingFor : "Any" }] : []),
+                { label: "Discoverable", value: d.privacy ? (d.privacy.paused ? "Paused" : d.privacy.visibility === "EVERYONE" ? "Visible" : "Hidden") + (d.privacy.invisibleMode ? " · Invisible Mode on" : "") : "—" },
+              ]}
+            />
+          ) : (
+            <p className="text-body-sm text-text-secondary">No discovery preferences row.</p>
           )}
         </Panel>
         <Panel title="Verification">

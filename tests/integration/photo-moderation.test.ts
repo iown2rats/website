@@ -256,10 +256,10 @@ describe("the empty-deck reason", () => {
     });
   });
 
-  it("still says EXHAUSTED when there is genuinely nobody, and FILTERS when the viewer's own filters are the cause", async () => {
+  it("says UNAVAILABLE (not \"seen everyone\") when there is genuinely nobody, and FILTERS when the viewer's own filters are the cause", async () => {
     const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 18, ageMax: 99 });
     await underProductionPolicy(async () => {
-      expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("EXHAUSTED");
+      expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("UNAVAILABLE");
     });
 
     // Someone approved but outside the viewer's age range: that is the viewer's filter, not moderation.
@@ -291,7 +291,8 @@ describe("the empty-deck reason", () => {
 
     await underProductionPolicy(async () => {
       expect(await countAwaitingPhotoReview(db, viewer, T0)).toBe(0);
-      expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("EXHAUSTED");
+      // Neither is shown (pending photos), so nobody compatible is here: not REVIEW, and not "seen everyone" either.
+      expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("UNAVAILABLE");
     });
   });
 

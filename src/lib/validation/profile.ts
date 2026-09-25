@@ -20,8 +20,12 @@ export const infoSchema = z.object({
 });
 export type InfoInput = z.infer<typeof infoSchema>;
 
-/** Edit profile → About / Interests / Prompts, plus relationship intention. Same rules as onboarding. */
-export const aboutEditSchema = aboutSchema.extend({ intent: intentSchema.shape.intent });
+/**
+ * Edit profile → About / Interests / Prompts, plus relationship intention. Same rules as onboarding. The intention is
+ * optional HERE because it belongs to Dating only; `updateAbout` requires it for a Dating member and ignores it for a
+ * Friendship member (src/server/preferences/intent-policy.ts `datingFieldsApply`).
+ */
+export const aboutEditSchema = aboutSchema.extend({ intent: intentSchema.shape.intent.nullable().optional() });
 export type AboutEditInput = z.infer<typeof aboutEditSchema>;
 
 /** Privacy toggles: only the keys present are changed. Invisible Mode has its own entitlement-checked path. */

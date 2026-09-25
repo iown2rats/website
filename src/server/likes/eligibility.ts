@@ -21,6 +21,12 @@
  *
  * Passes are not checked for expiry here, matching the behaviour this module replaces: a pass that has lapsed back
  * into the deck still suppresses a like it followed.
+ *
+ * THE POOL RULE. A like is shown only while its sender is in the viewer's pool (Dating or Friendship,
+ * docs/ARCHITECTURE.md §7.5). Somebody who liked you on Dating and has since moved to Friendship would otherwise
+ * sit on your page with one button — like back — that the server must refuse, because new likes never cross pools.
+ * The like itself is kept as it was: nothing is deleted, and it reappears if the two of you are ever in the same
+ * pool again. Existing matches are a different list and are never affected by a pool change.
  */
 import { Prisma } from "@/generated/prisma/client";
 import type { DbLike } from "@/lib/db";
@@ -94,9 +100,17 @@ async function eligibleLikesSql(db: DbLike, viewerId: string, now: Date, options
     FROM "Like" l
     JOIN "User" u ON u.id = l."fromUserId"
     JOIN "PrivacySettings" ps ON ps."userId" = u.id
+    JOIN "DiscoveryPreferences" lp ON lp."userId" = u.id
     LEFT JOIN "Verification" ver ON ver."userId" = u.id
     WHERE l."toUserId" = ${viewerId}
       ${restrict}
+      -- Same pool only (THE POOL RULE above): a like whose sender is now in the other pool stays stored, untouched,
+      -- and comes back if the two are ever in the same pool again. It is never shown in between, because the only
+      -- thing a Likes You tile offers is a like back, and a like may not cross pools (src/server/likes/like.ts).
+      AND lp."connectionIntent" = COALESCE(
+        (SELECT vp."connectionIntent" FROM "DiscoveryPreferences" vp WHERE vp."userId" = ${viewerId}),
+        'DATING'::"ConnectionIntent"
+      )
       ${after}
       ${before}
       AND ${baseVisibleSql(viewerId, viewer.phoneHash, now)}

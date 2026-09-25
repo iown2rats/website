@@ -14,6 +14,16 @@ export interface UserOptions {
   /** Dating (the default, matching the column) or Friendship. Separate pools in discovery. */
   connectionIntent?: "DATING" | "FRIENDSHIP";
   friendshipInterestedIn?: "WOMEN" | "MEN" | "EVERYONE" | null;
+  /**
+   * The member's own Dating answer (Profile.intent). Defaults as onboarding leaves it: SERIOUS_RELATIONSHIP on the
+   * Dating path, null on the Friendship path (which never asks). Pass a value to model a stale answer.
+   */
+  intent?: "SERIOUS_RELATIONSHIP" | "DATING" | "MARRIAGE" | "FIGURING_OUT" | null;
+  /** The Dating "Looking for" filter (DiscoveryPreferences.intent). Null by default. */
+  lookingFor?: "SERIOUS_RELATIONSHIP" | "DATING" | "MARRIAGE" | "FIGURING_OUT" | null;
+  locationScope?: "ANYWHERE" | "GREATER_MALE" | "MY_ATOLL" | "SPECIFIC";
+  /** DiscoveryPreferences.locationId, for locationScope SPECIFIC. */
+  prefLocationId?: string | null;
   age?: number;
   ageMin?: number;
   ageMax?: number;
@@ -70,7 +80,7 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
           handle,
           displayName: o.name ?? `User ${seq}`,
           bio: "Test bio",
-          intent: "SERIOUS_RELATIONSHIP",
+          intent: o.intent !== undefined ? o.intent : o.connectionIntent === "FRIENDSHIP" ? null : "SERIOUS_RELATIONSHIP",
           locationId: o.locationId ?? null,
           photos: {
             create: Array.from({ length: o.photos ?? 2 }, (_, i) => ({
@@ -93,6 +103,9 @@ export async function createUser(db: Db, o: UserOptions = {}): Promise<TestUser>
           friendshipInterestedIn: o.friendshipInterestedIn ?? (o.connectionIntent === "FRIENDSHIP" ? (o.interestedIn ?? "EVERYONE") : null),
           ageMin: o.ageMin ?? 18,
           ageMax: o.ageMax ?? 99,
+          intent: o.lookingFor ?? null,
+          locationScope: o.locationScope ?? "ANYWHERE",
+          locationId: o.prefLocationId ?? null,
         },
       },
       notificationSettings: { create: {} },

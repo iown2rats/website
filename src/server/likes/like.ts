@@ -52,6 +52,11 @@ export async function likeUser(actor: Actor, targetUserId: string, options: Like
     // Serialise against blockUser() for this pair, then re-check: the pre-transaction visibility check may be stale.
     await lockPair(tx, actor.userId, targetUserId);
     if (await isBlockedEitherWay(tx, actor.userId, targetUserId)) throw new NotFoundError("Profile");
+    // Dating and Friendship are separate pools for new interactions too, not only in the deck: a handle reached
+    // any other way (a stale Likes You tile, a crafted request) cannot start one across them. Read inside the
+    // transaction, so a pool switch that has already committed is what counts. Existing likes and matches are
+    // never touched by a later switch — this only refuses a new like.
+    if (!(await sharePool(tx, actor.userId, targetUserId))) throw new InvalidStateError(CROSS_POOL_LIKE);
 
     const existing = await tx.like.findUnique({
       where: { fromUserId_toUserId: { fromUserId: actor.userId, toUserId: targetUserId } },
@@ -87,6 +92,16 @@ export async function likeUser(actor: Actor, targetUserId: string, options: Like
       likesResetAt: consumed.windowEnd,
     };
   });
+}
+
+/** Deliberately neutral: it does not say which pool the other person is in (docs/ARCHITECTURE.md §7.5). */
+export const CROSS_POOL_LIKE = "This profile isn't available to like right now.";
+
+/** Are both members here for the same thing (Dating or Friendship)? A missing row reads as the column default, DATING. */
+async function sharePool(tx: Tx, a: string, b: string): Promise<boolean> {
+  const rows = await tx.discoveryPreferences.findMany({ where: { userId: { in: [a, b] } }, select: { userId: true, connectionIntent: true } });
+  const pool = (id: string) => rows.find((r) => r.userId === id)?.connectionIntent ?? "DATING";
+  return pool(a) === pool(b);
 }
 
 /** One LIKE_RECEIVED notification per liker, honouring the recipient's notification settings. */

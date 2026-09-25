@@ -56,6 +56,32 @@ export function canDate(gender: Gender | null): boolean {
   return datingInterestedIn(gender) !== null;
 }
 
+/** Why Dating is refused to a gender that has no opposite. One sentence, shown wherever that choice is refused. */
+export const DATING_NEEDS_GENDER = "Dating on Mellocrush matches women with men, so it needs Woman or Man as your gender. Friendship is open to everyone.";
+
+/** Why a Dating member cannot switch their gender to "Prefer not to say" without leaving Dating first. */
+export const GENDER_NEEDS_FRIENDSHIP = "Dating on Mellocrush matches women with men, so it needs Woman or Man as your gender. To use Prefer not to say, switch to Friendship in your Discover filters first.";
+
+/**
+ * Refuses a gender the member's chosen Dating intent cannot hold, instead of leaving an account in a Dating state
+ * that can never match anybody (the predicate's Dating branch needs a woman or a man on both sides).
+ */
+export function assertGenderFitsIntent(gender: Gender | null, connectionIntent: ConnectionIntent): void {
+  if (connectionIntent === "DATING" && !canDate(gender)) throw new ValidationError(GENDER_NEEDS_FRIENDSHIP);
+}
+
+/**
+ * THE rule for the romantic "how serious?" fields: `DiscoveryPreferences.intent` (the "Looking for" filter) and
+ * `Profile.intent` (the member's own answer) mean something only while the member is here to date.
+ *
+ * On Friendship both are kept exactly as stored, so a member who goes back to Dating finds them as they left them,
+ * and both are INERT: the discovery query ignores them, the filter sheet and Edit profile hide them, and no profile
+ * card shows them. Hidden values must never be able to decide who a Friendship member sees or is seen by.
+ */
+export function datingFieldsApply(connectionIntent: ConnectionIntent): boolean {
+  return connectionIntent === "DATING";
+}
+
 /** Does the member still owe us an answer before this intent is usable? Only Friendship ever asks. */
 export function needsFriendshipChoice(intent: ConnectionIntent, friendshipInterestedIn: InterestedIn | null): boolean {
   return intent === "FRIENDSHIP" && friendshipInterestedIn == null;
@@ -86,7 +112,7 @@ export function resolvePreferences(state: PreferenceState): ResolvedPreferences 
   if (state.connectionIntent === "DATING") {
     const interestedIn = datingInterestedIn(state.gender);
     if (!interestedIn) {
-      throw new ValidationError("Choose Woman or Man to use Dating. Friendship is open to everyone.");
+      throw new ValidationError(DATING_NEEDS_GENDER);
     }
     // The Friendship answer is carried through untouched: it is theirs, and they may come back to it.
     return { connectionIntent: "DATING", friendshipInterestedIn: state.friendshipInterestedIn, interestedIn };

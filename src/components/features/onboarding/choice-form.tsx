@@ -9,20 +9,21 @@ import { FormError, SubmitButton } from "./submit-button";
 export interface ChoiceFormProps {
   name: string;
   label: string;
-  options: { value: string; label: string; description?: string }[];
+  /** A disabled option is shown, with its description saying why, but cannot be chosen. */
+  options: { value: string; label: string; description?: string; disabled?: boolean }[];
   initial: string | null;
   action: (prev: StageFormState, formData: FormData) => Promise<StageFormState>;
 }
 
 export function ChoiceForm({ name, label, options, initial, action }: ChoiceFormProps) {
   const [state, formAction] = useActionState<StageFormState, FormData>(action, {});
-  const [value, setValue] = useState<string | null>(initial);
+  const [value, setValue] = useState<string | null>(() => (options.some((o) => o.value === initial && !o.disabled) ? initial : null));
   return (
     <form action={formAction} className="flex flex-1 flex-col gap-3.5" noValidate>
       <input type="hidden" name={name} value={value ?? ""} />
       <RadioGroup label={label}>
         {options.map((o) => (
-          <RadioCard key={o.value} label={o.label} description={o.description} selected={value === o.value} onSelect={() => setValue(o.value)} />
+          <RadioCard key={o.value} label={o.label} description={o.description} disabled={o.disabled} selected={value === o.value} onSelect={() => { if (!o.disabled) setValue(o.value); }} />
         ))}
       </RadioGroup>
       <FormError message={state.error} />

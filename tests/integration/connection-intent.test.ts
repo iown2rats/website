@@ -137,7 +137,8 @@ describe("changing gender or intent later", () => {
 
   it("Friendship → Dating enforces the derived preference", async () => {
     const user = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "MEN" });
-    await saveDiscoveryFilters(user, { ...FILTERS, connectionIntent: "DATING", interestedIn: "MEN" }, { db, now: T0 });
+    // A Friendship member has no Dating answer of their own yet, so the switch carries one (the sheet asks inline).
+    await saveDiscoveryFilters(user, { ...FILTERS, connectionIntent: "DATING", interestedIn: "MEN", myIntent: "DATING" }, { db, now: T0 });
     const row = await prefs(user.userId);
     expect(row.connectionIntent).toBe("DATING");
     expect(row.interestedIn).toBe("WOMEN");

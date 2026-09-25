@@ -10,6 +10,7 @@
 import "dotenv/config";
 import { createPrismaClient } from "../src/lib/db";
 import { hashPhone } from "../src/lib/hashing";
+import { DISCOVERY } from "../src/config/product";
 import { sortPair } from "../src/server/actor";
 import { INTERESTS, LOCATIONS, PLANS, PROMPTS } from "./seed-data/reference";
 import { DEMO_CHATS, DEMO_COMMUNITY_POSTS, DEMO_LIKES_YOU, DEMO_MATCHES, DEMO_PROFILES, blurhashFor, type DemoProfile } from "./seed-data/demo";
@@ -107,7 +108,7 @@ async function seedDemo() {
           },
         },
         privacy: { create: { hideLocation: o.hideLocation ?? false, hideAge: o.hideAge ?? false, invisibleMode: o.invisibleMode ?? false } },
-        discoveryPreferences: { create: { interestedIn: d.interestedIn, ageMin: o.ageMin ?? 22, ageMax: o.ageMax ?? 34 } },
+        discoveryPreferences: { create: { interestedIn: d.interestedIn, ageMin: o.ageMin ?? DISCOVERY.defaultAgeRange.min, ageMax: o.ageMax ?? DISCOVERY.defaultAgeRange.max } },
         notificationSettings: { create: {} },
         verification: { create: { status: d.verified ? "VERIFIED" : "NONE", decidedAt: d.verified ? now : null } },
       },

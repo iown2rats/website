@@ -13,12 +13,14 @@ import { computeCompletion, type CompletionResult } from "@/server/profiles/comp
 import { generateHandle } from "@/server/users/account";
 import { countActivePhotos } from "@/server/photos/photos";
 import {
+  assertGenderFitsIntent,
   parseConnectionIntent,
   parseFriendshipInterestedIn,
   resolveAfterGenderChange,
   resolvePreferences,
   type ConnectionIntent,
 } from "@/server/preferences/intent-policy";
+import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
 import { hasReached, nextStage, stageIndex, type OnboardingStageKey, type StageOrComplete } from "./stages";
 
 export interface OnboardingData {
@@ -176,9 +178,27 @@ export async function saveDateOfBirth(actor: Actor, input: unknown, deps: { db?:
 export async function saveGender(actor: Actor, input: unknown, deps: { db?: Db } = {}): Promise<void> {
   const db = deps.db ?? getDb();
   const { gender } = parse(genderSchema.safeParse(input));
+  await assertGenderFitsChosenIntent(db, actor.userId, gender);
   await db.user.update({ where: { id: actor.userId }, data: { gender } });
   await reconcilePreferencesForGender(db, actor.userId, gender);
   await advance(db, actor.userId, "GENDER");
+}
+
+/**
+ * A gender change may not strand a member in a Dating state that can never match (Dating is woman ↔ man). Only an
+ * intent the member actually CHOSE counts: before the CONNECTION step the row's DATING is the column default, not an
+ * answer, so the GENDER step itself is never refused — CONNECTION then refuses Dating for them instead.
+ *
+ * Only a CHANGE is refused. A member already in that state (it predates this rule) is not rewritten and is not
+ * locked out of saving the rest of their Info; the Filters sheet explains Dating to them instead.
+ */
+export async function assertGenderFitsChosenIntent(db: DbLike, userId: string, gender: "WOMAN" | "MAN" | "UNSPECIFIED"): Promise<void> {
+  const [user, prefs] = await Promise.all([
+    db.user.findUniqueOrThrow({ where: { id: userId }, select: { onboardingStage: true, gender: true } }),
+    db.discoveryPreferences.findUnique({ where: { userId }, select: { connectionIntent: true } }),
+  ]);
+  if (!prefs || !hasReached(user.onboardingStage, "MEET") || user.gender === gender) return;
+  assertGenderFitsIntent(gender, prefs.connectionIntent);
 }
 
 /**
@@ -222,7 +242,7 @@ export async function saveConnectionIntent(actor: Actor, input: unknown, deps: {
     // inert until the answer arrives because the pointer has not passed MEET.
     await db.discoveryPreferences.upsert({
       where: { userId: actor.userId },
-      create: { userId: actor.userId, connectionIntent: intent },
+      create: { userId: actor.userId, connectionIntent: intent, ...DEFAULT_AGE_PREFERENCES },
       update: { connectionIntent: intent },
     });
     await advance(db, actor.userId, "CONNECTION");
@@ -232,7 +252,7 @@ export async function saveConnectionIntent(actor: Actor, input: unknown, deps: {
   const resolved = resolvePreferences({ gender: user.gender, connectionIntent: intent, friendshipInterestedIn: remembered });
   await db.discoveryPreferences.upsert({
     where: { userId: actor.userId },
-    create: { userId: actor.userId, ...resolved },
+    create: { userId: actor.userId, ...resolved, ...DEFAULT_AGE_PREFERENCES },
     update: resolved,
   });
   await advance(db, actor.userId, "CONNECTION");
@@ -256,7 +276,7 @@ export async function saveInterestedIn(actor: Actor, input: unknown, deps: { db?
   const resolved = resolvePreferences({ gender: user.gender, connectionIntent: "FRIENDSHIP", friendshipInterestedIn: choice });
   await db.discoveryPreferences.upsert({
     where: { userId: actor.userId },
-    create: { userId: actor.userId, ...resolved },
+    create: { userId: actor.userId, ...resolved, ...DEFAULT_AGE_PREFERENCES },
     update: resolved,
   });
   await advance(db, actor.userId, "MEET");

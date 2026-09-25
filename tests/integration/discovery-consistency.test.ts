@@ -1,0 +1,462 @@
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { Prisma } from "@/generated/prisma/client";
+import { DISCOVERY } from "@/config/product";
+import { InvalidStateError, ValidationError } from "@/lib/errors";
+import { LocalDiskStorageProvider } from "@/lib/storage/local";
+import { getUserDetail } from "@/server/admin/users";
+import { listConversations } from "@/server/conversations/list";
+import { getDeck } from "@/server/discovery/deck";
+import { DEFAULT_FILTERS, getDiscoveryFilters, saveDiscoveryFilters } from "@/server/discovery/filters";
+import { viewerFilterSql } from "@/server/discovery/predicate";
+import { countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate, loadViewerContext } from "@/server/discovery/query";
+import { countEligibleIncomingLikes, listEligibleIncomingLikes } from "@/server/likes/eligibility";
+import { CROSS_POOL_LIKE, likeUser } from "@/server/likes/like";
+import {
+  completeOnboarding,
+  confirmPhotos,
+  saveAbout,
+  saveConnectionIntent,
+  saveDateOfBirth,
+  saveGender,
+  saveInterestedIn,
+  saveLocation,
+  saveName,
+  savePrivacy,
+} from "@/server/onboarding/onboarding";
+import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
+import { getEditProfileData, updateAbout, updateInfo } from "@/server/profiles/edit";
+import { buildVisibleProfiles } from "@/server/profiles/visible-profile";
+import { createAccount } from "@/server/users/account";
+import { visibilityMatrixSql } from "../../scripts/qa-visibility-sql";
+import { disconnectDb, resetDb, testDb } from "../helpers/db";
+import { createLocation, createStaff, createUser, type TestUser } from "../helpers/factory";
+
+/*
+ * Discovery ↔ onboarding consistency (docs/ARCHITECTURE.md §7.4–§7.5).
+ *
+ * The production incident behind this file: a Friendship member could not see another member, and the audit found
+ * the product model disagreeing with itself — a Dating-only "Looking for" filter applied to Friendship decks, a
+ * Friendship member's stale dating answer shown and matched, a silent 22–34 default that hid members from their
+ * own age group, the Filters sheet overwriting a remembered Friendship answer, likes crossing pools, and one empty
+ * state for every kind of empty. Each describe block pins one corrected rule against the real queries.
+ */
+const db = testDb();
+const T0 = new Date("2026-09-25T06:00:00Z");
+const storage = new LocalDiskStorageProvider("/tmp/thundi-test-storage", "x".repeat(32));
+
+beforeEach(() => resetDb(db));
+afterAll(() => disconnectDb());
+
+const deck = (viewer: TestUser) => getDeckCandidateIds(db, viewer, { now: T0, limit: 30 });
+const BASE_FILTERS = { ageMin: 18, ageMax: 60, locationScope: "ANYWHERE" as const, locationId: null, heightMinCm: null, heightMaxCm: null, education: null };
+
+describe("Dating intent never affects Friendship", () => {
+  it("a Friendship viewer with a stored Dating 'Looking for' still sees Friendship members with no, or a different, dating answer", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", lookingFor: "MARRIAGE" });
+    const neverAsked = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: null });
+    const stale = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "SERIOUS_RELATIONSHIP" });
+    const ids = await deck(viewer);
+    expect(ids).toEqual(expect.arrayContaining([neverAsked.userId, stale.userId]));
+    expect(await isDeckCandidate(db, viewer, neverAsked.userId, T0)).toBe(true);
+  });
+
+  it("the viewer context carries no intent on Friendship, and the predicate refuses to apply one even if handed it", async () => {
+    const viewer = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", lookingFor: "DATING" });
+    const v = await loadViewerContext(db, viewer.userId, T0);
+    expect(v.intent).toBeNull();
+    // The second lock: a context built any other way still cannot narrow a Friendship deck by a dating answer.
+    const forged = viewerFilterSql({ ...v, intent: "DATING" }, T0);
+    expect(forged.sql).not.toContain("p.intent");
+    const dating = viewerFilterSql({ ...v, connectionIntent: "DATING", intent: "DATING" }, T0);
+    expect(dating.sql).toContain("p.intent");
+  });
+
+  it("a Friendship candidate's stale dating answer is irrelevant to every Friendship viewer's stored filter", async () => {
+    const candidate = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "MARRIAGE" });
+    for (const lookingFor of ["SERIOUS_RELATIONSHIP", "DATING", "FIGURING_OUT", null] as const) {
+      const viewer = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", lookingFor });
+      expect(await deck(viewer)).toContain(candidate.userId);
+    }
+  });
+
+  it("Dating keeps its Looking for: a Dating viewer filtering on Marriage sees Marriage daters only", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN", lookingFor: "MARRIAGE" });
+    const marriage = await createUser(db, { now: T0, gender: "WOMAN", intent: "MARRIAGE" });
+    const serious = await createUser(db, { now: T0, gender: "WOMAN", intent: "SERIOUS_RELATIONSHIP" });
+    const unanswered = await createUser(db, { now: T0, gender: "WOMAN", intent: null });
+    const ids = await deck(viewer);
+    expect(ids).toContain(marriage.userId);
+    expect(ids).not.toContain(serious.userId);
+    expect(ids).not.toContain(unanswered.userId);
+  });
+
+  it("switching Dating → Friendship keeps the Dating filter stored but inert, and switching back restores it", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN" });
+    await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "WOMEN", intent: "MARRIAGE" }, { db, now: T0 });
+    // The sheet hides Looking for on Friendship; a crafted request that still sends one changes nothing.
+    const friendship = await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "DATING" }, { db, now: T0 });
+    expect(friendship.intent).toBe("MARRIAGE");
+    expect((await loadViewerContext(db, viewer.userId, T0)).intent).toBeNull();
+    const friend = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: null });
+    expect(await deck(viewer)).toContain(friend.userId);
+
+    const back = await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "WOMEN", intent: friendship.intent }, { db, now: T0 });
+    expect(back.intent).toBe("MARRIAGE");
+    expect((await loadViewerContext(db, viewer.userId, T0)).intent).toBe("MARRIAGE");
+  });
+
+  it("an empty Friendship deck is never blamed on a hidden Dating filter", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", lookingFor: "MARRIAGE" });
+    await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: null });
+    const page = await getDeck(viewer, {}, { db, storage, now: T0 });
+    expect(page.cards).toHaveLength(1);
+    expect(page.emptyReason).toBe("NONE");
+  });
+});
+
+describe("Friendship cards never expose a stale Dating intent", () => {
+  it("hides Profile.intent for Friendship members on every surface built from the visible profile, and keeps it for Dating", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE" });
+    const friend = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "MARRIAGE" });
+    const dater = await createUser(db, { now: T0, gender: "WOMAN", intent: "MARRIAGE" });
+    const [f, d] = await buildVisibleProfiles(db, viewer.userId, [friend.userId, dater.userId], T0);
+    expect(f?.intent).toBeNull();
+    expect(d?.intent).toBe("MARRIAGE");
+
+    const page = await getDeck(viewer, {}, { db, storage, now: T0 });
+    expect(page.cards.map((c) => c.handle)).toEqual([friend.handle]);
+    expect(page.cards[0]?.intent).toBeNull();
+    expect(JSON.stringify(page)).not.toContain("MARRIAGE");
+    // Stored, not deleted: it is theirs if they go back to Dating.
+    expect((await db.profile.findUniqueOrThrow({ where: { userId: friend.userId } })).intent).toBe("MARRIAGE");
+  });
+});
+
+describe("Edit profile follows the same rule", () => {
+  it("a Friendship member saves About without a relationship intention, and a stored one is neither cleared nor overwritten", async () => {
+    const me = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "FIGURING_OUT" });
+    expect((await getEditProfileData(me, { db })).connectionIntent).toBe("FRIENDSHIP");
+    await updateAbout(me, { bio: "Here for friends", interestIds: [], prompts: [] }, { db });
+    await updateAbout(me, { bio: "Still here for friends", intent: "MARRIAGE", interestIds: [], prompts: [] }, { db });
+    const profile = await db.profile.findUniqueOrThrow({ where: { userId: me.userId } });
+    expect(profile.bio).toBe("Still here for friends");
+    expect(profile.intent).toBe("FIGURING_OUT");
+  });
+
+  it("a Friendship member who never had one can save without one", async () => {
+    const me = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: null });
+    await updateAbout(me, { bio: "Hi", intent: null, interestIds: [], prompts: [] }, { db });
+    expect((await db.profile.findUniqueOrThrow({ where: { userId: me.userId } })).intent).toBeNull();
+  });
+
+  it("a Dating member still has to answer it", async () => {
+    const me = await createUser(db, { now: T0, gender: "MAN" });
+    await expect(updateAbout(me, { bio: "Hi", interestIds: [], prompts: [] }, { db })).rejects.toBeInstanceOf(ValidationError);
+    await updateAbout(me, { bio: "Hi", intent: "DATING", interestIds: [], prompts: [] }, { db });
+    expect((await db.profile.findUniqueOrThrow({ where: { userId: me.userId } })).intent).toBe("DATING");
+  });
+});
+
+describe("Friendship → Dating requires the member's own Dating answer", () => {
+  it("refuses the switch without one, and records the answer given in the sheet", async () => {
+    const me = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: null });
+    const before = await getDiscoveryFilters(me, { db, now: T0 });
+    expect(before.hasDatingIntent).toBe(false);
+    await expect(saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "MEN", intent: null }, { db, now: T0 })).rejects.toThrow("Choose what you're looking for");
+    expect((await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } })).connectionIntent).toBe("FRIENDSHIP");
+
+    const after = await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "MEN", intent: null, myIntent: "SERIOUS_RELATIONSHIP" }, { db, now: T0 });
+    expect(after).toMatchObject({ connectionIntent: "DATING", hasDatingIntent: true });
+    expect((await db.profile.findUniqueOrThrow({ where: { userId: me.userId } })).intent).toBe("SERIOUS_RELATIONSHIP");
+  });
+
+  it("never lets the sheet overwrite an existing answer — that is Edit profile's job", async () => {
+    const me = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "MARRIAGE" });
+    await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "MEN", intent: null, myIntent: "DATING" }, { db, now: T0 });
+    expect((await db.profile.findUniqueOrThrow({ where: { userId: me.userId } })).intent).toBe("MARRIAGE");
+  });
+});
+
+describe("Friendship 'Show me' is remembered per mode", () => {
+  /** What the Filters sheet submits on a switch, using the values it restores from the DTO (src/lib/discovery-filters.ts). */
+  async function switchTo(me: TestUser, mode: "DATING" | "FRIENDSHIP") {
+    const f = await getDiscoveryFilters(me, { db, now: T0 });
+    const interestedIn = mode === "DATING" ? f.datingInterestedIn! : (f.friendshipInterestedIn ?? f.interestedIn);
+    return saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: mode, interestedIn, intent: f.intent }, { db, now: T0 });
+  }
+
+  it("Dating → Friendship → Dating → Friendship restores each mode's own value, without leaking one into the other", async () => {
+    // Has a Dating answer already, so the switch into Dating is not held up asking for one (tested separately above).
+    const me = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "DATING" });
+    let f = await switchTo(me, "DATING");
+    expect(f).toMatchObject({ connectionIntent: "DATING", interestedIn: "WOMEN", friendshipInterestedIn: "EVERYONE" });
+    f = await switchTo(me, "FRIENDSHIP");
+    expect(f).toMatchObject({ connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", friendshipInterestedIn: "EVERYONE" });
+    f = await switchTo(me, "DATING");
+    expect(f).toMatchObject({ connectionIntent: "DATING", interestedIn: "WOMEN", friendshipInterestedIn: "EVERYONE" });
+    f = await switchTo(me, "FRIENDSHIP");
+    expect(f).toMatchObject({ connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", friendshipInterestedIn: "EVERYONE" });
+  });
+
+  it("a Dating save never overwrites the remembered Friendship answer, whatever 'Show me' the request carries", async () => {
+    const me = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "MEN", intent: "DATING" });
+    await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "EVERYONE", intent: null }, { db, now: T0 });
+    const row = await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } });
+    expect(row).toMatchObject({ connectionIntent: "DATING", interestedIn: "WOMEN", friendshipInterestedIn: "MEN" });
+    expect((await getDiscoveryFilters(me, { db, now: T0 })).friendshipInterestedIn).toBe("MEN");
+  });
+});
+
+describe("age compatibility stays reciprocal", () => {
+  const cases = [
+    { name: "both ranges include each other", viewerRange: [25, 40], candRange: [25, 40], visible: true },
+    { name: "candidate outside the viewer's range", viewerRange: [18, 30], candRange: [25, 40], visible: false },
+    { name: "viewer outside the candidate's range", viewerRange: [25, 40], candRange: [35, 40], visible: false },
+    { name: "neither inside the other's", viewerRange: [18, 25], candRange: [40, 50], visible: false },
+  ] as const;
+  for (const mode of ["DATING", "FRIENDSHIP"] as const) {
+    for (const c of cases) {
+      it(`${mode}: ${c.name}`, async () => {
+        const viewer = await createUser(db, { now: T0, gender: "MAN", age: 31, connectionIntent: mode, interestedIn: mode === "DATING" ? "WOMEN" : "EVERYONE", ageMin: c.viewerRange[0], ageMax: c.viewerRange[1] });
+        const cand = await createUser(db, { now: T0, gender: "WOMAN", age: 36, connectionIntent: mode, interestedIn: mode === "DATING" ? "MEN" : "EVERYONE", ageMin: c.candRange[0], ageMax: c.candRange[1] });
+        expect((await deck(viewer)).includes(cand.userId)).toBe(c.visible);
+      });
+    }
+  }
+});
+
+describe("18–60 is the one canonical default", () => {
+  it("every source agrees: config, the row a new account gets, the onboarding upserts, the filters default, the no-row fallback and the database column", async () => {
+    expect(DISCOVERY.defaultAgeRange).toEqual({ min: DISCOVERY.filterAgeMin, max: DISCOVERY.filterAgeMax });
+    expect(DEFAULT_AGE_PREFERENCES).toEqual({ ageMin: 18, ageMax: 60 });
+    expect({ ageMin: DEFAULT_FILTERS.ageMin, ageMax: DEFAULT_FILTERS.ageMax }).toEqual(DEFAULT_AGE_PREFERENCES);
+
+    const account = await createAccount(db, T0);
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: account.id }, select: { ageMin: true, ageMax: true } })).toEqual(DEFAULT_AGE_PREFERENCES);
+
+    // The onboarding CONNECTION step creates the row when it is missing: with the default range, not the column's.
+    await db.discoveryPreferences.delete({ where: { userId: account.id } });
+    await saveName({ userId: account.id }, { name: "New" }, { db });
+    await saveGender({ userId: account.id }, { gender: "MAN" }, { db });
+    await saveConnectionIntent({ userId: account.id }, { connectionIntent: "DATING" }, { db });
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: account.id }, select: { ageMin: true, ageMax: true } })).toEqual(DEFAULT_AGE_PREFERENCES);
+
+    // No row at all: the viewer context falls back to the same range.
+    await db.discoveryPreferences.delete({ where: { userId: account.id } });
+    const v = await loadViewerContext(db, account.id, T0);
+    expect({ ageMin: v.ageMin, ageMax: v.ageMax }).toEqual(DEFAULT_AGE_PREFERENCES);
+
+    // And the database's own column default, which the migration pins to the same numbers.
+    const cols = await db.$queryRaw<{ column_name: string; column_default: string }[]>(Prisma.sql`
+      SELECT column_name, column_default FROM information_schema.columns
+      WHERE table_name = 'DiscoveryPreferences' AND column_name IN ('ageMin', 'ageMax')`);
+    expect(Object.fromEntries(cols.map((c) => [c.column_name, Number(c.column_default)]))).toEqual(DEFAULT_AGE_PREFERENCES);
+  });
+
+  it("two members who walk the Friendship onboarding path, aged 31 and 36, see each other with the defaults they were given", async () => {
+    const loc = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
+    const onboard = async (name: string, gender: "MAN" | "WOMAN", year: number) => {
+      const account = await createAccount(db, T0);
+      const actor = { userId: account.id };
+      await saveName(actor, { name }, { db });
+      await saveDateOfBirth(actor, { day: 1, month: 1, year }, { db, now: T0 });
+      await saveGender(actor, { gender }, { db });
+      await saveConnectionIntent(actor, { connectionIntent: "FRIENDSHIP" }, { db });
+      await saveInterestedIn(actor, { interestedIn: "EVERYONE" }, { db });
+      await saveLocation(actor, { locationId: loc.id }, { db });
+      const profile = await db.profile.findUniqueOrThrow({ where: { userId: actor.userId } });
+      for (const i of [0, 1]) {
+        await db.profilePhoto.create({ data: { profileId: profile.id, position: i, storageKey: `t/${name}/${i}`, thumbKey: `t/${name}/${i}t`, blurhash: "LKO2?U%2Tw=w]~RBVZRi};RPxuwH", width: 1080, height: 1440, moderation: "APPROVED" } });
+      }
+      await confirmPhotos(actor, { db });
+      await saveAbout(actor, { bio: "", interestIds: [], prompts: [] }, { db });
+      await savePrivacy(actor, { hideLocation: false, hideAge: false }, { db });
+      await completeOnboarding(actor, { db, now: T0 });
+      return actor;
+    };
+    const a = await onboard("Thirty-one", "MAN", 1995);
+    const b = await onboard("Thirty-six", "WOMAN", 1990);
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: a.userId }, select: { ageMin: true, ageMax: true } })).toEqual(DEFAULT_AGE_PREFERENCES);
+    expect(await getDeckCandidateIds(db, a, { now: T0 })).toContain(b.userId);
+    expect(await getDeckCandidateIds(db, b, { now: T0 })).toContain(a.userId);
+  });
+});
+
+describe("Prefer not to say cannot be stranded on Dating", () => {
+  it("the sheet's Dating switch is refused with an explanation, and the DTO says so up front", async () => {
+    const me = await createUser(db, { now: T0, gender: "UNSPECIFIED", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE" });
+    expect((await getDiscoveryFilters(me, { db, now: T0 })).canDate).toBe(false);
+    await expect(saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "EVERYONE", intent: null, myIntent: "DATING" }, { db, now: T0 })).rejects.toThrow("needs Woman or Man");
+    expect((await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } })).connectionIntent).toBe("FRIENDSHIP");
+  });
+
+  it("a Dating member cannot change their gender to Prefer not to say; a Friendship member can", async () => {
+    const loc = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
+    const dater = await createUser(db, { now: T0, gender: "MAN" });
+    await expect(updateInfo(dater, { gender: "UNSPECIFIED", locationId: loc.id }, { db })).rejects.toThrow("switch to Friendship");
+    expect((await db.user.findUniqueOrThrow({ where: { id: dater.userId } })).gender).toBe("MAN");
+
+    const friend = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE" });
+    await updateInfo(friend, { gender: "UNSPECIFIED", locationId: loc.id }, { db });
+    expect((await db.user.findUniqueOrThrow({ where: { id: friend.userId } })).gender).toBe("UNSPECIFIED");
+  });
+
+  it("a member already in that state (it predates the rule) is not rewritten and can still save the rest of their Info", async () => {
+    const loc = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
+    const legacy = await createUser(db, { now: T0, gender: "UNSPECIFIED", interestedIn: "WOMEN" });
+    await updateInfo(legacy, { gender: "UNSPECIFIED", locationId: loc.id, occupation: "Teacher" }, { db });
+    expect(await db.profile.findUniqueOrThrow({ where: { userId: legacy.userId }, select: { occupation: true } })).toEqual({ occupation: "Teacher" });
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: legacy.userId }, select: { connectionIntent: true, interestedIn: true } })).toEqual({ connectionIntent: "DATING", interestedIn: "WOMEN" });
+    expect((await getDiscoveryFilters(legacy, { db, now: T0 })).canDate).toBe(false);
+  });
+
+  it("onboarding: the GENDER step allows it before an intent is chosen, but not once Dating was chosen", async () => {
+    const account = await createAccount(db, T0);
+    const actor = { userId: account.id };
+    await saveName(actor, { name: "Xan" }, { db });
+    await saveGender(actor, { gender: "UNSPECIFIED" }, { db });
+    await expect(saveConnectionIntent(actor, { connectionIntent: "DATING" }, { db })).rejects.toBeInstanceOf(ValidationError);
+    await saveGender(actor, { gender: "MAN" }, { db });
+    await saveConnectionIntent(actor, { connectionIntent: "DATING" }, { db });
+    await expect(saveGender(actor, { gender: "UNSPECIFIED" }, { db })).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
+describe("specific atoll selection", () => {
+  it("an atoll matches every island and city in it; an island matches only itself", async () => {
+    const atoll = await db.location.create({ data: { slug: "atoll-lh", name: "Lh. Atoll", kind: "ATOLL", atollCode: "Lh", atollName: "Faadhippolhu" } });
+    const naifaru = await db.location.create({ data: { slug: "naifaru", name: "Naifaru", kind: "ISLAND", atollCode: "Lh", atollName: "Faadhippolhu" } });
+    const hinnavaru = await db.location.create({ data: { slug: "hinnavaru", name: "Hinnavaru", kind: "ISLAND", atollCode: "Lh", atollName: "Faadhippolhu" } });
+    const male = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
+    const onAtollRow = await createUser(db, { now: T0, gender: "WOMAN", locationId: atoll.id });
+    const onNaifaru = await createUser(db, { now: T0, gender: "WOMAN", locationId: naifaru.id });
+    const onHinnavaru = await createUser(db, { now: T0, gender: "WOMAN", locationId: hinnavaru.id });
+    const inMale = await createUser(db, { now: T0, gender: "WOMAN", locationId: male.id });
+
+    const atollViewer = await createUser(db, { now: T0, gender: "MAN", locationScope: "SPECIFIC", prefLocationId: atoll.id });
+    const atollDeck = await deck(atollViewer);
+    expect(atollDeck).toEqual(expect.arrayContaining([onAtollRow.userId, onNaifaru.userId, onHinnavaru.userId]));
+    expect(atollDeck).not.toContain(inMale.userId);
+
+    const islandViewer = await createUser(db, { now: T0, gender: "MAN", locationScope: "SPECIFIC", prefLocationId: naifaru.id });
+    expect(await deck(islandViewer)).toEqual([onNaifaru.userId]);
+  });
+});
+
+describe("likes respect pools", () => {
+  it("a new like across pools is refused server-side, consumes nothing and creates nothing", async () => {
+    const dater = await createUser(db, { now: T0, gender: "MAN" });
+    const friend = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE" });
+    await expect(likeUser(dater, friend.userId, { db, now: T0 })).rejects.toBeInstanceOf(InvalidStateError);
+    await expect(likeUser(friend, dater.userId, { db, now: T0 })).rejects.toThrow(CROSS_POOL_LIKE);
+    expect(await db.like.count()).toBe(0);
+    expect(await db.notification.count()).toBe(0);
+    expect(await db.usageCounter.count({ where: { used: { gt: 0 } } })).toBe(0);
+  });
+
+  it("an existing match and its conversation survive either member changing pools", async () => {
+    const a = await createUser(db, { now: T0, gender: "MAN" });
+    const b = await createUser(db, { now: T0, gender: "WOMAN" });
+    await likeUser(a, b.userId, { db, now: T0 });
+    const matched = await likeUser(b, a.userId, { db, now: T0 });
+    expect(matched.matched).toBe(true);
+    await db.discoveryPreferences.update({ where: { userId: b.userId }, data: { connectionIntent: "FRIENDSHIP", friendshipInterestedIn: "EVERYONE", interestedIn: "EVERYONE" } });
+    expect(await db.match.count()).toBe(1);
+    expect(await db.like.count()).toBe(2);
+    const chats = await listConversations(a, { db, storage, now: T0 });
+    expect(chats.newMatches.length + chats.conversations.length).toBe(1);
+  });
+
+  it("Likes You shows a like only while both are in the same pool; the like itself is kept and comes back", async () => {
+    const liker = await createUser(db, { now: T0, gender: "MAN" });
+    const me = await createUser(db, { now: T0, gender: "WOMAN" });
+    await likeUser(liker, me.userId, { db, now: T0 });
+    expect(await countEligibleIncomingLikes(db, me.userId, T0)).toBe(1);
+
+    await db.discoveryPreferences.update({ where: { userId: liker.userId }, data: { connectionIntent: "FRIENDSHIP", friendshipInterestedIn: "EVERYONE", interestedIn: "EVERYONE" } });
+    expect(await countEligibleIncomingLikes(db, me.userId, T0)).toBe(0);
+    expect(await listEligibleIncomingLikes(db, me.userId, T0)).toEqual([]);
+    expect(await db.like.count()).toBe(1);
+
+    await db.discoveryPreferences.update({ where: { userId: me.userId }, data: { connectionIntent: "FRIENDSHIP", friendshipInterestedIn: "EVERYONE", interestedIn: "EVERYONE" } });
+    expect(await countEligibleIncomingLikes(db, me.userId, T0)).toBe(1);
+  });
+});
+
+describe("the empty-deck reason", () => {
+  it("FILTERS when the viewer's own filters hide compatible people", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN", age: 30, ageMin: 18, ageMax: 25 });
+    await createUser(db, { now: T0, gender: "WOMAN", age: 40 });
+    expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("FILTERS");
+  });
+
+  it("EXHAUSTED only when the viewer has acted on everybody compatible", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN" });
+    const only = await createUser(db, { now: T0, gender: "WOMAN" });
+    await likeUser(viewer, only.userId, { db, now: T0 });
+    expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("EXHAUSTED");
+  });
+
+  it("UNAVAILABLE when nobody compatible is here — including when only someone else's preferences exclude the viewer, which it never names", async () => {
+    // The Zen/Nabu shape: different pools, and her age range leaves him out. Neither is his to learn.
+    const zen = await createUser(db, { now: T0, gender: "MAN", age: 31, connectionIntent: "FRIENDSHIP", interestedIn: "WOMEN", ageMin: 18, ageMax: 37, intent: "FIGURING_OUT" });
+    const nabu = await createUser(db, { now: T0, gender: "WOMAN", age: 36, interestedIn: "MEN", friendshipInterestedIn: "MEN", ageMin: 35, ageMax: 40, intent: "MARRIAGE" });
+    const page = await getDeck(zen, {}, { db, storage, now: T0 });
+    expect(page.cards).toEqual([]);
+    expect(page.emptyReason).toBe("UNAVAILABLE");
+    expect(await countRelaxedCandidates(db, zen, T0)).toBe(0);
+    const json = JSON.stringify(page);
+    expect(json).not.toContain(nabu.handle);
+    expect(json).not.toMatch(/ageMin|ageMax|connectionIntent|interestedIn/);
+
+    // Same pool, but her range still excludes him: still neutral, still nothing about her.
+    await db.discoveryPreferences.update({ where: { userId: nabu.userId }, data: { connectionIntent: "FRIENDSHIP", interestedIn: "MEN" } });
+    expect((await getDeck(zen, {}, { db, storage, now: T0 })).emptyReason).toBe("UNAVAILABLE");
+    // And once her range includes him, they see each other.
+    await db.discoveryPreferences.update({ where: { userId: nabu.userId }, data: { ageMin: 30 } });
+    expect(await deck(zen)).toEqual([nabu.userId]);
+  });
+});
+
+describe("admin: read-only discovery preferences", () => {
+  it("shows the pool, both Show me values, the age range, scope, and Looking for only on Dating", async () => {
+    const staff = await createStaff(db, { now: T0 });
+    const admin = { userId: staff.userId, role: "ADMIN" as const };
+    const friend = await createUser(db, { now: T0, age: 31, connectionIntent: "FRIENDSHIP", interestedIn: "WOMEN", lookingFor: "MARRIAGE", ageMin: 35, ageMax: 40 });
+    const f = await getUserDetail(admin, friend.userId, { db, now: T0 });
+    expect(f.discovery).toMatchObject({ connectionIntent: "FRIENDSHIP", showMe: "WOMEN", friendshipShowMe: "WOMEN", ageMin: 35, ageMax: 40, ownAgeOutsideRange: true, locationScope: "ANYWHERE", datingLookingFor: null });
+    const dater = await createUser(db, { now: T0, gender: "MAN", interestedIn: "WOMEN", lookingFor: "MARRIAGE" });
+    expect((await getUserDetail(admin, dater.userId, { db, now: T0 })).discovery).toMatchObject({ connectionIntent: "DATING", datingLookingFor: "MARRIAGE" });
+  });
+});
+
+describe("qa-cohort's visibility SQL agrees with the real deck query", () => {
+  it("pair for pair, across pools, intents, age ranges, scopes and swipes", async () => {
+    const atoll = await db.location.create({ data: { slug: "atoll-b", name: "B. Atoll", kind: "ATOLL", atollCode: "B", atollName: "Baa" } });
+    const eydhafushi = await db.location.create({ data: { slug: "eydhafushi", name: "Eydhafushi", kind: "ISLAND", atollCode: "B", atollName: "Baa" } });
+    const male = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
+    const users = [
+      await createUser(db, { now: T0, gender: "MAN", age: 31, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", lookingFor: "MARRIAGE", locationId: male.id }),
+      await createUser(db, { now: T0, gender: "WOMAN", age: 36, connectionIntent: "FRIENDSHIP", interestedIn: "MEN", intent: null, locationId: eydhafushi.id }),
+      await createUser(db, { now: T0, gender: "WOMAN", age: 29, connectionIntent: "FRIENDSHIP", interestedIn: "WOMEN", ageMin: 25, ageMax: 35, locationId: male.id }),
+      await createUser(db, { now: T0, gender: "UNSPECIFIED", age: 40, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", locationId: male.id }),
+      await createUser(db, { now: T0, gender: "MAN", age: 33, lookingFor: "MARRIAGE", locationScope: "SPECIFIC", prefLocationId: atoll.id, locationId: male.id }),
+      await createUser(db, { now: T0, gender: "WOMAN", age: 30, intent: "MARRIAGE", locationId: eydhafushi.id }),
+      await createUser(db, { now: T0, gender: "WOMAN", age: 45, intent: "DATING", locationId: eydhafushi.id, ageMin: 40, ageMax: 60 }),
+      await createUser(db, { now: T0, gender: "MAN", age: 24, locationScope: "GREATER_MALE", locationId: eydhafushi.id }),
+      await createUser(db, { now: T0, gender: "WOMAN", age: 26, locationId: male.id, photos: 1 }),
+    ];
+    await likeUser(users[7]!, users[5]!.userId, { db, now: T0 });
+
+    const handles = new Map(users.map((u) => [u.userId, u.handle]));
+    const rows = await db.$queryRawUnsafe<{ viewer: string; deck: string }[]>(
+      visibilityMatrixSql(`WITH cohort AS (SELECT u.id, p.handle FROM "User" u JOIN "Profile" p ON p."userId" = u.id)`),
+    );
+    const sqlDecks = new Map(rows.map((r) => [r.viewer, r.deck === "(empty deck)" ? [] : r.deck.split(" ")]));
+    for (const u of users) {
+      // The matrix computes ages with the database clock, so the real query runs at "now" too.
+      const real = (await getDeckCandidateIds(db, u, { limit: 30 })).map((id) => handles.get(id)!).sort();
+      expect({ viewer: u.handle, deck: sqlDecks.get(u.handle) ?? [] }).toEqual({ viewer: u.handle, deck: real });
+    }
+  });
+});

@@ -71,9 +71,10 @@ describe("own profile and editing", () => {
     const { male, addu } = await fixtures();
     const me = await createUser(db, { now: T0, gender: "MAN" });
     const other = await createUser(db, { now: T0, gender: "MAN", locationId: male.id });
-    await updateInfo(me, { gender: "UNSPECIFIED", locationId: addu.id, homeLocationId: male.id, occupation: "Product Designer", education: "Villa College", heightCm: 178, userId: other.userId, name: "Hacked", dateOfBirth: "2015-01-01" }, { db });
+    // A gender Dating can hold: "Prefer not to say" is refused on Dating (tests/integration/discovery-consistency.test.ts).
+    await updateInfo(me, { gender: "WOMAN", locationId: addu.id, homeLocationId: male.id, occupation: "Product Designer", education: "Villa College", heightCm: 178, userId: other.userId, name: "Hacked", dateOfBirth: "2015-01-01" }, { db });
     const mine = await getEditProfileData(me, { db });
-    expect(mine).toMatchObject({ gender: "UNSPECIFIED", locationName: "Addu City", homeLocationName: "Malé", occupation: "Product Designer", education: "Villa College", heightCm: 178 });
+    expect(mine).toMatchObject({ gender: "WOMAN", locationName: "Addu City", homeLocationName: "Malé", occupation: "Product Designer", education: "Villa College", heightCm: 178 });
     expect(mine.name).not.toBe("Hacked");
     expect(mine.age).toBe(27); // DOB untouched: it is not an editable field
     const theirs = await getEditProfileData(other, { db });

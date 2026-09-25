@@ -8,7 +8,9 @@ import type { DbLike } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { getEntitlements } from "@/server/entitlements";
-import { awaitingPhotoReviewSql, baseVisibleSql, compatibilitySql, discoverableSql, notSwipedSql, openToDiscoverySql, orderSql, viewerFilterSql, type ViewerContext } from "./predicate";
+import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
+import { datingFieldsApply } from "@/server/preferences/intent-policy";
+import { awaitingPhotoReviewSql, baseVisibleSql, compatibilitySql, discoverableSql, notSwipedSql, openToDiscoverySql, orderSql, swipedSql, viewerFilterSql, type ViewerContext } from "./predicate";
 
 /** Loads everything the predicate needs to know about the viewer. */
 export async function loadViewerContext(db: DbLike, userId: string, now: Date): Promise<ViewerContext> {
@@ -21,6 +23,7 @@ export async function loadViewerContext(db: DbLike, userId: string, now: Date): 
     getEntitlements(db, userId, now),
   ]);
   if (!user) throw new NotFoundError("User");
+  const connectionIntent = prefs?.connectionIntent ?? "DATING";
   return {
     userId,
     phoneHash: user.phoneHash,
@@ -29,10 +32,11 @@ export async function loadViewerContext(db: DbLike, userId: string, now: Date): 
     interestedIn: prefs?.interestedIn ?? "EVERYONE",
     // Matches the column default: a viewer with no preferences row yet is treated as here to date, never as
     // belonging to both pools.
-    connectionIntent: prefs?.connectionIntent ?? "DATING",
-    ageMin: prefs?.ageMin ?? 18,
-    ageMax: prefs?.ageMax ?? 99,
-    intent: prefs?.intent ?? null,
+    connectionIntent,
+    ageMin: prefs?.ageMin ?? DEFAULT_AGE_PREFERENCES.ageMin,
+    ageMax: prefs?.ageMax ?? DEFAULT_AGE_PREFERENCES.ageMax,
+    // Dating only. On Friendship the stored value is kept for a switch back, and is inert until then.
+    intent: datingFieldsApply(connectionIntent) ? (prefs?.intent ?? null) : null,
     locationScope: prefs?.locationScope ?? "ANYWHERE",
     locationId: prefs?.locationId ?? null,
     atollCode: user.profile?.location?.atollCode ?? null,
@@ -98,6 +102,24 @@ export async function countRelaxedCandidates(db: DbLike, actor: Actor, now: Date
       AND ${discoverableSql()}
       AND ${compatibilitySql(v)}
       AND ${notSwipedSql(v.userId, now)}
+  `);
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * How many compatible people the viewer has ALREADY acted on (liked, passed within the pass window, or matched),
+ * with their own filters lifted. Used only to tell "you have seen everyone" apart from "nobody compatible is here
+ * right now"; never returns identities, and a count of people is all it can ever say.
+ */
+export async function countSwipedCompatible(db: DbLike, actor: Actor, now: Date = new Date()): Promise<number> {
+  const v = await loadViewerContext(db, actor.userId, now);
+  const rows = await db.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+    SELECT count(*)::bigint AS n
+    ${FROM_CLAUSE}
+    WHERE ${baseVisibleSql(v.userId, v.phoneHash, now)}
+      AND ${discoverableSql()}
+      AND ${compatibilitySql(v)}
+      AND ${swipedSql(v.userId, now)}
   `);
   return Number(rows[0]?.n ?? 0);
 }

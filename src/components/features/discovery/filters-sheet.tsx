@@ -11,14 +11,21 @@ import { Input, Select } from "@/components/ui/field";
 import { LockIcon } from "@/components/ui/icons";
 import { PlusTag } from "@/components/ui/badge";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
-import type { ConnectionIntent } from "@/server/preferences/intent-policy";
+import { ageRangeWarning, rememberedFriendship, resetFilterValues, showMeForMode } from "@/lib/discovery-filters";
+import { DATING_NEEDS_GENDER, type ConnectionIntent } from "@/server/preferences/intent-policy";
 
 /*
- * Prototype "FILTERS SHEET": 22/800 title with a "Reset" text button; Age range with two sliders and "22–34";
- * "Show me" three 44 px segments (radius 14); Location chips 40 px; "Looking for" chips (Any + 4 intents);
- * bordered "PREMIUM Advanced filters" group with 52 px lock rows; "Apply" 52 px primary. Sheet on phones, modal on desktop.
+ * Prototype "FILTERS SHEET": 22/800 title with a "Reset" text button; Age range with two sliders; "Show me" three
+ * 44 px segments (radius 14); Location chips 40 px; "Looking for" chips (Any + 4 intents); bordered "PREMIUM Advanced
+ * filters" group with 52 px lock rows; "Apply" 52 px primary. Sheet on phones, modal on desktop.
  * Advanced filters offered: Height and Education — the two the profile actually stores. Occupation and Interests
  * appear in the prototype's list but have no filterable data model yet, so they are not shown as filters.
+ *
+ * Dating and Friendship are different products and the sheet shows each its own questions
+ * (src/server/preferences/intent-policy.ts): "Looking for" is a Dating question and is not drawn at all on
+ * Friendship, and each mode's "Show me" is restored from its own remembered value when the member switches — the
+ * Dating one derived from gender, the Friendship one the member's own `friendshipInterestedIn`. None of this is the
+ * enforcement; the server ignores hidden values whatever the sheet sends.
  */
 export interface LocationOption {
   id: string;
@@ -37,18 +44,38 @@ export interface FiltersSheetProps {
   onLockedAdvanced: () => void;
 }
 
-export type FiltersDraft = Omit<DiscoveryFiltersDto, "advancedEnabled" | "hasOwnLocation">;
+type InterestedIn = DiscoveryFiltersDto["interestedIn"];
+type RelationshipIntent = NonNullable<DiscoveryFiltersDto["intent"]>;
 
-const INTENTS = Object.entries(INTENT_LABELS) as [keyof typeof INTENT_LABELS, string][];
+/** Exactly what the sheet submits. Hidden fields ride along unchanged and the server decides what applies. */
+export interface FiltersDraft {
+  connectionIntent: ConnectionIntent;
+  /** Null only on Friendship before the member has ever answered; Apply waits for an answer then. */
+  interestedIn: InterestedIn | null;
+  ageMin: number;
+  ageMax: number;
+  locationScope: DiscoveryFiltersDto["locationScope"];
+  locationId: string | null;
+  /** The Dating "Looking for" filter. Kept (not cleared) while on Friendship so a switch back restores it. */
+  intent: RelationshipIntent | null;
+  /** The member's OWN Dating answer, asked only when switching into Dating without one. */
+  myIntent: RelationshipIntent | null;
+  heightMinCm: number | null;
+  heightMaxCm: number | null;
+  education: string | null;
+}
+
+const INTENTS = Object.entries(INTENT_LABELS) as [RelationshipIntent, string][];
 const HEIGHTS = Array.from({ length: (210 - 140) / 5 + 1 }, (_, i) => 140 + i * 5);
 
 function toDraft(f: DiscoveryFiltersDto): FiltersDraft {
-  return { connectionIntent: f.connectionIntent, interestedInEditable: f.interestedInEditable, datingInterestedIn: f.datingInterestedIn, interestedIn: f.interestedIn, ageMin: f.ageMin, ageMax: f.ageMax, locationScope: f.locationScope, locationId: f.locationId, intent: f.intent, heightMinCm: f.heightMinCm, heightMaxCm: f.heightMaxCm, education: f.education };
+  return { connectionIntent: f.connectionIntent, interestedIn: f.interestedIn, ageMin: f.ageMin, ageMax: f.ageMax, locationScope: f.locationScope, locationId: f.locationId, intent: f.intent, myIntent: null, heightMinCm: f.heightMinCm, heightMaxCm: f.heightMaxCm, education: f.education };
 }
 
 export function FiltersSheet({ open, onClose, filters, locations, saving, error, onApply, onLockedAdvanced }: FiltersSheetProps) {
   const titleId = useId();
   const [draft, setDraft] = useState<FiltersDraft>(() => toDraft(filters));
+  const [friendshipShowMe, setFriendshipShowMe] = useState<InterestedIn | null>(() => rememberedFriendship(filters));
   const [showPicker, setShowPicker] = useState(filters.locationScope === "SPECIFIC");
   const [wasOpen, setWasOpen] = useState(open);
 
@@ -57,17 +84,36 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
     setWasOpen(open);
     if (open) {
       setDraft(toDraft(filters));
+      setFriendshipShowMe(rememberedFriendship(filters));
       setShowPicker(filters.locationScope === "SPECIFIC");
     }
   }
 
   const set = <K extends keyof FiltersDraft>(key: K, value: FiltersDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  const dating = draft.connectionIntent === "DATING";
   const reset = () => {
-    setDraft({ connectionIntent: draft.connectionIntent, interestedInEditable: draft.interestedInEditable, datingInterestedIn: draft.datingInterestedIn, interestedIn: draft.interestedIn, ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", locationId: null, intent: null, heightMinCm: null, heightMaxCm: null, education: null });
+    // The mode and its "Show me" are not filters, so Reset leaves them; everything else returns to THE defaults.
+    setDraft((d) => ({ ...d, ...resetFilterValues(d.connectionIntent, d.intent) }));
     setShowPicker(false);
   };
-  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md text-body-sm font-medium text-text", on ? "bg-primary text-on-primary" : "bg-surface-muted");
+  const chooseMode = (v: ConnectionIntent) => {
+    if (v === "DATING" && !filters.canDate) return;
+    setDraft((d) => ({
+      ...d,
+      connectionIntent: v,
+      // Each mode restores its own "Show me": Dating's is derived from gender, Friendship's is the member's answer.
+      interestedIn: showMeForMode(v, filters.datingInterestedIn, friendshipShowMe),
+    }));
+  };
+  const chooseFriendshipShowMe = (v: InterestedIn) => {
+    setFriendshipShowMe(v);
+    set("interestedIn", v);
+  };
+  const segment = (on: boolean) => cn("h-11 flex-1 rounded-md text-body-sm font-medium text-text disabled:opacity-45", on ? "bg-primary text-on-primary" : "bg-surface-muted");
   const specificName = locations.find((l) => l.id === draft.locationId)?.name;
+  const needsMyIntent = dating && !filters.hasDatingIntent;
+  const warning = ageRangeWarning(filters.ownAge, draft.ageMin, draft.ageMax);
+  const blocked = (draft.locationScope === "SPECIFIC" && !draft.locationId) || draft.interestedIn == null || (needsMyIntent && !draft.myIntent);
 
   return (
     <ResponsiveDialog
@@ -78,7 +124,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       footer={
         <div className="flex flex-col gap-2.5">
           {error ? <p role="alert" className="text-body-sm font-medium text-danger">{error}</p> : null}
-          <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={draft.locationScope === "SPECIFIC" && !draft.locationId}>Apply</Button>
+          <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={blocked}>Apply</Button>
         </div>
       }
     >
@@ -103,6 +149,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
             <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMin} onChange={(e) => set("ageMin", Math.min(Number(e.target.value), draft.ageMax))} aria-label="Minimum age" className="w-full accent-primary" />
             <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMax} onChange={(e) => set("ageMax", Math.max(Number(e.target.value), draft.ageMin))} aria-label="Maximum age" className="w-full accent-primary" />
           </div>
+          {warning ? <p role="status" className="text-caption font-medium leading-relaxed text-warning">{warning}</p> : null}
         </section>
 
         <section className="flex flex-col gap-2.5">
@@ -114,31 +161,26 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
                 type="button"
                 role="radio"
                 aria-checked={draft.connectionIntent === v}
-                /* Switching to Dating settles "Show me" as well, so the sheet shows the answer immediately rather
-                   than leaving a stale choice on screen until the save comes back. Friendship restores their own. */
-                onClick={() => setDraft((d) => ({
-                  ...d,
-                  connectionIntent: v,
-                  interestedInEditable: v === "FRIENDSHIP",
-                  interestedIn: v === "DATING" ? (d.datingInterestedIn ?? d.interestedIn) : (filters.connectionIntent === "FRIENDSHIP" ? filters.interestedIn : d.interestedIn),
-                }))}
+                disabled={v === "DATING" && !filters.canDate}
+                onClick={() => chooseMode(v)}
                 className={segment(draft.connectionIntent === v)}
               >{label}</button>
             ))}
           </div>
+          {!filters.canDate ? <p className="text-caption leading-relaxed text-text-secondary">{DATING_NEEDS_GENDER}</p> : null}
         </section>
 
         <section className="flex flex-col gap-2.5">
           <div className="text-body font-medium">Show me</div>
-          {draft.interestedInEditable ? (
+          {!dating ? (
             <div className="flex gap-2" role="radiogroup" aria-label="Show me">
               {([["WOMEN", "Women"], ["MEN", "Men"], ["EVERYONE", "Everyone"]] as const).map(([v, label]) => (
-                <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => set("interestedIn", v)} className={segment(draft.interestedIn === v)}>{label}</button>
+                <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => chooseFriendshipShowMe(v)} className={segment(draft.interestedIn === v)}>{label}</button>
               ))}
             </div>
           ) : (
             /* Dating has one answer, so this states it instead of offering a choice that cannot be made. */
-            <p className="text-body-sm text-text-secondary">{INTERESTED_IN_LABELS[draft.interestedIn]} — Dating on Mellocrush is opposite gender only.</p>
+            <p className="text-body-sm text-text-secondary">{draft.interestedIn ? INTERESTED_IN_LABELS[draft.interestedIn] : "—"} — Dating on Mellocrush is opposite gender only.</p>
           )}
         </section>
       </div>
@@ -161,15 +203,31 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         <p className="text-caption text-text-secondary">Island or atoll only — Mellocrush never uses distance or GPS.</p>
       </section>
 
-      <section className="flex flex-col gap-2.5">
-        <div className="text-body font-medium">Looking for</div>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Looking for">
-          <Chip role="radio" aria-checked={draft.intent === null} selected={draft.intent === null} onClick={() => set("intent", null)}>Any</Chip>
-          {INTENTS.map(([v, label]) => (
-            <Chip key={v} role="radio" aria-checked={draft.intent === v} selected={draft.intent === v} onClick={() => set("intent", v)}>{label}</Chip>
-          ))}
-        </div>
-      </section>
+      {needsMyIntent ? (
+        /* Their OWN answer, not a filter: somebody who came in through Friendship was never asked it, and Dating needs it. */
+        <section className="flex flex-col gap-2.5">
+          <div className="text-body font-medium">What are you looking for?</div>
+          <p className="-mt-1 text-caption text-text-secondary">Dating needs your answer to this. It shows on your profile, and you can change it later in Edit profile.</p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="What are you looking for?">
+            {INTENTS.map(([v, label]) => (
+              <Chip key={v} role="radio" aria-checked={draft.myIntent === v} selected={draft.myIntent === v} onClick={() => set("myIntent", v)}>{label}</Chip>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* A Dating question. Not drawn on Friendship at all — the stored answer waits, inert, for a switch back. */}
+      {dating ? (
+        <section className="flex flex-col gap-2.5">
+          <div className="text-body font-medium">Looking for</div>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Looking for">
+            <Chip role="radio" aria-checked={draft.intent === null} selected={draft.intent === null} onClick={() => set("intent", null)}>Any</Chip>
+            {INTENTS.map(([v, label]) => (
+              <Chip key={v} role="radio" aria-checked={draft.intent === v} selected={draft.intent === v} onClick={() => set("intent", v)}>{label}</Chip>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-2xl glass-card">
         <div className="flex items-center gap-2 bg-surface-muted px-3.5 py-3.5 text-tag uppercase tracking-[.08em] text-ocean">

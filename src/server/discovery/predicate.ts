@@ -31,6 +31,10 @@ export interface ViewerContext {
   connectionIntent: "DATING" | "FRIENDSHIP";
   ageMin: number;
   ageMax: number;
+  /**
+   * The Dating "Looking for" filter. Null whenever it does not apply — in particular always null on Friendship,
+   * where a stored value is kept for a switch back but must never narrow the deck (`datingFieldsApply`).
+   */
   intent: string | null;
   locationScope: "ANYWHERE" | "GREATER_MALE" | "MY_ATOLL" | "SPECIFIC";
   locationId: string | null;
@@ -211,12 +215,19 @@ export function compatibilitySql(v: ViewerContext): Prisma.Sql {
   return Prisma.join(parts, " AND ");
 }
 
-/** The viewer's own filters: age range, intent, location scope, and (Plus only) advanced filters. */
+/**
+ * The viewer's own filters: age range, the Dating "Looking for", location scope, and (Plus only) advanced filters.
+ *
+ * "Looking for" is a romantic question and belongs to Dating alone (src/server/preferences/intent-policy.ts
+ * `datingFieldsApply`). `loadViewerContext` already hands a Friendship viewer a null intent; the pool check here is
+ * the second lock on the same door, so a context built any other way still cannot let a hidden dating value narrow a
+ * Friendship deck — and a candidate's `Profile.intent` is never consulted for Friendship at all.
+ */
 export function viewerFilterSql(v: ViewerContext, now: Date): Prisma.Sql {
   const parts: Prisma.Sql[] = [
     Prisma.sql`date_part('year', age(${now}::timestamp, u."dateOfBirth"::timestamp)) BETWEEN ${v.ageMin} AND ${v.ageMax}`,
   ];
-  if (v.intent) parts.push(Prisma.sql`p.intent = ${v.intent}::"RelationshipIntent"`);
+  if (v.connectionIntent === "DATING" && v.intent) parts.push(Prisma.sql`p.intent = ${v.intent}::"RelationshipIntent"`);
 
   switch (v.locationScope) {
     case "GREATER_MALE":
@@ -226,7 +237,16 @@ export function viewerFilterSql(v: ViewerContext, now: Date): Prisma.Sql {
       parts.push(Prisma.sql`loc."atollCode" = ${v.atollCode ?? ""}`);
       break;
     case "SPECIFIC":
-      parts.push(Prisma.sql`p."locationId" = ${v.locationId ?? ""}`);
+      // An island or city matches itself. An atoll matches itself AND every island and city in it: members pick
+      // the place they live, so "Lh. Atoll" meaning only the handful who chose the atoll row would hide almost
+      // everyone in Lh. Still place names only — no coordinates, no distance.
+      parts.push(Prisma.sql`(
+        p."locationId" = ${v.locationId ?? ""}
+        OR EXISTS (
+          SELECT 1 FROM "Location" sl
+          WHERE sl.id = ${v.locationId ?? ""} AND sl.kind = 'ATOLL' AND sl."atollCode" = loc."atollCode"
+        )
+      )`);
       break;
     case "ANYWHERE":
       break;
@@ -245,6 +265,11 @@ export function viewerFilterSql(v: ViewerContext, now: Date): Prisma.Sql {
 /** Backwards-compatible alias: compatibility plus the viewer's filters. */
 export function preferenceSql(v: ViewerContext, now: Date): Prisma.Sql {
   return Prisma.sql`${compatibilitySql(v)} AND ${viewerFilterSql(v, now)}`;
+}
+
+/** The viewer has already acted on the candidate: the exact negation of `notSwipedSql`. Used only to classify an empty deck. */
+export function swipedSql(viewerId: string, now: Date): Prisma.Sql {
+  return Prisma.sql`NOT (${notSwipedSql(viewerId, now)})`;
 }
 
 /** Exclude candidates the viewer has already acted on (like, unexpired pass, any match row). */

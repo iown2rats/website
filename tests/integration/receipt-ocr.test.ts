@@ -148,14 +148,15 @@ describe("reading a receipt at upload", () => {
     const blank = await attach(customer, order.id, "   \n  ");
     expect(blank.check.outcome).toBe("UNSUPPORTED_RECEIPT");
     const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, ...new Array(600).fill(0x20)]);
-    await expect(attachReceipt(customer, order.id, { bytes: pdf, size: pdf.byteLength }, { db, storage, engine: stub("") })).rejects.toThrow(/PDF receipts aren't supported/);
+    await expect(attachReceipt(customer, order.id, { bytes: pdf, size: pdf.byteLength }, { db, storage, now: at(T0, hours(1)), engine: stub("") })).rejects.toThrow(/PDF receipts aren't supported/);
     const heic = new Uint8Array([0, 0, 0, 0x18, ...Buffer.from("ftypheic"), ...new Array(600).fill(0)]);
-    await expect(attachReceipt(customer, order.id, { bytes: heic, size: heic.byteLength }, { db, storage, engine: stub("") })).rejects.toThrow(/HEIC photos aren't supported yet/);
-    await expect(attachReceipt(customer, order.id, { bytes: new Uint8Array([1, 2, 3, 4, 5]), size: 5 }, { db, storage, engine: stub("") })).rejects.toBeInstanceOf(ValidationError);
+    await expect(attachReceipt(customer, order.id, { bytes: heic, size: heic.byteLength }, { db, storage, now: at(T0, hours(1)), engine: stub("") })).rejects.toThrow(/HEIC photos aren't supported yet/);
+    // On the test's own clock: without it these ran on the wall clock and failed once the fixture order expired.
+    await expect(attachReceipt(customer, order.id, { bytes: new Uint8Array([1, 2, 3, 4, 5]), size: 5 }, { db, storage, now: at(T0, hours(1)), engine: stub("") })).rejects.toBeInstanceOf(ValidationError);
     expect(await db.receiptVerification.count({ where: { orderId: order.id } })).toBe(2);
     // Submitting without any receipt is refused.
     const bare = await createOrder(await createUser(db, { now: T0 }), { planId: plan.id }, { db, now: T0 });
-    await expect(submitOrder({ userId: bare.id ? (await db.subscriptionOrder.findUniqueOrThrow({ where: { id: bare.id } })).userId : "" }, bare.id, { db })).rejects.toBeInstanceOf(InvalidStateError);
+    await expect(submitOrder({ userId: bare.id ? (await db.subscriptionOrder.findUniqueOrThrow({ where: { id: bare.id } })).userId : "" }, bare.id, { db, now: at(T0, hours(1)) })).rejects.toThrow(/receipt/i);
   });
 });
 

@@ -113,7 +113,11 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
   const specificName = locations.find((l) => l.id === draft.locationId)?.name;
   const needsMyIntent = dating && !filters.hasDatingIntent;
   const warning = ageRangeWarning(filters.ownAge, draft.ageMin, draft.ageMax);
-  const blocked = (draft.locationScope === "SPECIFIC" && !draft.locationId) || draft.interestedIn == null || (needsMyIntent && !draft.myIntent);
+  const blockedReason =
+    needsMyIntent && !draft.myIntent ? "Answer “What are you looking for?” to switch to Dating."
+    : draft.interestedIn == null ? "Choose who you'd like to meet."
+    : draft.locationScope === "SPECIFIC" && !draft.locationId ? "Choose an island or atoll."
+    : null;
 
   return (
     <ResponsiveDialog
@@ -124,7 +128,9 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       footer={
         <div className="flex flex-col gap-2.5">
           {error ? <p role="alert" className="text-body-sm font-medium text-danger">{error}</p> : null}
-          <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={blocked}>Apply</Button>
+          {/* A disabled Apply always says why, right beside it: the question may be scrolled out of view. */}
+          {blockedReason ? <p className="text-caption text-text-secondary">{blockedReason}</p> : null}
+          <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={blockedReason != null}>Apply</Button>
         </div>
       }
     >
@@ -185,6 +191,20 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         </section>
       </div>
 
+      {needsMyIntent ? (
+        /* Their OWN answer, not a filter: somebody who came in through Friendship was never asked it, and Dating needs it.
+           Drawn right under the switch that caused it, so it is on screen the moment they tap Dating. */
+        <section className="flex flex-col gap-2.5">
+          <div className="text-body font-medium">What are you looking for?</div>
+          <p className="-mt-1 text-caption text-text-secondary">Dating needs your answer to this. It shows on your profile, and you can change it later in Edit profile.</p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="What are you looking for?">
+            {INTENTS.map(([v, label]) => (
+              <Chip key={v} role="radio" aria-checked={draft.myIntent === v} selected={draft.myIntent === v} onClick={() => set("myIntent", v)}>{label}</Chip>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-2.5">
         <div className="text-body font-medium">Location</div>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Location">
@@ -202,19 +222,6 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         ) : null}
         <p className="text-caption text-text-secondary">Island or atoll only — Mellocrush never uses distance or GPS.</p>
       </section>
-
-      {needsMyIntent ? (
-        /* Their OWN answer, not a filter: somebody who came in through Friendship was never asked it, and Dating needs it. */
-        <section className="flex flex-col gap-2.5">
-          <div className="text-body font-medium">What are you looking for?</div>
-          <p className="-mt-1 text-caption text-text-secondary">Dating needs your answer to this. It shows on your profile, and you can change it later in Edit profile.</p>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="What are you looking for?">
-            {INTENTS.map(([v, label]) => (
-              <Chip key={v} role="radio" aria-checked={draft.myIntent === v} selected={draft.myIntent === v} onClick={() => set("myIntent", v)}>{label}</Chip>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {/* A Dating question. Not drawn on Friendship at all — the stored answer waits, inert, for a switch back. */}
       {dating ? (

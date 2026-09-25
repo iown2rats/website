@@ -153,13 +153,18 @@ export const DISCOVERY = {
   filterAgeMin: FILTER_AGE.min,
   filterAgeMax: FILTER_AGE.max,
   /**
+   * The narrowest age range a member can save: To is always at least this many years above From. The two sliders
+   * used to be able to meet, and members saved 60–60 and 34–34 by dragging From to the end — a range that shows
+   * them almost nobody. Enforced by the sheet (src/lib/discovery-filters.ts) and by the server schema.
+   */
+  filterAgeMinSpan: 3,
+  /**
    * THE default age range, and the only place it is written down (docs/ARCHITECTURE.md §7.4). A new member's
    * preferences row, the Filters sheet's Reset and every "no row" fallback read it from here, and the database
    * column defaults are pinned to it by tests/integration/discovery-consistency.test.ts.
    *
-   * It is the whole slider on purpose. The age check is reciprocal (a candidate appears only when each person's age
-   * is inside the other's range), so a narrow default is not a neutral starting point: the old 22–34 silently hid
-   * every member older than 34 from their own age group until they happened to open Filters.
+   * It is the whole slider on purpose: a member who never opens Filters should see everybody. (The age check is
+   * one-way — a range decides who the member sees, never who sees them — see `compatibilitySql`.)
    */
   defaultAgeRange: FILTER_AGE,
   /** Maximum handles a client may pass as "already in my deck". */

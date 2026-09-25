@@ -3,7 +3,6 @@
  */
 import { Prisma } from "@/generated/prisma/client";
 import { DISCOVERY } from "@/config/product";
-import { ageFromDateOfBirth } from "@/lib/age";
 import type { DbLike } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
@@ -17,7 +16,7 @@ export async function loadViewerContext(db: DbLike, userId: string, now: Date): 
   const [user, prefs, entitlements] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
-      select: { phoneHash: true, gender: true, dateOfBirth: true, profile: { select: { location: { select: { atollCode: true } } } } },
+      select: { phoneHash: true, gender: true, profile: { select: { location: { select: { atollCode: true } } } } },
     }),
     db.discoveryPreferences.findUnique({ where: { userId } }),
     getEntitlements(db, userId, now),
@@ -28,7 +27,6 @@ export async function loadViewerContext(db: DbLike, userId: string, now: Date): 
     userId,
     phoneHash: user.phoneHash,
     gender: user.gender,
-    age: user.dateOfBirth ? ageFromDateOfBirth(user.dateOfBirth, now) : null,
     interestedIn: prefs?.interestedIn ?? "EVERYONE",
     // Matches the column default: a viewer with no preferences row yet is treated as here to date, never as
     // belonging to both pools.

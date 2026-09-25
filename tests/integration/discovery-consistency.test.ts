@@ -7,7 +7,7 @@ import { getUserDetail } from "@/server/admin/users";
 import { listConversations } from "@/server/conversations/list";
 import { getDeck } from "@/server/discovery/deck";
 import { DEFAULT_FILTERS, getDiscoveryFilters, saveDiscoveryFilters } from "@/server/discovery/filters";
-import { viewerFilterSql } from "@/server/discovery/predicate";
+import { baseVisibleSql, compatibilitySql, discoverableSql, notSwipedSql, viewerFilterSql } from "@/server/discovery/predicate";
 import { countRelaxedCandidates, getDeckCandidateIds, isDeckCandidate, loadViewerContext } from "@/server/discovery/query";
 import { countEligibleIncomingLikes, listEligibleIncomingLikes } from "@/server/likes/eligibility";
 import { CROSS_POOL_LIKE, likeUser } from "@/server/likes/like";
@@ -207,22 +207,86 @@ describe("Friendship 'Show me' is remembered per mode", () => {
   });
 });
 
-describe("age compatibility stays reciprocal", () => {
-  const cases = [
-    { name: "both ranges include each other", viewerRange: [25, 40], candRange: [25, 40], visible: true },
-    { name: "candidate outside the viewer's range", viewerRange: [18, 30], candRange: [25, 40], visible: false },
-    { name: "viewer outside the candidate's range", viewerRange: [25, 40], candRange: [35, 40], visible: false },
-    { name: "neither inside the other's", viewerRange: [18, 25], candRange: [40, 50], visible: false },
-  ] as const;
+describe("age is one-way: my range decides who I see, never who can see me", () => {
   for (const mode of ["DATING", "FRIENDSHIP"] as const) {
-    for (const c of cases) {
-      it(`${mode}: ${c.name}`, async () => {
-        const viewer = await createUser(db, { now: T0, gender: "MAN", age: 31, connectionIntent: mode, interestedIn: mode === "DATING" ? "WOMEN" : "EVERYONE", ageMin: c.viewerRange[0], ageMax: c.viewerRange[1] });
-        const cand = await createUser(db, { now: T0, gender: "WOMAN", age: 36, connectionIntent: mode, interestedIn: mode === "DATING" ? "MEN" : "EVERYONE", ageMin: c.candRange[0], ageMax: c.candRange[1] });
-        expect((await deck(viewer)).includes(cand.userId)).toBe(c.visible);
-      });
-    }
+    const showMe = (g: "MAN" | "WOMAN") => (mode === "DATING" ? (g === "MAN" ? "WOMEN" : "MEN") : "EVERYONE");
+
+    it(`${mode}: a 27-year-old whose own range is 40–60 is still shown to a 25-year-old looking for 18–30`, async () => {
+      const viewer = await createUser(db, { now: T0, gender: "MAN", age: 25, connectionIntent: mode, interestedIn: showMe("MAN"), ageMin: 18, ageMax: 30 });
+      const cand = await createUser(db, { now: T0, gender: "WOMAN", age: 27, connectionIntent: mode, interestedIn: showMe("WOMAN"), ageMin: 40, ageMax: 60 });
+      expect(await deck(viewer)).toContain(cand.userId);
+      expect(await isDeckCandidate(db, viewer, cand.userId, T0)).toBe(true);
+      // Her 40–60 still governs HER deck: he is 25, so she does not see him.
+      expect(await deck(cand)).not.toContain(viewer.userId);
+      // And that is her own filter, so her empty deck says FILTERS, not "nobody is here".
+      expect(await countRelaxedCandidates(db, cand, T0)).toBe(1);
+    });
+
+    it(`${mode}: a 35-year-old is not shown to a viewer looking for 18–30`, async () => {
+      const viewer = await createUser(db, { now: T0, gender: "MAN", age: 25, connectionIntent: mode, interestedIn: showMe("MAN"), ageMin: 18, ageMax: 30 });
+      const cand = await createUser(db, { now: T0, gender: "WOMAN", age: 35, connectionIntent: mode, interestedIn: showMe("WOMAN"), ageMin: 18, ageMax: 60 });
+      expect(await deck(viewer)).not.toContain(cand.userId);
+      expect(await isDeckCandidate(db, viewer, cand.userId, T0)).toBe(false);
+      // …while she, 18–60, does see him.
+      expect(await deck(cand)).toContain(viewer.userId);
+    });
   }
+
+  it("a collapsed range (60–60, saved by the old slider) hides nobody from anybody else — it only narrows that member's own deck", async () => {
+    const collapsed = await createUser(db, { now: T0, gender: "WOMAN", age: 26, ageMin: 60, ageMax: 60 });
+    const men = await Promise.all([22, 34, 48].map((age) => createUser(db, { now: T0, gender: "MAN", age })));
+    for (const m of men) expect(await deck(m)).toContain(collapsed.userId);
+    expect(await deck(collapsed)).toEqual([]);
+    // The stored row is exactly what it was: nothing rewrites it.
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: collapsed.userId }, select: { ageMin: true, ageMax: true } })).toEqual({ ageMin: 60, ageMax: 60 });
+  });
+
+  it("no visibility query reads the candidate's age range", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN", age: 30 });
+    const v = await loadViewerContext(db, viewer.userId, T0);
+    const text = compatibilitySql(v).sql + baseVisibleSql(v.userId, null, T0).sql + discoverableSql().sql + viewerFilterSql(v, T0).sql + notSwipedSql(v.userId, T0).sql;
+    expect(text).not.toMatch(/cp\."ageMin"|cp\."ageMax"/);
+    // The only age comparison left is the viewer's own range applied to the candidate's age.
+    expect(viewerFilterSql(v, T0).sql).toMatch(/u\."dateOfBirth"/);
+  });
+
+  it("likes are unaffected: a like from someone whose range leaves me out still reaches Likes You", async () => {
+    const me = await createUser(db, { now: T0, gender: "WOMAN", age: 29, ageMin: 18, ageMax: 60 });
+    const fan = await createUser(db, { now: T0, gender: "MAN", age: 45, ageMin: 40, ageMax: 60 });
+    await likeUser(fan, me.userId, { db, now: T0 });
+    expect(await countEligibleIncomingLikes(db, me.userId, T0)).toBe(1);
+  });
+});
+
+describe("the age range can't be saved collapsed", () => {
+  it("refuses 60–60 and 34–34 and anything narrower than 3 years, whatever the client sends", async () => {
+    const me = await createUser(db, { now: T0, gender: "MAN", age: 30 });
+    for (const [ageMin, ageMax] of [[60, 60], [34, 34], [58, 60], [18, 20]] as const) {
+      await expect(saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "WOMEN", intent: null, ageMin, ageMax }, { db, now: T0 })).rejects.toThrow(/at least 3 years/);
+    }
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId }, select: { ageMin: true, ageMax: true } })).toEqual({ ageMin: 18, ageMax: 99 });
+  });
+
+  it("saves the narrowest allowed ranges at both bounds, and normal ranges, exactly as chosen", async () => {
+    const me = await createUser(db, { now: T0, gender: "MAN", age: 30 });
+    for (const [ageMin, ageMax] of [[57, 60], [18, 21], [18, 30], [25, 40]] as const) {
+      const saved = await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "WOMEN", intent: null, ageMin, ageMax }, { db, now: T0 });
+      expect({ ageMin: saved.ageMin, ageMax: saved.ageMax }).toEqual({ ageMin, ageMax });
+    }
+  });
+
+  it("a range that leaves out the member's own age is saved as chosen — the server never corrects it", async () => {
+    const me = await createUser(db, { now: T0, gender: "MAN", age: 25 });
+    const saved = await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "WOMEN", intent: null, ageMin: 40, ageMax: 60 }, { db, now: T0 });
+    expect({ ageMin: saved.ageMin, ageMax: saved.ageMax, ownAge: saved.ownAge }).toEqual({ ageMin: 40, ageMax: 60, ownAge: 25 });
+  });
+
+  it("a member already stored at 60–60 is read back untouched, and can save once they widen it", async () => {
+    const me = await createUser(db, { now: T0, gender: "WOMAN", age: 26, ageMin: 60, ageMax: 60 });
+    expect(await getDiscoveryFilters(me, { db, now: T0 })).toMatchObject({ ageMin: 60, ageMax: 60 });
+    const saved = await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "MEN", intent: null, ageMin: 57, ageMax: 60 }, { db, now: T0 });
+    expect({ ageMin: saved.ageMin, ageMax: saved.ageMax }).toEqual({ ageMin: 57, ageMax: 60 });
+  });
 });
 
 describe("18–60 is the one canonical default", () => {
@@ -397,8 +461,8 @@ describe("the empty-deck reason", () => {
     expect((await getDeck(viewer, {}, { db, storage, now: T0 })).emptyReason).toBe("EXHAUSTED");
   });
 
-  it("UNAVAILABLE when nobody compatible is here — including when only someone else's preferences exclude the viewer, which it never names", async () => {
-    // The Zen/Nabu shape: different pools, and her age range leaves him out. Neither is his to learn.
+  it("UNAVAILABLE when nobody compatible is here, which it never names — and someone else's age range is never the reason", async () => {
+    // The Zen/Nabu shape: different pools, and her age range leaves him out. Only the pool matters to him.
     const zen = await createUser(db, { now: T0, gender: "MAN", age: 31, connectionIntent: "FRIENDSHIP", interestedIn: "WOMEN", ageMin: 18, ageMax: 37, intent: "FIGURING_OUT" });
     const nabu = await createUser(db, { now: T0, gender: "WOMAN", age: 36, interestedIn: "MEN", friendshipInterestedIn: "MEN", ageMin: 35, ageMax: 40, intent: "MARRIAGE" });
     const page = await getDeck(zen, {}, { db, storage, now: T0 });
@@ -409,12 +473,17 @@ describe("the empty-deck reason", () => {
     expect(json).not.toContain(nabu.handle);
     expect(json).not.toMatch(/ageMin|ageMax|connectionIntent|interestedIn/);
 
-    // Same pool, but her range still excludes him: still neutral, still nothing about her.
+    // Same pool: he sees her straight away. Her 35–40 leaves him (31) out, but age is one-way — her range decides
+    // who she sees, and it never hides her from him.
     await db.discoveryPreferences.update({ where: { userId: nabu.userId }, data: { connectionIntent: "FRIENDSHIP", interestedIn: "MEN" } });
-    expect((await getDeck(zen, {}, { db, storage, now: T0 })).emptyReason).toBe("UNAVAILABLE");
-    // And once her range includes him, they see each other.
-    await db.discoveryPreferences.update({ where: { userId: nabu.userId }, data: { ageMin: 30 } });
     expect(await deck(zen)).toEqual([nabu.userId]);
+    // Her deck is where her range applies: he is outside it, and that is her own filter.
+    const hers = await getDeck(nabu, {}, { db, storage, now: T0 });
+    expect(hers.cards).toEqual([]);
+    expect(hers.emptyReason).toBe("FILTERS");
+    // Once her range includes him, they see each other.
+    await db.discoveryPreferences.update({ where: { userId: nabu.userId }, data: { ageMin: 30 } });
+    expect(await deck(nabu)).toEqual([zen.userId]);
   });
 });
 

@@ -6,16 +6,18 @@ import { DISCOVERY } from "@/config/product";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/choice";
-import { ResponsiveDialog } from "@/components/ui/dialog";
+import { ConfirmationDialog, ResponsiveDialog } from "@/components/ui/dialog";
 import { Input, Select } from "@/components/ui/field";
 import { LockIcon } from "@/components/ui/icons";
 import { PlusTag } from "@/components/ui/badge";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
-import { ageRangeWarning, rememberedFriendship, resetFilterValues, showMeForMode } from "@/lib/discovery-filters";
+import { AGE_RANGE_TOO_NARROW, ageRangeTooNarrow, ageRangeWarning, moveAgeFrom, moveAgeTo, needsOwnAgeConfirmation, rememberedFriendship, resetFilterValues, showMeForMode } from "@/lib/discovery-filters";
 import { DATING_NEEDS_GENDER, type ConnectionIntent } from "@/server/preferences/intent-policy";
 
 /*
- * Prototype "FILTERS SHEET": 22/800 title with a "Reset" text button; Age range with two sliders; "Show me" three
+ * Prototype "FILTERS SHEET": 22/800 title with a "Reset" text button; Age range with two labelled sliders (From / To,
+ * never closer than `filterAgeMinSpan` years, and a "Save it anyway?" check when the new range leaves out the
+ * member's own age); "Show me" three
  * 44 px segments (radius 14); Location chips 40 px; "Looking for" chips (Any + 4 intents); bordered "PREMIUM Advanced
  * filters" group with 52 px lock rows; "Apply" 52 px primary. Sheet on phones, modal on desktop.
  * Advanced filters offered: Height and Education — the two the profile actually stores. Occupation and Interests
@@ -78,6 +80,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
   const [friendshipShowMe, setFriendshipShowMe] = useState<InterestedIn | null>(() => rememberedFriendship(filters));
   const [showPicker, setShowPicker] = useState(filters.locationScope === "SPECIFIC");
   const [wasOpen, setWasOpen] = useState(open);
+  const [confirmingAge, setConfirmingAge] = useState(false);
 
   // Opening discards unsaved edits and starts from the persisted preferences (state adjusted on the prop change).
   if (open !== wasOpen) {
@@ -86,6 +89,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       setDraft(toDraft(filters));
       setFriendshipShowMe(rememberedFriendship(filters));
       setShowPicker(filters.locationScope === "SPECIFIC");
+      setConfirmingAge(false);
     }
   }
 
@@ -114,12 +118,16 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
   const needsMyIntent = dating && !filters.hasDatingIntent;
   const warning = ageRangeWarning(filters.ownAge, draft.ageMin, draft.ageMax);
   const blockedReason =
-    needsMyIntent && !draft.myIntent ? "Answer “What are you looking for?” to switch to Dating."
+    ageRangeTooNarrow(draft.ageMin, draft.ageMax) ? AGE_RANGE_TOO_NARROW
+    : needsMyIntent && !draft.myIntent ? "Answer “What are you looking for?” to switch to Dating."
     : draft.interestedIn == null ? "Choose who you'd like to meet."
     : draft.locationScope === "SPECIFIC" && !draft.locationId ? "Choose an island or atoll."
     : null;
+  // A range that leaves out the member's own age is asked about once, when they change it; it is never corrected.
+  const apply = () => (needsOwnAgeConfirmation(filters.ownAge, filters, draft) ? setConfirmingAge(true) : onApply(draft));
 
   return (
+    <>
     <ResponsiveDialog
       open={open}
       onClose={onClose}
@@ -130,7 +138,7 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
           {error ? <p role="alert" className="text-body-sm font-medium text-danger">{error}</p> : null}
           {/* A disabled Apply always says why, right beside it: the question may be scrolled out of view. */}
           {blockedReason ? <p className="text-caption text-text-secondary">{blockedReason}</p> : null}
-          <Button onClick={() => onApply(draft)} loading={saving} fullWidth disabled={blockedReason != null}>Apply</Button>
+          <Button onClick={apply} loading={saving} fullWidth disabled={blockedReason != null}>Apply</Button>
         </div>
       }
     >
@@ -146,14 +154,15 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         */}
       <div className="flex flex-col gap-4 desktop:grid desktop:grid-cols-2 desktop:gap-3.5">
         <section className="flex flex-col gap-3">
-          <div className="flex justify-between text-body font-medium">
-            <span>Age range</span>
-            <span className="text-text-secondary tabular-nums">{draft.ageMin}–{draft.ageMax}</span>
-          </div>
-          {/* Half-width on desktop, so the two sliders stack rather than becoming 120 px each. */}
+          <div className="text-body font-medium">Age range</div>
+          {/*
+            * Half-width on desktop, so the two sliders stack rather than becoming 120 px each. Each slider carries its
+            * own visible label and value: side by side on a phone, two unlabelled sliders read as one control, and
+            * members dragged the left one to the end and saved 60–60.
+            */}
           <div className="grid grid-cols-2 gap-3 desktop:grid-cols-1 desktop:gap-4">
-            <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMin} onChange={(e) => set("ageMin", Math.min(Number(e.target.value), draft.ageMax))} aria-label="Minimum age" className="w-full accent-primary" />
-            <input type="range" min={DISCOVERY.filterAgeMin} max={DISCOVERY.filterAgeMax} value={draft.ageMax} onChange={(e) => set("ageMax", Math.max(Number(e.target.value), draft.ageMin))} aria-label="Maximum age" className="w-full accent-primary" />
+            <AgeSlider label="From" value={draft.ageMin} onChange={(n) => set("ageMin", moveAgeFrom(n, draft.ageMax))} />
+            <AgeSlider label="To" value={draft.ageMax} onChange={(n) => set("ageMax", moveAgeTo(n, draft.ageMin))} />
           </div>
           {warning ? <p role="status" className="text-caption font-medium leading-relaxed text-warning">{warning}</p> : null}
         </section>
@@ -266,5 +275,43 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       </section>
 
     </ResponsiveDialog>
+    <ConfirmationDialog
+      open={confirmingAge}
+      onClose={() => setConfirmingAge(false)}
+      onConfirm={() => {
+        setConfirmingAge(false);
+        onApply(draft);
+      }}
+      title="Your age isn't included in this range"
+      description={`You're ${filters.ownAge} and you've chosen ${draft.ageMin}–${draft.ageMax}. Save it anyway?`}
+      confirmLabel="Save anyway"
+      cancelLabel="Change range"
+    />
+    </>
+  );
+}
+
+/** One labelled age slider on the full 18–60 scale. The caller clamps, so the thumb stops where the rule says. */
+function AgeSlider({ label, value, onChange }: { label: "From" | "To"; value: number; onChange: (next: number) => void }) {
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between">
+        <label htmlFor={id} className="text-caption font-medium text-text-secondary">
+          {label}
+          <span className="sr-only"> age</span>
+        </label>
+        <span aria-hidden="true" className="text-body font-medium tabular-nums text-text">{value}</span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={DISCOVERY.filterAgeMin}
+        max={DISCOVERY.filterAgeMax}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-primary"
+      />
+    </div>
   );
 }

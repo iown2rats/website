@@ -13,7 +13,6 @@ export function visibilityMatrixSql(cohortCte: string): string {
   return `${cohortCte}
 , viewers AS (
   SELECT u.id vid, p.handle vh, u.gender vg, u."phoneHash" vph,
-         date_part('year', age(now(), u."dateOfBirth"))::int va,
          cp."connectionIntent" vci, cp."interestedIn" vi, cp."ageMin" vmin, cp."ageMax" vmax, cp.intent vint,
          cp."locationScope" vscope, cp."locationId" vloc, vl."atollCode" vatoll
   FROM cohort c JOIN "User" u ON u.id = c.id
@@ -26,7 +25,7 @@ export function visibilityMatrixSql(cohortCte: string): string {
          date_part('year', age(now(), u."dateOfBirth"))::int ca,
          u."accountType" cacct, u.status cstatus, u."deletedAt" cdel, u."onboardingCompletedAt" conb,
          ps.visibility cvis, ps."pausedAt" cpaused, ps."invisibleMode" cinv,
-         cp."connectionIntent" cci, cp."interestedIn" ci, cp."ageMin" cmin, cp."ageMax" cmax,
+         cp."connectionIntent" cci, cp."interestedIn" ci,
          p.intent cintent, p."locationId" cloc, cl."atollCode" catoll, cl."isGreaterMale" cgm
   FROM cohort c JOIN "User" u ON u.id = c.id
   JOIN "Profile" p ON p."userId" = u.id
@@ -54,7 +53,8 @@ FROM viewers v LEFT JOIN cands c ON c.cid <> v.vid
   -- discoverable: open to discovery, enough approved photos
   AND c.cvis = 'EVERYONE' AND c.cpaused IS NULL
   AND (SELECT count(*) FROM "ProfilePhoto" ph WHERE ph."profileId" = c.pid AND ph.moderation = 'APPROVED') >= 2
-  -- compatibility: same pool; the pool's gender rule; both ages inside the other's range
+  -- compatibility: same pool; the pool's gender rule. Age is one-way (the viewer's range only, below):
+  -- the candidate's own range never decides who may see them, so it is not read here at all.
   AND c.cci = v.vci
   AND (CASE v.vci
          WHEN 'DATING' THEN (c.cg = 'WOMAN' AND v.vg = 'MAN') OR (c.cg = 'MAN' AND v.vg = 'WOMAN')
@@ -62,8 +62,7 @@ FROM viewers v LEFT JOIN cands c ON c.cid <> v.vid
           AND (c.ci = 'EVERYONE' OR (v.vg = 'WOMAN' AND c.ci = 'WOMEN') OR (v.vg = 'MAN' AND c.ci = 'MEN'))
        END)
   AND c.cdob IS NOT NULL
-  AND (v.va IS NULL OR v.va BETWEEN c.cmin AND c.cmax)
-  -- the viewer's own filters
+  -- the viewer's own filters (the age range among them: the only place age applies)
   AND c.ca BETWEEN v.vmin AND v.vmax
   AND (v.vci <> 'DATING' OR v.vint IS NULL OR c.cintent = v.vint)   -- "Looking for" is Dating-only
   AND (CASE v.vscope

@@ -24,8 +24,6 @@ export interface ViewerContext {
   /** Null when the viewer has not added a phone number: only their own hidden-contacts list applies then. */
   phoneHash: Uint8Array | null;
   gender: "WOMAN" | "MAN" | "UNSPECIFIED" | null;
-  /** Viewer's own age, used for the candidate's age preference (mutual compatibility). */
-  age: number | null;
   interestedIn: "WOMEN" | "MEN" | "EVERYONE";
   /** Dating and Friendship are separate pools; see `intentCompatibilitySql`. */
   connectionIntent: "DATING" | "FRIENDSHIP";
@@ -203,20 +201,20 @@ export function genderCompatibilitySql(v: ViewerContext): Prisma.Sql {
  * Mutual compatibility, independent of the viewer's optional filters (docs/ARCHITECTURE.md §7.1):
  *  - the viewer and the candidate must be here for the same thing (Dating or Friendship);
  *  - their genders must be compatible, by the rule that belongs to that pool (`genderCompatibilitySql`);
- *  - the candidate must have a date of birth, and the viewer's age must fall inside the candidate's age range.
+ *  - the candidate must have a date of birth (the viewer's age filter needs one to compare).
+ *
+ * Age is deliberately NOT here. An age range is one-way: it decides who the member SEES (`viewerFilterSql`) and
+ * never who may see them, so the candidate's own `ageMin`/`ageMax` are not read by any visibility query. When it
+ * was two-way, a range the member never chose (the old 22–34 default) or a slider slip (60–60) silently hid them
+ * from almost everybody, and nothing on screen said so.
  */
 export function compatibilitySql(v: ViewerContext): Prisma.Sql {
-  const parts: Prisma.Sql[] = [
-    intentCompatibilitySql(v),
-    genderCompatibilitySql(v),
-    Prisma.sql`u."dateOfBirth" IS NOT NULL`,
-  ];
-  if (v.age != null) parts.push(Prisma.sql`${v.age} BETWEEN cp."ageMin" AND cp."ageMax"`);
-  return Prisma.join(parts, " AND ");
+  return Prisma.join([intentCompatibilitySql(v), genderCompatibilitySql(v), Prisma.sql`u."dateOfBirth" IS NOT NULL`], " AND ");
 }
 
 /**
  * The viewer's own filters: age range, the Dating "Looking for", location scope, and (Plus only) advanced filters.
+ * The age range is applied here and only here — to the candidate's age, from the viewer's range. It is one-way.
  *
  * "Looking for" is a romantic question and belongs to Dating alone (src/server/preferences/intent-policy.ts
  * `datingFieldsApply`). `loadViewerContext` already hands a Friendship viewer a null intent; the pool check here is

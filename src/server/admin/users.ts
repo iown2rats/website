@@ -155,7 +155,8 @@ export async function getUserDetail(admin: AdminActor, userId: string, deps: { d
     else photos.rejected += 1;
   }
   const age = u.dateOfBirth ? Math.floor((now.getTime() - u.dateOfBirth.getTime()) / (365.25 * 86_400_000)) : null;
-  // The same age the discovery query uses for the reciprocal check, so "outside own range" means what the deck means.
+  // The same exact age the discovery query uses. Age filtering is one-way, so a range that leaves out the member's own
+  // age hides nobody from them — but it is the usual sign of a slider slip, which is why the panel still flags it.
   const exactAge = u.dateOfBirth ? ageFromDateOfBirth(u.dateOfBirth, now) : null;
   return {
     account: { userId: u.id, handle: u.profile?.handle ?? null, displayName: u.profile?.displayName ?? null, status: u.status, role: u.role, onboardingStage: u.onboardingStage, onboardingCompletedAt: u.onboardingCompletedAt?.toISOString() ?? null, createdAt: u.createdAt.toISOString(), lastActiveAt: u.lastActiveAt?.toISOString() ?? null, deletedAt: u.deletedAt?.toISOString() ?? null, hasPhone: Boolean(u.phoneE164), ageYears: age, activeSessions: u._count.sessions },

@@ -10,6 +10,7 @@ import { ValidationError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { getEntitlements } from "@/server/entitlements";
 import { ageFromDateOfBirth } from "@/lib/age";
+import { AGE_RANGE_TOO_NARROW } from "@/lib/discovery-filters";
 import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
 import { canDate, datingFieldsApply, datingInterestedIn, resolvePreferences, type ConnectionIntent } from "@/server/preferences/intent-policy";
 
@@ -36,6 +37,9 @@ export const filtersSchema = z
     education: z.string().trim().max(60).regex(/^[^<>]*$/, "Education can't contain < or >").nullable().optional(),
   })
   .refine((f) => f.ageMin <= f.ageMax, { message: "Minimum age must not exceed maximum age", path: ["ageMax"] })
+  // The same minimum span the sliders enforce (src/lib/discovery-filters.ts), so a collapsed range like 60–60 can't
+  // be saved by any client. Stored rows narrower than this are never rewritten; they just can't be saved again as is.
+  .refine((f) => f.ageMax - f.ageMin >= DISCOVERY.filterAgeMinSpan, { message: AGE_RANGE_TOO_NARROW, path: ["ageMax"] })
   .refine((f) => f.heightMinCm == null || f.heightMaxCm == null || f.heightMinCm <= f.heightMaxCm, { message: "Minimum height must not exceed maximum", path: ["heightMaxCm"] })
   .refine((f) => f.locationScope !== "SPECIFIC" || Boolean(f.locationId), { message: "Choose an island or atoll", path: ["locationId"] });
 

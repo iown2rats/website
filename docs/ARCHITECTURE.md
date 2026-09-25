@@ -305,11 +305,11 @@ One SQL predicate, built from fragments in `src/server/discovery/predicate.ts` a
 `compatibilitySql` (mutual, independent of the viewer's optional filters):
 
 5. V's "Show me" includes U's gender **and** U's "Show me" includes V's gender. `WOMEN` matches `WOMAN`, `MEN` matches `MAN`, `EVERYONE` matches all three; "Prefer not to say" (`UNSPECIFIED`) is therefore shown only to, and can only see, people who chose Everyone. Nothing assumes heterosexual pairs.
-6. U has a date of birth, and V's age (derived from V's private DOB on the server) lies within U's `ageMin–ageMax`. Age preferences are mutual; location scope is not (it is V's own viewing filter, see below).
+6. U has a date of birth. **U's own age range is not read here or anywhere else in a visibility query**: an age range is one-way — it decides who its owner sees (rule 7), never who can see them. (It was mutual until 2026-09-25; see §7.6.)
 
 `viewerFilterSql` (V's own filters, stored on `DiscoveryPreferences`):
 
-7. U's age (`date_part('year', age(now, dob))`) within V's `ageMin–ageMax`; the Dating-only "Looking for" (`p.intent = V.intent`, applied **only when V is on Dating** — §7.6); location scope `ANYWHERE` | `GREATER_MALE` (`Location.isGreaterMale`) | `MY_ATOLL` (V's own `atollCode`) | `SPECIFIC` (`locationId`; an `ATOLL` row also matches every island and city with that `atollCode`). Island/atoll only: there are no coordinates or distances anywhere in the schema or the API.
+7. U's age (`date_part('year', age(now, dob))`) within V's `ageMin–ageMax` — the only place age applies; the Dating-only "Looking for" (`p.intent = V.intent`, applied **only when V is on Dating** — §7.6); location scope `ANYWHERE` | `GREATER_MALE` (`Location.isGreaterMale`) | `MY_ATOLL` (V's own `atollCode`) | `SPECIFIC` (`locationId`; an `ATOLL` row also matches every island and city with that `atollCode`). Island/atoll only: there are no coordinates or distances anywhere in the schema or the API.
 8. Advanced filters (height range, education substring) are applied **only when V holds `canUseAdvancedFilters`**; stored values are inert otherwise, and `saveDiscoveryFilters` refuses to store them for Free users in the first place.
 
 `notSwipedSql`: no Like from V to U, no unexpired un-undone Pass (30 days, `PASS_TTL_MS`), and no Match row between the pair in any status.
@@ -351,12 +351,23 @@ the audit found the model disagreeing with itself elsewhere). Tests: `tests/inte
 - **"Prefer not to say".** Dating needs a woman and a man. The Dating choice is disabled with an explanation in
   onboarding and in the sheet; a Dating member cannot change their gender to "Prefer not to say" (Edit profile, or the
   onboarding GENDER step once Dating was chosen). Existing rows in that state are not rewritten.
-- **Age.** Still reciprocal in both pools. The default range is `DISCOVERY.defaultAgeRange` (18–60, the whole slider)
+- **Age.** One-way in both pools (changed later the same day, see "Age is one-way" below). The default range is `DISCOVERY.defaultAgeRange` (18–60, the whole slider)
   — the only place it is written. Every row the app creates writes it explicitly, Reset uses it, the no-row fallback
   uses it, and the database column default is pinned to it by migration `20260925100000_discovery_default_age_range`
   plus a test. The old 22–34 hid members over 34 from their own age group. Existing rows were **not** backfilled:
-  a deliberate 22–34 cannot be told apart from the old default. The sheet and Settings show a non-blocking warning
+  a deliberate 22–34 cannot be told apart from the old default. The sheet and Settings show a non-blocking note
   when a member's range excludes their own age.
+- **Age is one-way.** A production audit found age the largest cause of missing profiles: with the check mutual, a
+  member's range decided who could see *them*, so the 54 members still on the untouched 22–34 default and the few who
+  had saved a collapsed range (60–60, 34–34) were hidden from most of their pool without knowing it. `compatibilitySql`
+  no longer reads the candidate's `ageMin`/`ageMax`; the viewer's own range (rule 7) is the only age rule. Likes,
+  Likes You and profile views never used age and are unchanged. No stored range was rewritten.
+- **Age sliders.** Each slider has a visible label and value ("From 18", "To 60"). They can no longer meet: moving
+  either stops `DISCOVERY.filterAgeMinSpan` (3) years short of the other inside 18–60 (`moveAgeFrom` / `moveAgeTo`,
+  `src/lib/discovery-filters.ts`), and `filtersSchema` refuses a narrower range from any client. A range stored
+  narrower than that before the fix loads as it is and Apply waits, saying why, until the member widens it. When the
+  member changes the range to one that leaves out their own age, Apply asks "Save it anyway?" first; confirming saves
+  exactly what they chose, cancelling saves nothing.
 - **Admin.** User detail has a read-only Discovery preferences panel (pool, both Show me values, age range and whether
   it excludes their own age, scope, Dating Looking for only on Dating, discoverability).
 - **QA cohort.** `scripts/qa-visibility-sql.ts` is the hand-written matrix; a test runs it beside the real deck query

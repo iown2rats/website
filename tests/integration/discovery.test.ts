@@ -129,17 +129,19 @@ describe("discovery eligibility", () => {
     expect(await getDeckCandidateIds(db, unspecifiedEveryone, { now: T0 })).not.toContain(manWantsWomen.userId);
   });
 
-  it("applies the viewer's age range and the candidate's age range (mutual)", async () => {
+  it("applies the viewer's age range only — the candidate's own range never decides who sees them (one-way)", async () => {
     const viewer = await createUser(db, { gender: "MAN", now: T0, age: 30, ageMin: 25, ageMax: 35 });
     const inRange = await createUser(db, { now: T0, age: 28, ageMin: 18, ageMax: 99 });
     const tooYoung = await createUser(db, { now: T0, age: 22 });
     const tooOld = await createUser(db, { now: T0, age: 40 });
+    // Her range leaves him out. That decides who SHE sees, not whether he sees her.
     const doesNotWantMyAge = await createUser(db, { now: T0, age: 30, ageMin: 18, ageMax: 25 });
     const deck = await getDeckCandidateIds(db, viewer, { now: T0 });
-    expect(deck).toEqual([inRange.userId]);
+    expect(deck.sort()).toEqual([inRange.userId, doesNotWantMyAge.userId].sort());
     expect(deck).not.toContain(tooYoung.userId);
     expect(deck).not.toContain(tooOld.userId);
-    expect(deck).not.toContain(doesNotWantMyAge.userId);
+    // And her range still applies to her own deck: he is 30, outside her 18–25.
+    expect(await getDeckCandidateIds(db, doesNotWantMyAge, { now: T0 })).not.toContain(viewer.userId);
   });
 
   it("filters by location scope without any distance or coordinates", async () => {

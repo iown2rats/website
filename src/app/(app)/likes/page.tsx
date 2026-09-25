@@ -19,7 +19,7 @@ export default async function LikesPage({ searchParams }: { searchParams: Promis
     <AppScreen aria-label="Likes">
       <TabHeader title="Likes" />
       <ScrollArea>
-        <LikesClient initial={page} initialTab={sp.tab === "matches" ? "matches" : "you"} myPhoto={myPhoto} source={parsePlusSurface(sp.from) === "discover_likes" ? "discover_likes" : "likes_you"} />
+        <LikesClient initial={page} initialTab={sp.tab === "matches" || sp.tab === "sent" ? sp.tab : "you"} myPhoto={myPhoto} source={parsePlusSurface(sp.from) === "discover_likes" ? "discover_likes" : "likes_you"} />
       </ScrollArea>
     </AppScreen>
   );

@@ -576,43 +576,60 @@ Because the advisory lock still serialises a sender's concurrent sends, six simu
 The one messaging limit that is still tier-dependent is the **Intro** (`introsPerWeek`), and it applies *before*
 a match exists — an intro is a note attached to a like, not a message in a conversation.
 
-### 12.5 Likes You
+### 12.5 Likes You and Sent
 
-Free: the read model returns `{ count, placeholders: [{ blurhash, verified }] }` where the blurhash is the primary photo's precomputed 28-character placeholder stored on `ProfilePhoto`. It contains no identifier, name, age, location or URL, and the list order is randomised per request so it cannot be aligned with other lists. Plus: the read model returns full `VisibleProfile` DTOs through the standard visibility predicate. There is no route that serves the real image to a Free client.
+`/likes` has three tabs: **Likes You (N)**, **Sent (N)** and **Matches (N)** (`src/server/likes/likes-page.ts`,
+`src/app/(app)/likes/likes-client.tsx`). Every count is the number of cards that tab renders, because each list and
+its count run one shared SQL (`src/server/likes/eligibility.ts`); the lists stop at `LIKES_PAGE_SIZE` (100), the
+counts never do.
 
-Phase 10 built the screen (`/likes`, `src/server/likes/likes-page.ts`): Free receives `count` and `placeholders` (blurhash + verified flag) and renders blurred tiles behind a lock card ("N people like you · Plus feature · See who likes you" → the lock sheet → Membership); Plus receives the standard discovery card DTO and can open a profile, like back (a mutual like shows the match screen) or pass. The Matches tab lists active matches with a way into each chat. Tested in `tests/integration/plus-enforcement.test.ts`: the Free payload contains no names, handles, ids or URLs.
+**Likes You, Free:** the read model returns `{ tier: "FREE", count }` and nothing else — no photo, URL, blurhash,
+name, handle, age, location or flag, not even the ids (they are not read). The page draws one locked tile per like
+from four fixed decorative blurhashes that belong to nobody, plus the lock card ("Someone likes you ❤️" / "N people
+like you ❤️" → the Plus lock sheet → Membership). Until 2026-09-25 each tile carried the liker's first-photo
+blurhash and verified flag; Discover sends every candidate's blurhash too, so a Free member could match the strings
+in their own browser and learn who liked them. There is no route that serves any per-liker data to a Free client.
 
-#### 12.5.1 One eligibility rule, and the order of a pass
+**Likes You, Plus:** the standard discovery card DTO through the visibility predicate; a card opens the full profile
+with Like back (a mutual like shows the match screen, through the ordinary `likeUser` → `createMatchIfMutual`
+flow) or Pass, which dismisses that like (below).
+
+**Sent, every tier:** people the viewer has liked who have not become a match, as ordinary cards (they already saw
+and chose these people). No actions: a like cannot be withdrawn. A match in any state takes the person out (liked
+back → Matches; unmatched → gone), as do the base predicate (blocks, contact hashes, suspended / banned / deleted /
+non-member accounts, Invisible Mode) and the pool rule below. Sent never consults what the other person did about
+the like — a pass or a dismissal — so it cannot be used to learn a "no". Sent is not a Plus feature.
+
+#### 12.5.1 One eligibility rule: only a "no" on Likes You hides a like
 
 `src/server/likes/eligibility.ts` owns the only answer to "may this viewer be told that this person liked them".
-Three surfaces call it — the Likes You grid and count, the Discover aside, and the notification feed's decision to
-print a liker's name — so none of them can reveal somebody another one hides.
+Every surface calls it — the Likes You grid and count, the Discover teaser, the Discover aside, the notification
+feed's decision to print a liker's name, and the likes digest email — so none can reveal or count somebody another
+one hides. An incoming like is shown unless: the two are matched or the viewer liked back; either blocked the other
+(or a contact hash applies); the liker's account is suspended, banned, deleted, not onboarded or not a member; the
+liker is in Invisible Mode without Plus; the liker is now in the other pool (THE POOL RULE — hidden, never deleted,
+back if the pools agree again); or the viewer **dismissed** it.
 
-A pass suppresses an incoming like **only when the pass came after it**:
+A dismissal is `Like.dismissedAt` (migration `20260925200000_like_dismissed_at`), set only by a Pass tapped on Likes
+You (`passUser(…, { dismissIncomingLike: true })`, `passCard({ source: "likes_you" })`). **A Discover pass never
+hides a like, before it or after it.** Discover does not say who liked you, so any pass made there is blind to the
+like. The history:
 
-```sql
-AND NOT EXISTS (
-  SELECT 1 FROM "Pass" pa
-  WHERE pa."fromUserId" = <viewer> AND pa."toUserId" = u.id
-    AND pa."undoneAt" IS NULL
-    AND pa."createdAt" > l."createdAt"      -- strict: simultaneous does not suppress
-)
-```
+- The first rule hid a like from anybody the viewer had ever swiped on. A member passed somebody, she liked him six
+  hours later, his notification named her the moment he bought Plus, and Likes You showed nothing.
+- The second rule hid a like only when the pass came *after* it ("an informed no"). In production that hid 29 likes,
+  28 of them from Free members who had been told only "Someone liked you" and later passed that very person in
+  Discover — a notification and an empty page, the state this section exists to prevent.
 
-Passing somebody *after* they liked you is an informed "no" and it sticks. Passing them *before* was a decision
-made without the very information this app sells, so it does not cancel the like. Expiry is deliberately not
-considered: a lapsed pass that followed a like still suppresses it.
-
-This was found the expensive way. A member passed somebody in Discover; she liked him six hours later; his
-notification named her the moment he bought Plus; and Likes You — which excluded anyone he had already swiped on,
-in either order — showed him nothing. He paid MVR 49 to be told a name that led to an empty page. Two surfaces,
-two definitions, one refund.
+A pass still does what a pass does: it keeps the person out of the Discover deck for `PASS_TTL_MS`. Discover is not
+changed by a like — a passed liker is not put back into the deck; they are on Likes You instead.
 
 A corollary worth stating: a `LIKE_RECEIVED` notification always has a `Like` row behind it, written in the same
-transaction by `likeUser`. A fixture that creates the notification alone is testing a state production cannot
-reach, and after this change such a row is correctly never named.
+transaction by `likeUser`, at most once per (recipient, liker). When the like later becomes a match, or is hidden by
+one of the rules above, the notification stays in the feed unnamed and still leads to `/likes`; it is never
+rewritten or deleted.
 
-Covered by `tests/integration/like-pass-order.test.ts`.
+Covered by `tests/integration/likes-sent.test.ts` and `tests/integration/like-pass-order.test.ts`.
 
 ### 12.6 Invisible Mode
 

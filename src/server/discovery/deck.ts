@@ -203,11 +203,11 @@ export async function likeByHandle(actor: Actor, handle: string, deps: DeckDeps 
   return { created: result.created, matched: result.matched && match != null, match, allowance: toAllowanceDto(allowance), serverNow: now.toISOString() };
 }
 
-export async function passByHandle(actor: Actor, handle: string, deps: DeckDeps = {}): Promise<{ created: boolean; serverNow: string }> {
+export async function passByHandle(actor: Actor, handle: string, deps: DeckDeps & { dismissIncomingLike?: boolean } = {}): Promise<{ created: boolean; serverNow: string }> {
   const db = deps.db ?? getDb();
   const now = deps.now ?? new Date();
   const targetId = await resolveHandle(db, handle);
-  const result = await passUser(actor, targetId, { db, now });
+  const result = await passUser(actor, targetId, { db, now, dismissIncomingLike: deps.dismissIncomingLike });
   return { created: result.created, serverNow: now.toISOString() };
 }
 

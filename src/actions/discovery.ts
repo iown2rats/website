@@ -68,11 +68,12 @@ export async function likeCard(input: { handle: string }): Promise<({ ok: true }
   }
 }
 
-export async function passCard(input: { handle: string }): Promise<{ ok: true; created: boolean; serverNow: string } | ActionFailure> {
+export async function passCard(input: { handle: string; source?: "likes_you" }): Promise<{ ok: true; created: boolean; serverNow: string } | ActionFailure> {
   try {
     const actor = await requireMember();
     const handle = handleSchema.parse(input?.handle);
-    return { ok: true, ...(await passByHandle(actor, handle)) };
+    // A pass tapped on Likes You is a "no" to that person's like; one from Discover is not (§12.5).
+    return { ok: true, ...(await passByHandle(actor, handle, { dismissIncomingLike: input?.source === "likes_you" })) };
   } catch (e) {
     return failure(e);
   }

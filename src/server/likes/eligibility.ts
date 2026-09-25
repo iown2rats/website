@@ -10,17 +10,15 @@
  * So there is now exactly one predicate and one query, and every surface calls it. A row can no longer name
  * somebody the grid refuses to show.
  *
- * THE PASS RULE. A pass suppresses an incoming like only when the pass came *after* it:
+ * THE DISMISSAL RULE. A Discover pass never hides an incoming like, whenever it was made. Only the recipient's
+ * explicit "no" on Likes You does — `Like.dismissedAt`, set by a Pass tapped on that page (`passUser` with
+ * `dismissIncomingLike`).
  *
- *     pass."createdAt" > like."createdAt"
- *
- * The order is the whole point. Passing somebody *after* they liked you is a real "no" — you were told, and it
- * sticks. Passing them *before* they liked you was a decision made without that information, and on this app that
- * information is the thing behind the paywall. Letting a blind swipe silently cancel a later like meant selling
- * somebody a feature and then hiding its only content from them.
- *
- * Passes are not checked for expiry here, matching the behaviour this module replaces: a pass that has lapsed back
- * into the deck still suppresses a like it followed.
+ * Discover never says that a card has liked you, so every pass made there is blind to the like, before it or after
+ * it. The rule this replaces let a pass made AFTER the like hide it, on the theory that the member had been told;
+ * in production 28 of the 29 likes it hid belonged to Free members, who had been told only "Someone liked you" and
+ * then, hours later, passed that very person in Discover without knowing. They were left with a notification and an
+ * empty page. A pass still does what a pass does — keeps the person out of the deck for 30 days — and nothing more.
  *
  * THE POOL RULE. A like is shown only while its sender is in the viewer's pool (Dating or Friendship,
  * docs/ARCHITECTURE.md §7.5). Somebody who liked you on Dating and has since moved to Friendship would otherwise
@@ -34,9 +32,6 @@ import { baseVisibleSql } from "@/server/discovery/predicate";
 
 export interface EligibleLiker {
   id: string;
-  /** Blurhash of the liker's first APPROVED photo, or null when they have none. */
-  blurhash: string | null;
-  verified: boolean;
 }
 
 export interface EligibilityOptions {
@@ -52,7 +47,8 @@ export interface EligibilityOptions {
 
 /**
  * Everyone who has liked the viewer and is still theirs to act on: visible under the base predicate (blocks,
- * contact hashes, account state, Invisible Mode), not already liked back, and not passed since the like landed.
+ * contact hashes, account state, Invisible Mode), in the viewer's pool, not already liked back (so never a match),
+ * and not dismissed on Likes You.
  *
  * Ordered newest like first, which is the order Likes You shows.
  */
@@ -61,15 +57,12 @@ export async function listEligibleIncomingLikes(db: DbLike, viewerId: string, no
   const eligible = await eligibleLikesSql(db, viewerId, now, options);
   const limit = options.limit != null ? Prisma.sql`LIMIT ${Math.min(options.limit, 100)}` : Prisma.empty;
 
+  // Ids only. Nothing about a liker leaves this module except that they are eligible: the Free page carries no
+  // per-person data at all (src/server/likes/likes-you.ts), and the Plus page hydrates profiles separately.
   return db.$queryRaw<EligibleLiker[]>(Prisma.sql`
-    SELECT u.id,
-           (COALESCE(ver.status::text, '') = 'VERIFIED') AS verified,
-           -- APPROVED only, whatever PHOTO_VISIBILITY_POLICY says: a pending or rejected photo must not reach a Free
-           -- viewer even as a 32-pixel colour wash. No approved photo → null → the plain placeholder tile.
-           (SELECT ph.blurhash FROM "ProfilePhoto" ph JOIN "Profile" pp ON pp.id = ph."profileId"
-             WHERE pp."userId" = u.id AND ph.moderation = 'APPROVED' ORDER BY ph.position ASC LIMIT 1) AS blurhash
+    SELECT u.id
     ${eligible}
-    ORDER BY l."createdAt" DESC
+    ORDER BY l."createdAt" DESC, u.id
     ${limit}
   `);
 }
@@ -99,9 +92,10 @@ async function eligibleLikesSql(db: DbLike, viewerId: string, now: Date, options
   return Prisma.sql`
     FROM "Like" l
     JOIN "User" u ON u.id = l."fromUserId"
+    -- Profile is joined so the count can only ever include people the page can render (buildVisibleProfiles needs one).
+    JOIN "Profile" p ON p."userId" = u.id
     JOIN "PrivacySettings" ps ON ps."userId" = u.id
     JOIN "DiscoveryPreferences" lp ON lp."userId" = u.id
-    LEFT JOIN "Verification" ver ON ver."userId" = u.id
     WHERE l."toUserId" = ${viewerId}
       ${restrict}
       -- Same pool only (THE POOL RULE above): a like whose sender is now in the other pool stays stored, untouched,
@@ -116,12 +110,11 @@ async function eligibleLikesSql(db: DbLike, viewerId: string, now: Date, options
       AND ${baseVisibleSql(viewerId, viewer.phoneHash, now)}
       AND NOT EXISTS (SELECT 1 FROM "Like" back WHERE back."fromUserId" = ${viewerId} AND back."toUserId" = u.id)
       AND NOT EXISTS (
-        SELECT 1 FROM "Pass" pa
-        WHERE pa."fromUserId" = ${viewerId} AND pa."toUserId" = u.id
-          AND pa."undoneAt" IS NULL
-          -- Only a pass made AFTER the like counts. See THE PASS RULE above.
-          AND pa."createdAt" > l."createdAt"
+        SELECT 1 FROM "Match" m
+        WHERE (m."userAId" = ${viewerId} AND m."userBId" = u.id) OR (m."userAId" = u.id AND m."userBId" = ${viewerId})
       )
+      -- THE DISMISSAL RULE above: only a "no" said on Likes You hides a like. Discover passes are not consulted.
+      AND l."dismissedAt" IS NULL
   `;
 }
 
@@ -136,4 +129,53 @@ export async function nameableLikers(db: DbLike, viewerId: string, likerIds: str
   const unique = [...new Set(likerIds)];
   const rows = await listEligibleIncomingLikes(db, viewerId, now, { onlyLikerIds: unique });
   return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * SENT: the people the viewer has liked who have not become a match (docs/ARCHITECTURE.md §12.5). One SQL for the
+ * list and the count, as with Likes You, so "Sent (7)" always renders seven cards.
+ *
+ * What removes somebody from Sent is only what removes them everywhere: a match in any state (they liked back, or
+ * the pair was since unmatched — either way it is no longer a pending like), the base predicate (a block either
+ * way, contact hashes, an account that is suspended, banned, deleted or not a member, Invisible Mode), and the pool
+ * rule, for the same reason Likes You applies it: a like across pools can never become a match while they differ,
+ * and a Dating member is never shown Friendship profiles. The pool rule hides; it never deletes, and the card comes
+ * back if the two are in the same pool again.
+ *
+ * Deliberately NOT consulted: anything the other person did about the like — a pass, a Likes You dismissal. Sent
+ * is the sender's own list, and it must not become a way to learn a "no".
+ */
+export async function listSentLikes(db: DbLike, viewerId: string, now: Date, options: { limit?: number } = {}): Promise<EligibleLiker[]> {
+  const sent = await sentLikesSql(db, viewerId, now);
+  const limit = options.limit != null ? Prisma.sql`LIMIT ${Math.min(options.limit, 100)}` : Prisma.empty;
+  return db.$queryRaw<EligibleLiker[]>(Prisma.sql`SELECT u.id ${sent} ORDER BY l."createdAt" DESC, u.id ${limit}`);
+}
+
+export async function countSentLikes(db: DbLike, viewerId: string, now: Date): Promise<number> {
+  const sent = await sentLikesSql(db, viewerId, now);
+  const rows = await db.$queryRaw<{ n: bigint | number }[]>(Prisma.sql`SELECT count(*) AS n ${sent}`);
+  return Number(rows[0]?.n ?? 0);
+}
+
+async function sentLikesSql(db: DbLike, viewerId: string, now: Date): Promise<Prisma.Sql> {
+  const viewer = await db.user.findUniqueOrThrow({ where: { id: viewerId }, select: { phoneHash: true } });
+  return Prisma.sql`
+    FROM "Like" l
+    JOIN "User" u ON u.id = l."toUserId"
+    JOIN "Profile" p ON p."userId" = u.id
+    JOIN "PrivacySettings" ps ON ps."userId" = u.id
+    JOIN "DiscoveryPreferences" tp ON tp."userId" = u.id
+    WHERE l."fromUserId" = ${viewerId}
+      AND tp."connectionIntent" = COALESCE(
+        (SELECT vp."connectionIntent" FROM "DiscoveryPreferences" vp WHERE vp."userId" = ${viewerId}),
+        'DATING'::"ConnectionIntent"
+      )
+      AND ${baseVisibleSql(viewerId, viewer.phoneHash, now)}
+      AND NOT EXISTS (
+        SELECT 1 FROM "Match" m
+        WHERE (m."userAId" = ${viewerId} AND m."userBId" = u.id) OR (m."userAId" = u.id AND m."userBId" = ${viewerId})
+      )
+      -- Mutual likes always become a match; this only guards a malformed pair from reading as "pending".
+      AND NOT EXISTS (SELECT 1 FROM "Like" back WHERE back."fromUserId" = u.id AND back."toUserId" = ${viewerId})
+  `;
 }

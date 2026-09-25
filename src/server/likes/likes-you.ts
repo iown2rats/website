@@ -1,6 +1,6 @@
 /**
  * Likes You read model (docs/ARCHITECTURE.md §12.5).
- * Free: count + anonymised placeholders with no identifying fields.
+ * Free: the count, and nothing else about anybody.
  * Plus: full visible profiles.
  */
 import { getDb, type Db } from "@/lib/db";
@@ -9,14 +9,17 @@ import { getEntitlements } from "@/server/entitlements";
 import { buildVisibleProfiles, type VisibleProfile } from "@/server/profiles/visible-profile";
 import { countEligibleIncomingLikes, listEligibleIncomingLikes } from "./eligibility";
 
-export interface LikesYouPlaceholder {
-  /** Blurhash of the liker's first APPROVED photo (never a pending or rejected one), or null when they have none. */
-  blurhash: string | null;
-  verified: boolean;
-}
+/** How many profiles one Likes You or Sent page carries. The counts are never capped; see `LIKES_PAGE_SIZE` uses. */
+export const LIKES_PAGE_SIZE = 100;
 
+/*
+ * The Free result is a number and nothing more. It used to carry, per liker, the blurhash of their first photo and
+ * their verified flag "for the blurred tile" — but the Discover deck ships every candidate's blurhash too, so a Free
+ * member could match the two strings in their own browser and learn exactly who liked them. The locked tiles are
+ * now drawn from no data at all: the server cannot leak what it does not send.
+ */
 export type LikesYouResult =
-  | { tier: "FREE"; count: number; placeholders: LikesYouPlaceholder[] }
+  | { tier: "FREE"; count: number }
   | { tier: "PLUS"; count: number; profiles: VisibleProfile[] };
 
 /**
@@ -29,21 +32,13 @@ export async function getLikesYou(actor: Actor, options: { now?: Date; db?: Db; 
 
   // One rule, shared with the notification feed and the Discover aside, so they cannot disagree (see
   // src/server/likes/eligibility.ts).
-  const [likerRows, count] = await Promise.all([
-    listEligibleIncomingLikes(db, actor.userId, now, { limit: options.limit ?? 50 }),
-    // The number the member is told comes from the same rule, uncapped: the list stops at one page, the count doesn't.
-    countEligibleIncomingLikes(db, actor.userId, now),
-  ]);
-
   const entitlements = await getEntitlements(db, actor.userId, now);
-  if (!entitlements.rules.canSeeIncomingLikes) {
-    // Randomise so placeholder order cannot be correlated with any other list.
-    const placeholders = likerRows
-      .map((r) => ({ blurhash: r.blurhash, verified: r.verified }))
-      .sort(() => Math.random() - 0.5);
-    return { tier: "FREE", count, placeholders };
-  }
+  // The number the member is told comes from the same rule as the list, uncapped: the list stops at one page.
+  const count = await countEligibleIncomingLikes(db, actor.userId, now);
+  // Free: not even the ids are read. There is nothing per-person to put in the response.
+  if (!entitlements.rules.canSeeIncomingLikes) return { tier: "FREE", count };
 
+  const likerRows = await listEligibleIncomingLikes(db, actor.userId, now, { limit: options.limit ?? LIKES_PAGE_SIZE });
   const profiles = await buildVisibleProfiles(db, actor.userId, likerRows.map((r) => r.id), now);
   return { tier: "PLUS", count, profiles };
 }

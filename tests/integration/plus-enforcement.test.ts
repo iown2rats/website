@@ -100,7 +100,7 @@ describe("Plus-only capabilities are server-enforced", () => {
 });
 
 describe("Likes You privacy boundary", () => {
-  it("8 · the Free page carries a count and anonymous placeholders only; the Plus page carries the allow-listed card DTO", async () => {
+  it("8 · the Free page carries a count only; the Plus page carries the allow-listed card DTO", async () => {
     const viewer = await createUser(db, { now: T0, gender: "WOMAN", interestedIn: "MEN" });
     const a = await createUser(db, { now: T0, gender: "MAN", interestedIn: "WOMEN", name: "Ahmed Secret", verified: true });
     const b = await createUser(db, { now: T0, gender: "MAN", interestedIn: "WOMEN", name: "Bashir Hidden" });
@@ -110,8 +110,7 @@ describe("Likes You privacy boundary", () => {
     expect(free.tier).toBe("FREE");
     expect(free.count).toBe(2);
     expect(free.cards).toBeNull();
-    expect(free.placeholders).toHaveLength(2);
-    for (const p of free.placeholders!) expect(Object.keys(p).sort()).toEqual(["blurhash", "verified"]);
+    expect(Object.keys(free).sort()).toEqual(["cards", "count", "matches", "sent", "serverNow", "tier"]);
     const json = JSON.stringify(free);
     for (const leak of ["Ahmed", "Bashir", a.handle, b.handle, a.userId, b.userId, "handle", "url", "storageKey", "thumbKey", "age"]) expect(json).not.toContain(leak);
     await grantPlus(db, viewer.userId, T0, at(T0, hours(24)));

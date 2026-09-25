@@ -11,7 +11,7 @@ beforeEach(() => resetDb(db));
 afterAll(() => disconnectDb());
 
 describe("Likes You", () => {
-  it("a Free user gets the count and placeholders with no identifying fields", async () => {
+  it("a Free user gets the count and nothing else — no per-person field of any kind", async () => {
     const me = await createUser(db, { gender: "MAN", now: T0 });
     const likers = [await createUser(db, { now: T0, name: "Hassan" }), await createUser(db, { now: T0, name: "Zara" })];
     for (const l of likers) await likeUser(l, me.userId, { db, now: T0 });
@@ -19,12 +19,9 @@ describe("Likes You", () => {
     const result = await getLikesYou(me, { db, now: T0 });
     expect(result.tier).toBe("FREE");
     expect(result.count).toBe(2);
-    if (result.tier !== "FREE") throw new Error("unreachable");
-    expect(result.placeholders).toHaveLength(2);
-    for (const p of result.placeholders) {
-      expect(Object.keys(p).sort()).toEqual(["blurhash", "verified"]);
-      expect(p.blurhash).toMatch(/^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/);
-    }
+    // Exactly these keys: the blurhash and verified flag the tiles used to carry are gone, because Discover ships the
+    // same blurhash for every candidate and a Free member could match the two strings to learn who liked them.
+    expect(result).toEqual({ tier: "FREE", count: 2 });
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain("Hassan");
     expect(serialized).not.toContain("Zara");

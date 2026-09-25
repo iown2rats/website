@@ -156,7 +156,8 @@ export async function sweepMatchEmails(options: { db?: Db; now?: Date; force?: b
  * WHAT A DIGEST REPORTS. "You have N new likes" must mean exactly that:
  *
  *   - ELIGIBLE likes, by the same rule Likes You runs (src/server/likes/eligibility.ts). A like from somebody the
- *     member has since passed, blocked or matched is not on that page, so it is not in the number either;
+ *     member has since blocked, matched or dismissed on Likes You is not on that page, so it is not in the number
+ *     either (a Discover pass hides nothing there, so it hides nothing here);
  *   - NEW since the previous digest. The digest used to count every unread LIKE_RECEIVED row, so the same likes
  *     were re-announced every day for a week. Now a like is reported once;
  *   - still UNREAD in the feed. The notification row is kept as a guard, not as the count: it carries the Likes

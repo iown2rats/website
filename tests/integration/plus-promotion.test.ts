@@ -81,37 +81,17 @@ async function setPhotos(user: TestUser, rows: { moderation: "APPROVED" | "PENDI
   }
 }
 
-describe("Free Likes You preview: approved photos only", () => {
-  it("never derives a preview from a pending photo", async () => {
+describe("Free Likes You: no per-person data, whatever the photos are", () => {
+  it("never carries a blurhash — approved, pending or rejected — nor any other field about the liker", async () => {
     const me = await createUser(db, { now: T0 });
-    const [liker] = await likedBy(me, 1);
-    await setPhotos(liker!, [{ moderation: "PENDING", blurhash: "PENDINGHASH00" }, { moderation: "PENDING", blurhash: "PENDINGHASH01" }]);
+    const likers = await likedBy(me, 3);
+    await setPhotos(likers[0]!, [{ moderation: "APPROVED", blurhash: "APPROVEDHASH1" }, { moderation: "APPROVED", blurhash: "APPROVEDHASH2" }]);
+    await setPhotos(likers[1]!, [{ moderation: "PENDING", blurhash: "PENDINGHASH00" }, { moderation: "PENDING", blurhash: "PENDINGHASH01" }]);
+    await setPhotos(likers[2]!, [{ moderation: "REJECTED", blurhash: "REJECTEDHASH0" }, { moderation: "REJECTED", blurhash: "REJECTEDHASH1" }]);
 
     const result = await getLikesYou(me, { db, now: T0 });
-    if (result.tier !== "FREE") throw new Error("expected Free");
-    expect(result.placeholders).toEqual([{ blurhash: null, verified: false }]);
-  });
-
-  it("never derives a preview from a rejected photo", async () => {
-    const me = await createUser(db, { now: T0 });
-    const [liker] = await likedBy(me, 1);
-    await setPhotos(liker!, [{ moderation: "REJECTED", blurhash: "REJECTEDHASH0" }, { moderation: "REJECTED", blurhash: "REJECTEDHASH1" }]);
-
-    const result = await getLikesYou(me, { db, now: T0 });
-    if (result.tier !== "FREE") throw new Error("expected Free");
-    expect(JSON.stringify(result)).not.toContain("REJECTEDHASH");
-    expect(result.placeholders[0]!.blurhash).toBeNull();
-  });
-
-  it("uses the first APPROVED photo when the main one is still under review", async () => {
-    const me = await createUser(db, { now: T0 });
-    const [liker] = await likedBy(me, 1);
-    await setPhotos(liker!, [{ moderation: "PENDING", blurhash: "PENDINGHASH00" }, { moderation: "APPROVED", blurhash: "APPROVEDHASH1" }]);
-
-    const result = await getLikesYou(me, { db, now: T0 });
-    if (result.tier !== "FREE") throw new Error("expected Free");
-    expect(result.placeholders[0]!.blurhash).toBe("APPROVEDHASH1");
-    expect(JSON.stringify(result)).not.toContain("PENDINGHASH");
+    expect(result).toEqual({ tier: "FREE", count: 3 });
+    expect(JSON.stringify(result)).not.toMatch(/HASH/);
   });
 });
 
@@ -122,27 +102,27 @@ describe("Likes You count", () => {
     const result = await getLikesYou(me, { db, now: T0 });
     if (result.tier !== "FREE") throw new Error("expected Free");
     expect(result.count).toBe(53);
-    // The tiles stay one page, and every one is a real liker.
-    expect(result.placeholders).toHaveLength(50);
   });
 
   it("the teaser and the page agree, under every exclusion the page applies", async () => {
     const me = await createUser(db, { now: T0 });
-    const [kept, passedAfter, blocked, likedBack] = await likedBy(me, 4);
+    const [kept, passedAfter, blocked, likedBack, dismissed] = await likedBy(me, 5);
     const blindPass = await createUser(db, { now: T0, name: "Blind" });
     await passUser(me, blindPass.userId, { db, now: at(T0, -hours(1)) });
     await likeUser(blindPass, me.userId, { db, now: T0 });
 
+    // A Discover pass after the like hides nothing; a "no" on Likes You does.
     await passUser(me, passedAfter!.userId, { db, now: at(T0, minutes(5)) });
+    await passUser(me, dismissed!.userId, { db, now: at(T0, minutes(5)), dismissIncomingLike: true });
     await blockUser(me, blocked!.userId, { db, now: at(T0, minutes(5)) });
     await likeUser(me, likedBack!.userId, { db, now: at(T0, minutes(5)) });
 
     const now = at(T0, minutes(10));
     const page = await getLikesYou(me, { db, now });
     const teaser = await getLikesTeaser(me, { db, now });
-    // kept + the blind pass (a pass made BEFORE the like does not hide it).
-    expect(page.count).toBe(2);
-    expect(teaser).toEqual({ count: 2 });
+    // kept + both Discover passes (before and after the like); not the blocked, liked-back or dismissed ones.
+    expect(page.count).toBe(3);
+    expect(teaser).toEqual({ count: 3 });
     expect(kept).toBeTruthy();
   });
 
@@ -423,7 +403,9 @@ describe("Discover Likes You prompt (Option A)", () => {
   it("carries the real eligible count for a Free member with likes", async () => {
     process.env.PLUS_DISCOVER_PROMPT = "on";
     const me = await createUser(db, { now: T0 });
-    const [, passed] = await likedBy(me, 3);
+    const [, blocked, passed] = await likedBy(me, 3);
+    // A block removes a like from the count; a Discover pass does not (Likes You's own rule, §12.5).
+    await blockUser(me, blocked!.userId, { db, now: at(T0, minutes(1)) });
     await passUser(me, passed!.userId, { db, now: at(T0, minutes(1)) });
     expect((await getDeck(me, {}, { db, storage, now: at(T0, minutes(2)) })).likesTeaser).toEqual({ count: 2 });
   });

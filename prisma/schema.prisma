@@ -763,11 +763,14 @@ model RateLimitBucket {
 // ───────────────────────────── Dating graph ─────────────────────────────
 
 model Like {
-  id         String   @id @default(cuid(2))
-  fromUserId String
-  toUserId   String
-  introId    String?  @unique
-  createdAt  DateTime @default(now())
+  id          String    @id @default(cuid(2))
+  fromUserId  String
+  toUserId    String
+  introId     String?   @unique
+  createdAt   DateTime  @default(now())
+  /// The RECIPIENT's explicit "no" on Likes You (a Pass tapped there). Hides the like from their Likes You and
+  /// nowhere else: the sender's Sent list is unaffected, and a Discover pass never sets it (§12.5).
+  dismissedAt DateTime?
 
   from  User   @relation("LikeFrom", fields: [fromUserId], references: [id], onDelete: Restrict)
   to    User   @relation("LikeTo", fields: [toUserId], references: [id], onDelete: Restrict)

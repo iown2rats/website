@@ -25,6 +25,15 @@ export interface LikeOptions {
   db?: Db;
 }
 
+export interface PassOptions extends LikeOptions {
+  /**
+   * The pass was tapped on Likes You, on somebody who liked the actor: it is an informed "no" to that like, so the
+   * like is marked dismissed and leaves Likes You (src/server/likes/eligibility.ts, THE DISMISSAL RULE). A Discover
+   * pass never sets this — Discover does not say who has liked you, so a pass there says nothing about a like.
+   */
+  dismissIncomingLike?: boolean;
+}
+
 /**
  * Likes `targetUserId` on behalf of the actor.
  * Transaction: lock usage row → lazy reset → resolve limit → pair lock → block re-check → insert like
@@ -112,8 +121,12 @@ async function notifyLikeReceived(tx: Tx, fromUserId: string, toUserId: string, 
   if (!already) await tx.notification.create({ data: { userId: toUserId, type: "LIKE_RECEIVED", actorId: fromUserId, createdAt: now } });
 }
 
-/** Passes never consume the like allowance. Idempotent; re-passing refreshes the 30-day window. */
-export async function passUser(actor: Actor, targetUserId: string, options: LikeOptions = {}): Promise<{ created: boolean }> {
+/**
+ * Passes never consume the like allowance. Idempotent; re-passing refreshes the 30-day window. With
+ * `dismissIncomingLike` (Likes You only) the target's like on the actor is dismissed in the same transaction; it is a
+ * no-op when there is no such like, and it never touches the actor's own likes or anybody else's.
+ */
+export async function passUser(actor: Actor, targetUserId: string, options: PassOptions = {}): Promise<{ created: boolean }> {
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
   if (targetUserId === actor.userId) throw new ValidationError("You cannot pass yourself");
@@ -122,16 +135,21 @@ export async function passUser(actor: Actor, targetUserId: string, options: Like
   if (!target) throw new NotFoundError("Profile");
 
   const expiresAt = new Date(now.getTime() + PASS_TTL_MS);
-  const existing = await db.pass.findUnique({
-    where: { fromUserId_toUserId: { fromUserId: actor.userId, toUserId: targetUserId } },
-    select: { id: true },
+  return db.$transaction(async (tx) => {
+    if (options.dismissIncomingLike) {
+      await tx.like.updateMany({ where: { fromUserId: targetUserId, toUserId: actor.userId, dismissedAt: null }, data: { dismissedAt: now } });
+    }
+    const existing = await tx.pass.findUnique({
+      where: { fromUserId_toUserId: { fromUserId: actor.userId, toUserId: targetUserId } },
+      select: { id: true },
+    });
+    if (existing) {
+      await tx.pass.update({ where: { id: existing.id }, data: { createdAt: now, expiresAt, undoneAt: null } });
+      return { created: false };
+    }
+    await tx.pass.create({ data: { fromUserId: actor.userId, toUserId: targetUserId, createdAt: now, expiresAt } });
+    return { created: true };
   });
-  if (existing) {
-    await db.pass.update({ where: { id: existing.id }, data: { createdAt: now, expiresAt, undoneAt: null } });
-    return { created: false };
-  }
-  await db.pass.create({ data: { fromUserId: actor.userId, toUserId: targetUserId, createdAt: now, expiresAt } });
-  return { created: true };
 }
 
 export interface UndoResult {

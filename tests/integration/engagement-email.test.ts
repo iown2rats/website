@@ -429,12 +429,12 @@ describe("likes digest: new and eligible only", () => {
     expect(mailbox().sent).toHaveLength(1);
   });
 
-  it("counts by the Likes You rule: a like the member passed on afterwards is not counted", async () => {
+  it("counts by the Likes You rule: a like the member dismissed on Likes You is not counted", async () => {
     const target = await createUser(db, { now: T0 });
     await createIdentity(db, target.userId);
     const [kept, passed] = await plantLikes(target, 2, T0);
-    // Passed AFTER the like landed: a real "no", and Likes You no longer shows them.
-    await passUser(target, passed!.userId, { db, now: at(T0, minutes(5)) });
+    // A "no" said on Likes You: that like leaves the page, so it leaves the digest too.
+    await passUser(target, passed!.userId, { db, now: at(T0, minutes(5)), dismissIncomingLike: true });
     const now = SETTLED();
     await goAway(target, now);
 

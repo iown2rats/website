@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import type { ReactNode } from "react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AnalyticsTracker } from "@/components/features/analytics/tracker";
 import { NativeAuthListener } from "@/components/features/auth/native-auth-listener";
 import { ToastProvider } from "@/components/ui/toast";
@@ -51,6 +52,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <NativeAuthListener />
         {/* One fire-and-forget beacon per navigation (ARCHITECTURE §30.4). Renders nothing and blocks nothing. */}
         <AnalyticsTracker />
+        {/* Vercel Speed Insights: real-user Core Web Vitals, collected by a small script Vercel serves from
+            /_vercel/speed-insights (loaded after the page, never blocking it). Reports only on production. */}
+        <SpeedInsights />
       </body>
     </html>
   );

@@ -23,5 +23,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|webp|svg|ico|woff2)$).*)"],
+  // `_vercel` is Vercel's own endpoint space (Speed Insights script and its vitals beacon). Left to the proxy, a
+  // signed-out visitor's beacon would be redirected to the welcome screen like any other app route.
+  matcher: ["/((?!_next/static|_next/image|_vercel|favicon.ico|.*\\.(?:png|jpg|jpeg|webp|svg|ico|woff2)$).*)"],
 };

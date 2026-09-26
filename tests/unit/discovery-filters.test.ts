@@ -1,34 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { DISCOVERY } from "@/config/product";
-import { ageRangeTooNarrow, ageRangeWarning, moveAgeFrom, moveAgeTo, needsOwnAgeConfirmation, ownAgeOutsideRange, rememberedFriendship, resetFilterValues, showMeForMode } from "@/lib/discovery-filters";
+import { ageRangeTooNarrow, ageRangeWarning, moveAgeFrom, moveAgeTo, needsOwnAgeConfirmation, ownAgeOutsideRange, resetFilterValues } from "@/lib/discovery-filters";
 
 /* The Filters sheet's decisions (src/lib/discovery-filters.ts). The server enforces every rule regardless. */
-describe("Filters sheet: mode switching", () => {
-  it("restores each mode's own Show me across Dating → Friendship → Dating → Friendship", () => {
-    const dto = { connectionIntent: "DATING" as const, interestedIn: "WOMEN" as const, friendshipInterestedIn: "EVERYONE" as const };
-    const friendship = rememberedFriendship(dto);
-    const seq = (["FRIENDSHIP", "DATING", "FRIENDSHIP", "DATING"] as const).map((m) => showMeForMode(m, "WOMEN", friendship));
-    expect(seq).toEqual(["EVERYONE", "WOMEN", "EVERYONE", "WOMEN"]);
-  });
-
-  it("never hands the Dating-derived value to Friendship when nothing is remembered: the member is asked", () => {
-    expect(rememberedFriendship({ connectionIntent: "DATING", interestedIn: "WOMEN", friendshipInterestedIn: null })).toBeNull();
-    expect(showMeForMode("FRIENDSHIP", "WOMEN", null)).toBeNull();
-  });
-
-  it("uses the Friendship value in force when the member is already on Friendship", () => {
-    expect(rememberedFriendship({ connectionIntent: "FRIENDSHIP", interestedIn: "MEN", friendshipInterestedIn: null })).toBe("MEN");
-  });
-});
-
 describe("Filters sheet: Reset", () => {
   it("returns the age range to THE canonical default, 18–60", () => {
-    expect(resetFilterValues("DATING", "MARRIAGE")).toMatchObject({ ageMin: DISCOVERY.defaultAgeRange.min, ageMax: DISCOVERY.defaultAgeRange.max, locationScope: "ANYWHERE", intent: null });
+    expect(resetFilterValues()).toMatchObject({ ageMin: DISCOVERY.defaultAgeRange.min, ageMax: DISCOVERY.defaultAgeRange.max, locationScope: "ANYWHERE" });
     expect(DISCOVERY.defaultAgeRange).toEqual({ min: 18, max: 60 });
   });
 
-  it("on Friendship leaves the hidden Dating Looking for as it was", () => {
-    expect(resetFilterValues("FRIENDSHIP", "MARRIAGE").intent).toBe("MARRIAGE");
+  it("has no Show me and no Looking for to reset: neither is a filter any more", () => {
+    const reset = resetFilterValues();
+    expect("interestedIn" in reset).toBe(false);
+    expect("intent" in reset).toBe(false);
   });
 });
 

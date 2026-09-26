@@ -28,8 +28,6 @@ export const dobSchema = z
   }, "That date doesn't exist");
 
 export const genderSchema = z.object({ gender: z.enum(["WOMAN", "MAN", "UNSPECIFIED"]) });
-/** Friendship only: Dating derives its preference from gender and never accepts one from a request. */
-export const meetSchema = z.object({ interestedIn: z.enum(["WOMEN", "MEN", "EVERYONE"]) });
 export const connectionSchema = z.object({ connectionIntent: z.enum(["DATING", "FRIENDSHIP"]) });
 export const intentSchema = z.object({ intent: z.enum(["SERIOUS_RELATIONSHIP", "DATING", "MARRIAGE", "FIGURING_OUT"]) });
 export const locationSchema = z.object({ locationId: z.string().min(1).max(64) });

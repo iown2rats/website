@@ -164,7 +164,7 @@ describe("filters", () => {
     await db.profile.update({ where: { userId: short.userId }, data: { heightCm: 155, education: "MNU" } });
 
     const saved = await saveDiscoveryFilters(me, { connectionIntent: "DATING", interestedIn: "WOMEN", ageMin: 22, ageMax: 34, locationScope: "ANYWHERE", intent: null, heightMinCm: 175, education: "Villa" }, { db, now: T0 });
-    expect(saved).toMatchObject({ interestedIn: "WOMEN", ageMin: 22, ageMax: 34, heightMinCm: null, education: null, advancedEnabled: false });
+    expect(saved).toMatchObject({ connectionIntent: "DATING", ageMin: 22, ageMax: 34, heightMinCm: null, education: null, advancedEnabled: false });
     const row = await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } });
     expect(row.heightMinCm).toBeNull();
     expect(row.education).toBeNull();
@@ -190,7 +190,10 @@ describe("filters", () => {
     await expect(saveDiscoveryFilters(me, { ...base, interestedIn: "ROBOTS" }, { db, now: T0 })).rejects.toBeInstanceOf(ValidationError);
     const addu = await createLocation(db, { name: "Addu City", atollCode: "S" });
     const ok = await saveDiscoveryFilters(me, { ...base, locationScope: "SPECIFIC", locationId: addu.id, intent: "MARRIAGE" }, { db, now: T0 });
-    expect(ok).toMatchObject({ locationScope: "SPECIFIC", locationId: addu.id, intent: "MARRIAGE" });
+    expect(ok).toMatchObject({ locationScope: "SPECIFIC", locationId: addu.id });
+    // An old client's "Looking for" still parses, but it is not a filter and is not stored as one.
+    expect("intent" in ok).toBe(false);
+    expect((await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } })).intent).toBeNull();
     // Unknown keys (e.g. a smuggled userId) are ignored.
     await saveDiscoveryFilters(me, { ...base, userId: "someone-else" }, { db, now: T0 });
     expect(await db.discoveryPreferences.count()).toBe(1);

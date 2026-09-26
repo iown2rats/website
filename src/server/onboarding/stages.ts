@@ -1,19 +1,19 @@
 /**
  * Onboarding stages, in the prototype's order. Step 1 is authentication ("Continue with Google" or "Continue with
- * Telegram", replacing the prototype's phone + code screens) and shares the same "n / 11" progress treatment; the
- * done screen is 11.
+ * Telegram", replacing the prototype's phone + code screens) and shares the same "n / total" progress treatment.
  *
- * The flow branches once, after GENDER, on the connection intent (src/server/preferences/intent-policy.ts):
+ * The flow branches once, after CONNECTION, on the connection intent (src/server/preferences/intent-policy.ts):
  *
- *   … GENDER → CONNECTION → INTENT   → LOCATION …   for Dating     (how serious?)
- *   … GENDER → CONNECTION → MEET     → LOCATION …   for Friendship (who would you like to meet?)
+ *   … GENDER → CONNECTION → INTENT → LOCATION …   for Dating     (how serious? — 11 steps)
+ *   … GENDER → CONNECTION → LOCATION …            for Friendship (nothing to ask — 10 steps)
  *
- * Each path asks exactly one of MEET / INTENT, so both are the same length and the count stays 11 — the progress
- * treatment and the animations are untouched. That is also why the step number is computed from the path rather
- * than hard-coded per stage: a skipped stage must not leave a hole in the numbering.
+ * MEET ("Who would you like to meet?") is asked on NEITHER path any more (2026-09-26): who a member is shown follows
+ * from their gender and pool. The stage stays in the enum and in this list, because the OnboardingStage column is
+ * a database enum and members may have it stored as their pointer. Such a member is never shown it: the pointer is
+ * read through `effectiveStage`, which moves past any stage that is not on their path, so a stored MEET resumes at
+ * the next real question without anything being rewritten.
  *
- * Dating never asks who to meet, because for Dating there is one answer and a step with one answer is a step that
- * should not exist.
+ * The step number and the total are computed from the path, so a skipped stage never leaves a hole in the count.
  */
 import type { ConnectionIntent } from "@/server/preferences/intent-policy";
 
@@ -21,8 +21,8 @@ export const ONBOARDING_STAGES = ["NAME", "DOB", "GENDER", "CONNECTION", "MEET",
 export type OnboardingStageKey = (typeof ONBOARDING_STAGES)[number];
 export type StageOrComplete = OnboardingStageKey | "COMPLETE";
 
-/** The stage each path skips. Kept as data so `stagesFor` and `nextStage` cannot disagree. */
-const SKIPPED: Record<ConnectionIntent, OnboardingStageKey> = { DATING: "MEET", FRIENDSHIP: "INTENT" };
+/** The stages each path skips. Kept as data so `stagesFor` and `nextStage` cannot disagree. */
+const SKIPPED: Record<ConnectionIntent, readonly OnboardingStageKey[]> = { DATING: ["MEET"], FRIENDSHIP: ["MEET", "INTENT"] };
 
 /**
  * The stages this member actually walks. Before they have chosen an intent the Dating path is assumed, which is
@@ -30,10 +30,16 @@ const SKIPPED: Record<ConnectionIntent, OnboardingStageKey> = { DATING: "MEET", 
  */
 export function stagesFor(intent: ConnectionIntent | null): readonly OnboardingStageKey[] {
   const skipped = SKIPPED[intent ?? "DATING"];
-  return ONBOARDING_STAGES.filter((s) => s !== skipped);
+  return ONBOARDING_STAGES.filter((s) => !skipped.includes(s));
 }
 
-export const TOTAL_STEPS = 11;
+/** Auth (1) + the stages on the path + the done screen. 11 for Dating, 10 for Friendship. */
+export function totalSteps(intent: ConnectionIntent | null): number {
+  return stagesFor(intent).length + 2;
+}
+
+/** The longest path's total, for screens drawn before any intent is known. */
+export const TOTAL_STEPS = totalSteps("DATING");
 export const AUTH_STEPS = { GOOGLE: 1 } as const;
 
 export interface StageMeta {
@@ -57,7 +63,7 @@ export const STAGE_META: Record<OnboardingStageKey, StageMeta> = {
   PRIVACY: { key: "PRIVACY", slug: "privacy", title: "Privacy first", subtitle: "Set up how private you want to be before anyone sees you.", cta: "Continue" },
 };
 
-export const DONE_META = { slug: "done", step: TOTAL_STEPS, title: (name: string) => `You're ready, ${name || "there"}.`, subtitle: "", cta: "Start discovering" } as const;
+export const DONE_META = { slug: "done", title: (name: string) => `You're ready, ${name || "there"}.`, subtitle: "", cta: "Start discovering" } as const;
 
 /** The "n" in "n / 11" for this stage on this path. Auth is 1, so the first stage is 2. */
 export function stepNumber(stage: OnboardingStageKey, intent: ConnectionIntent | null): number {
@@ -97,9 +103,21 @@ export function slugForStage(stage: StageOrComplete): string {
   return stage === "COMPLETE" ? DONE_META.slug : STAGE_META[stage].slug;
 }
 
+/**
+ * The pointer as the member's path sees it. A stored stage that is not on their path — MEET, which no path asks any
+ * more — resolves to the next stage that is, so a member parked there is never stuck on (or bounced between) a
+ * question that no longer exists. Read-only: nothing is written to make this true, and the next save moves the
+ * stored pointer on as usual.
+ */
+export function effectiveStage(pointer: StageOrComplete, intent: ConnectionIntent | null): StageOrComplete {
+  if (pointer === "COMPLETE" || isOnPath(pointer, intent)) return pointer;
+  const path = stagesFor(intent);
+  return path.find((s) => stageIndex(s) > stageIndex(pointer)) ?? "COMPLETE";
+}
+
 /** The furthest stage a user may open. A stage beyond the pointer redirects here. */
-export function resumeSlug(pointer: StageOrComplete): string {
-  return slugForStage(pointer);
+export function resumeSlug(pointer: StageOrComplete, intent: ConnectionIntent | null = null): string {
+  return slugForStage(effectiveStage(pointer, intent));
 }
 
 /** Has the user reached (saved through) `stage`? */

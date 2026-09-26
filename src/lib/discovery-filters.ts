@@ -5,32 +5,13 @@
  */
 import { DISCOVERY } from "@/config/product";
 
-type InterestedIn = "WOMEN" | "MEN" | "EVERYONE";
-type Mode = "DATING" | "FRIENDSHIP";
-
-/** The Friendship "Show me" to restore: the remembered answer, or the one in force when they are on Friendship now. */
-export function rememberedFriendship(f: { connectionIntent: Mode; interestedIn: InterestedIn; friendshipInterestedIn: InterestedIn | null }): InterestedIn | null {
-  return f.friendshipInterestedIn ?? (f.connectionIntent === "FRIENDSHIP" ? f.interestedIn : null);
-}
-
-/**
- * What "Show me" becomes on a switch into `mode`. Each mode restores its OWN value: Dating's is derived from gender
- * and never chosen; Friendship's is the member's remembered answer, never the Dating-derived one (the bug this
- * replaces saved a man's derived "Women" as his Friendship answer the first time he switched).
- */
-export function showMeForMode(mode: Mode, datingInterestedIn: "WOMEN" | "MEN" | null, friendship: InterestedIn | null): InterestedIn | null {
-  return mode === "DATING" ? datingInterestedIn : friendship;
-}
-
-/** What Reset returns the filters to. The mode and its "Show me" are not filters, so the caller keeps them. */
-export function resetFilterValues<I extends string>(mode: Mode, currentIntent: I | null) {
+/** What Reset returns the filters to. The pool (Dating / Friendship) is not a filter, so the caller keeps it. */
+export function resetFilterValues() {
   return {
     ageMin: DISCOVERY.defaultAgeRange.min,
     ageMax: DISCOVERY.defaultAgeRange.max,
     locationScope: "ANYWHERE" as const,
     locationId: null,
-    // On Friendship the Dating "Looking for" is hidden and kept for a switch back, so Reset leaves it alone.
-    intent: mode === "DATING" ? null : currentIntent,
     heightMinCm: null,
     heightMaxCm: null,
     education: null,

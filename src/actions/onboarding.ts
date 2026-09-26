@@ -14,7 +14,6 @@ import {
   saveDateOfBirth,
   saveGender,
   saveIntent,
-  saveInterestedIn,
   saveLocation,
   saveName,
   savePrivacy,
@@ -85,16 +84,6 @@ export async function submitConnectionIntent(_prev: StageFormState, formData: Fo
     return friendly(e);
   }
   return goNext(actor, "CONNECTION");
-}
-
-export async function submitMeet(_prev: StageFormState, formData: FormData): Promise<StageFormState> {
-  const actor = await requireMember();
-  try {
-    await saveInterestedIn(actor, { interestedIn: formData.get("interestedIn") });
-  } catch (e) {
-    return friendly(e);
-  }
-  return goNext(actor, "MEET");
 }
 
 export async function submitIntent(_prev: StageFormState, formData: FormData): Promise<StageFormState> {

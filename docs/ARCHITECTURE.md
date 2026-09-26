@@ -236,7 +236,7 @@ Every failure returns the same nothing. Tested in `tests/integration/android-han
 
 ### 4.3 Age gate and onboarding state (as built)
 
-- Onboarding progress is a named pointer, `User.onboardingStage` (`NAME → DOB → GENDER → MEET → INTENT → LOCATION → PHOTOS → ABOUT → PRIVACY → COMPLETE`), never a numeric step. Each stage saves immediately and advances the pointer only forwards; going back and editing never moves it backwards; `COMPLETE` is set only by `completeOnboarding`, which re-validates every required field and the age on the server before switching the account to `ACTIVE`. `/onboarding` resumes at the pointer; a URL for a later stage redirects to it.
+- Onboarding progress is a named pointer, `User.onboardingStage` (`NAME → DOB → GENDER → CONNECTION → [MEET] → INTENT → LOCATION → PHOTOS → ABOUT → PRIVACY → COMPLETE`; MEET stays in the enum but no path asks it, and INTENT is Dating only — §7.5), never a numeric step. Each stage saves immediately and advances the pointer only forwards; going back and editing never moves it backwards; `COMPLETE` is set only by `completeOnboarding`, which re-validates every required field and the age on the server before switching the account to `ACTIVE`. `/onboarding` resumes at the pointer; a URL for a later stage redirects to it.
 - Date of birth is validated as a real calendar date and `ageFromDateOfBirth(dob, now) >= 18` on the server (UTC, tested at exactly 18 and 17 years 364 days). A refused date is never stored. DOB lives only on `User.dateOfBirth`; profile DTOs expose the derived `age` and the owner's onboarding data exposes day/month/year only to the owner.
 - Required to finish: name, DOB, gender, who to meet, intention, location and at least two non-rejected photos. Bio, interests, prompts and verification are optional and feed the completion percentage (`src/server/profiles/completion.ts`, single source of truth for both the onboarding "done" screen and the Profile ring).
 
@@ -304,12 +304,12 @@ One SQL predicate, built from fragments in `src/server/discovery/predicate.ts` a
 
 `compatibilitySql` (mutual, independent of the viewer's optional filters):
 
-5. V's "Show me" includes U's gender **and** U's "Show me" includes V's gender. `WOMEN` matches `WOMAN`, `MEN` matches `MAN`, `EVERYONE` matches all three; "Prefer not to say" (`UNSPECIFIED`) is therefore shown only to, and can only see, people who chose Everyone. Nothing assumes heterosexual pairs.
+5. Same pool (`connectionIntent`), then gender by pool (2026-09-26, §7.5): **Dating** is Woman ↔ Man only, so a legacy "Prefer not to say" (`UNSPECIFIED`) member has no Dating match either way; **Friendship** has no gender clause at all — every member of the pool, of any stored gender, is compatible with every other. The stored "Show me" (`interestedIn` / `friendshipInterestedIn`) is read by no discovery query (a test asserts none of the generated SQL mentions it).
 6. U has a date of birth. **U's own age range is not read here or anywhere else in a visibility query**: an age range is one-way — it decides who its owner sees (rule 7), never who can see them. (It was mutual until 2026-09-25; see §7.6.)
 
 `viewerFilterSql` (V's own filters, stored on `DiscoveryPreferences`):
 
-7. U's age (`date_part('year', age(now, dob))`) within V's `ageMin–ageMax` — the only place age applies; the Dating-only "Looking for" (`p.intent = V.intent`, applied **only when V is on Dating** — §7.6); location scope `ANYWHERE` | `GREATER_MALE` (`Location.isGreaterMale`) | `MY_ATOLL` (V's own `atollCode`) | `SPECIFIC` (`locationId`; an `ATOLL` row also matches every island and city with that `atollCode`). Island/atoll only: there are no coordinates or distances anywhere in the schema or the API.
+7. U's age (`date_part('year', age(now, dob))`) within V's `ageMin–ageMax` — the only place age applies; location scope `ANYWHERE` | `GREATER_MALE` (`Location.isGreaterMale`) | `MY_ATOLL` (V's own `atollCode`) | `SPECIFIC` (`locationId`; an `ATOLL` row also matches every island and city with that `atollCode`). Island/atoll only: there are no coordinates or distances anywhere in the schema or the API.
 8. Advanced filters (height range, education substring) are applied **only when V holds `canUseAdvancedFilters`**; stored values are inert otherwise, and `saveDiscoveryFilters` refuses to store them for Free users in the first place.
 
 `notSwipedSql`: no Like from V to U, no unexpired un-undone Pass (30 days, `PASS_TTL_MS`), and no Match row between the pair in any status.
@@ -327,7 +327,7 @@ The browser receives `DiscoveryCardDto` (`src/server/discovery/dto.ts`) built fr
 
 ### 7.4 Filters UI
 
-The prototype's Filters sheet (age range sliders, Show me, Location chips, Looking for chips, Premium "Advanced filters" group, Apply) is a `ResponsiveDialog` (sheet on phones, modal on desktop) and persists to `DiscoveryPreferences` through `saveFilters`. Advanced filters offered are Height and Education, the two the profile stores; the prototype also lists Occupation and Interests, which have no filterable data model yet and are not shown.
+The Filters sheet (I'm here for — Dating / Friendship with a one-line explainer of who each shows, age range sliders, Location chips, Plus "Advanced filters" group, Apply; "Show me" and "Looking for" were removed on 2026-09-26, §7.5) is a `ResponsiveDialog` (sheet on phones, modal on desktop) and persists to `DiscoveryPreferences` through `saveFilters`. Advanced filters offered are Height and Education, the two the profile stores; the prototype also lists Occupation and Interests, which have no filterable data model yet and are not shown.
 
 ### 7.6 Discovery ↔ onboarding consistency (2026-09-25)
 
@@ -344,10 +344,9 @@ the audit found the model disagreeing with itself elsewhere). Tests: `tests/inte
   `saveDiscoveryFilters` ignores a submitted one and keeps the stored one, the Filters sheet and Settings summary do
   not draw the section, Edit profile neither shows nor requires it, and `buildVisibleProfiles` — the one place every
   card, full profile, Likes You tile and match screen is built — sends `intent: null` for a Friendship member.
-- **Friendship → Dating** needs the member's own answer: the sheet asks "What are you looking for?" inline (`myIntent`)
-  and the server refuses the switch without one. It never overwrites an existing answer (Edit profile does that).
-- **"Show me" per mode.** The sheet restores `friendshipInterestedIn` on a switch into Friendship and the gender-derived
-  value on Dating (`src/lib/discovery-filters.ts`); it previously saved the Dating-derived value as the Friendship answer.
+- **Friendship → Dating** offers "What are you looking for? (optional)" inline (`myIntent`) when the member has no
+  answer; since 2026-09-26 it is optional and the switch never waits on it. It never overwrites an existing answer.
+- **"Show me" per mode** — superseded 2026-09-26: there is no Show me control (§7.5).
 - **"Prefer not to say".** Dating needs a woman and a man. The Dating choice is disabled with an explanation in
   onboarding and in the sheet; a Dating member cannot change their gender to "Prefer not to say" (Edit profile, or the
   onboarding GENDER step once Dating was chosen). Existing rows in that state are not rewritten.
@@ -368,8 +367,9 @@ the audit found the model disagreeing with itself elsewhere). Tests: `tests/inte
   narrower than that before the fix loads as it is and Apply waits, saying why, until the member widens it. When the
   member changes the range to one that leaves out their own age, Apply asks "Save it anyway?" first; confirming saves
   exactly what they chose, cancelling saves nothing.
-- **Admin.** User detail has a read-only Discovery preferences panel (pool, both Show me values, age range and whether
-  it excludes their own age, scope, Dating Looking for only on Dating, discoverability).
+- **Admin.** User detail has a read-only Discovery preferences panel (pool, the stored legacy Show me values labelled
+  "not used by discovery", age range and whether it excludes their own age, scope, legacy Looking for when set,
+  discoverability).
 - **QA cohort.** `scripts/qa-visibility-sql.ts` is the hand-written matrix; a test runs it beside the real deck query
   and fails on any pair where they disagree.
 
@@ -1365,6 +1365,33 @@ through exactly the rule dating uses.
 moves a Dating preference with it and leaves a Friendship one alone: who you want to be friends with does not
 change because you corrected your own gender. Friendship → Dating enforces the derived value; Dating → Friendship
 asks rather than inheriting.
+
+### Redesign: the pool decides who you see (2026-09-26)
+
+Supersedes the "gender preference" row above and the MEET branch. Tests: `tests/integration/discovery-pools.test.ts`
+(the full matrix), plus the updated `connection-intent`, `discovery`, `discovery-consistency` and `onboarding` suites.
+
+- **Rules.** Dating = opposite gender in the Dating pool. Friendship = everyone in the Friendship pool; gender plays
+  no part. The pools never mix. Nothing else about gender is a choice.
+- **"Show me" is gone** from onboarding (MEET), the Filters sheet, Settings, the predicate, `scripts/qa-visibility-sql.ts`,
+  empty-deck counts and Undo (all of which share `compatibilitySql`). `interestedIn` / `friendshipInterestedIn` stay
+  stored for backwards compatibility and are never read by discovery and never written again: switching pool or
+  changing gender writes only the pool or the gender, and a new row takes the column default. A stale value sent by
+  an older client parses and is ignored.
+- **Relationship intention is never a filter.** `Profile.intent` is still asked on the Dating path and shown on
+  profiles, but no visibility query reads it (`loadViewerContext` returns none; a test asserts the SQL never mentions
+  it). A null answer hides nobody. The stored `DiscoveryPreferences.intent` ("Looking for") is kept and not read.
+- **Onboarding**: `GENDER (Woman / Man) → CONNECTION → INTENT → LOCATION …` for Dating (11 steps) and
+  `GENDER → CONNECTION → LOCATION …` for Friendship (10 steps). `totalSteps(intent)` drives the "n / total".
+  MEET stays in the `OnboardingStage` database enum (no migration); a member whose stored pointer is MEET is read
+  through `effectiveStage`, which resolves to the next stage on their path, so they resume at "intention" (Dating) or
+  "location" (Friendship) and are never bounced to a removed page. Nothing is rewritten to make that true.
+- **"Prefer not to say"** is no longer offered to anyone who does not already hold it (onboarding GENDER and Edit
+  profile, `assertGenderSelectable` / `selectableGenders`). Existing holders keep it (it is never changed or inferred):
+  on Dating they have no gender match either way, as before; on Friendship they are ordinary members of the pool and
+  see, and are seen by, everyone in it.
+- **Unchanged**: one-way age (viewer's own range only), the 3-year minimum span, location scope, Plus advanced
+  filters, blocks, contact hashes, Invisible Mode, visibility/pause, photo moderation, the pool guard on likes.
 
 ## 26. The Welcome Screen cover (2026-09-20)
 

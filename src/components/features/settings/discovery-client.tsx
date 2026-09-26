@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { saveFilters } from "@/actions/discovery";
-import { CONNECTION_INTENT_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
+import { CONNECTION_INTENT_LABELS } from "@/constants/labels";
 import { FiltersSheet, type FiltersDraft, type LocationOption } from "@/components/features/discovery/filters-sheet";
 import { ageRangeWarning } from "@/lib/discovery-filters";
 import { PlusTag } from "@/components/ui/badge";
@@ -46,11 +46,8 @@ export function DiscoveryClient({ initial, locations }: { initial: DiscoveryFilt
       <p className="text-body-sm text-text-secondary">Who you see in Discover. These are the same preferences as the Filters button on Discover.</p>
       <ListGroup>
         <ListRow asDiv label="I’m here for" meta={CONNECTION_INTENT_LABELS[filters.connectionIntent]} />
-        <ListRow asDiv label="Show me" meta={INTERESTED_IN_LABELS[filters.interestedIn]} />
         <ListRow asDiv label="Age range" meta={`${filters.ageMin}–${filters.ageMax}`} />
         <ListRow asDiv label="Location" meta={locationName} />
-        {/* Dating only: on Friendship the stored "Looking for" is kept for a switch back, and is neither shown nor applied. */}
-        {filters.connectionIntent === "DATING" ? <ListRow asDiv label="Looking for" meta={filters.intent ? INTENT_LABELS[filters.intent] : "Any"} /> : null}
         <ListRow asDiv label={<span className="flex items-center gap-2">Height <PlusTag size="xs" /></span>} meta={filters.advancedEnabled ? (filters.heightMinCm || filters.heightMaxCm ? `${filters.heightMinCm ?? "…"}–${filters.heightMaxCm ?? "…"} cm` : "Any") : "Mellocrush Plus"} />
         <ListRow asDiv label={<span className="flex items-center gap-2">Education <PlusTag size="xs" /></span>} meta={filters.advancedEnabled ? (filters.education || "Any") : "Mellocrush Plus"} />
       </ListGroup>

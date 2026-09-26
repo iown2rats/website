@@ -163,10 +163,10 @@ describe("profile photos", () => {
 
 describe("discovery settings", () => {
   it("persists basic preferences for Free users and discards premium fields they submit", async () => {
-    // A man on Dating: "Show me" resolves to WOMEN from his gender, not from the submitted value.
+    // An older client may still send Show me and Looking for; both parse and neither is a filter.
     const me = await createUser(db, { now: T0, gender: "MAN" });
     const saved = await saveDiscoveryFilters(me, { connectionIntent: "DATING", interestedIn: "WOMEN", ageMin: 24, ageMax: 31, locationScope: "GREATER_MALE", intent: "DATING", heightMinCm: 170, heightMaxCm: 190, education: "Villa" }, { db, now: T0 });
-    expect(saved).toMatchObject({ interestedIn: "WOMEN", ageMin: 24, ageMax: 31, locationScope: "GREATER_MALE", intent: "DATING", advancedEnabled: false });
+    expect(saved).toMatchObject({ connectionIntent: "DATING", ageMin: 24, ageMax: 31, locationScope: "GREATER_MALE", advancedEnabled: false });
     const row = await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } });
     expect(row.heightMinCm).toBeNull();
     expect(row.education).toBeNull();

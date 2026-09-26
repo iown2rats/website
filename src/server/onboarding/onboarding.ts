@@ -7,21 +7,14 @@ import type { Db, DbLike } from "@/lib/db";
 import { getDb } from "@/lib/db";
 import { InvalidStateError, ValidationError } from "@/lib/errors";
 import { ageFromDateOfBirth, isAdult, MINIMUM_AGE } from "@/lib/age";
-import { aboutSchema, connectionSchema, dobSchema, genderSchema, intentSchema, locationSchema, meetSchema, nameSchema, privacySchema } from "@/lib/validation/onboarding";
+import { aboutSchema, connectionSchema, dobSchema, genderSchema, intentSchema, locationSchema, nameSchema, privacySchema } from "@/lib/validation/onboarding";
 import type { Actor } from "@/server/actor";
 import { computeCompletion, type CompletionResult } from "@/server/profiles/completion";
 import { generateHandle } from "@/server/users/account";
 import { countActivePhotos } from "@/server/photos/photos";
-import {
-  assertGenderFitsIntent,
-  parseConnectionIntent,
-  parseFriendshipInterestedIn,
-  resolveAfterGenderChange,
-  resolvePreferences,
-  type ConnectionIntent,
-} from "@/server/preferences/intent-policy";
+import { assertGenderFitsIntent, assertGenderSelectable, assertPoolAllowed, parseConnectionIntent, type ConnectionIntent } from "@/server/preferences/intent-policy";
 import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
-import { hasReached, nextStage, stageIndex, type OnboardingStageKey, type StageOrComplete } from "./stages";
+import { effectiveStage, hasReached, nextStage, stageIndex, type OnboardingStageKey, type StageOrComplete } from "./stages";
 
 export interface OnboardingData {
   stage: StageOrComplete;
@@ -29,10 +22,7 @@ export interface OnboardingData {
   dob: { day: number; month: number; year: number } | null;
   age: number | null;
   gender: "WOMAN" | "MAN" | "UNSPECIFIED" | null;
-  interestedIn: "WOMEN" | "MEN" | "EVERYONE" | null;
   connectionIntent: ConnectionIntent | null;
-  /** The member's own Friendship answer, so the MEET step prefills it rather than the derived Dating value. */
-  friendshipInterestedIn: "WOMEN" | "MEN" | "EVERYONE" | null;
   intent: "SERIOUS_RELATIONSHIP" | "DATING" | "MARRIAGE" | "FIGURING_OUT" | null;
   locationId: string | null;
   locationName: string | null;
@@ -53,7 +43,7 @@ export async function getOnboardingData(actor: Actor, deps: { db?: Db } = {}): P
       onboardingStage: true,
       dateOfBirth: true,
       gender: true,
-      discoveryPreferences: { select: { interestedIn: true, connectionIntent: true, friendshipInterestedIn: true } },
+      discoveryPreferences: { select: { connectionIntent: true } },
       privacy: { select: { hideLocation: true, hideAge: true } },
       verification: { select: { status: true } },
       profile: {
@@ -72,24 +62,20 @@ export async function getOnboardingData(actor: Actor, deps: { db?: Db } = {}): P
   const activePhotoCount = await countActivePhotos(db, actor.userId);
   // The pointer moves past CONNECTION only once an intent is saved, so anything earlier has not chosen one yet.
   const chosenIntent = hasReached(user.onboardingStage, "MEET") ? (user.discoveryPreferences?.connectionIntent ?? null) : null;
-  // "Who do you want to meet" counts as answered once the branch that asks it is behind them. Dating never asks,
-  // and is complete the moment the intent is saved, because the answer is derived from the gender.
-  const reachedMeet = chosenIntent === "DATING" ? true : hasReached(user.onboardingStage, "LOCATION");
+  // A stored pointer that is not on this member's path (MEET, which no path asks any more) reads as the next stage
+  // that is, so resuming, routing and completion all agree and nobody is parked on a removed question.
+  const stage = effectiveStage(user.onboardingStage, chosenIntent);
   /*
-   * And the mirror image, which was missing and made Friendship onboarding IMPOSSIBLE TO FINISH.
+   * Who a member is shown follows from gender and pool, so choosing the pool IS the whole answer: there is no
+   * "who would you like to meet" left to be missing once the intent is saved.
    *
-   * The flow branches after CONNECTION: Dating is asked INTENT ("how serious?") and skips MEET; Friendship is
-   * asked MEET ("who would you like to meet?") and skips INTENT. `Profile.intent` is written only by the INTENT
-   * stage — so for a Friendship member it is null forever, not because they failed to answer but because they
-   * were never asked. `computeCompletion` nonetheless required it, so every Friendship member reached the last
-   * screen and was told "Please finish: intent", with no screen left that could set it. Every one of them was
-   * stuck, permanently, and the pointer stayed on PRIVACY because `advance` stops there.
-   *
-   * So a skipped question counts as answered once the stage that would have asked it is behind them, which is
-   * exactly the rule `reachedMeet` above already applies to the other branch. Both paths now say the same thing:
-   * the question this path does not ask is not a question this path is missing.
+   * Friendship is not asked INTENT ("how serious?") either. `Profile.intent` is written only by that stage, so a
+   * skipped question counts as answered once the stage that would have asked it is behind them — without this,
+   * every Friendship member reached the last screen and was told "Please finish: intent" with no screen left that
+   * could set it.
    */
-  const reachedIntent = chosenIntent === "FRIENDSHIP" ? hasReached(user.onboardingStage, "LOCATION") : Boolean(user.profile?.intent);
+  const reachedMeet = chosenIntent !== null;
+  const reachedIntent = chosenIntent === "FRIENDSHIP" ? hasReached(stage, "LOCATION") : Boolean(user.profile?.intent);
   const dob = user.dateOfBirth;
   const completion = computeCompletion({
     hasName: Boolean(user.profile?.displayName),
@@ -105,14 +91,12 @@ export async function getOnboardingData(actor: Actor, deps: { db?: Db } = {}): P
     verified: user.verification?.status === "VERIFIED",
   });
   return {
-    stage: user.onboardingStage,
+    stage,
     name: user.profile?.displayName ?? null,
     dob: dob ? { day: dob.getUTCDate(), month: dob.getUTCMonth() + 1, year: dob.getUTCFullYear() } : null,
     age: dob ? ageFromDateOfBirth(dob) : null,
     gender: user.gender,
-    interestedIn: reachedMeet ? (user.discoveryPreferences?.interestedIn ?? null) : null,
     connectionIntent: chosenIntent,
-    friendshipInterestedIn: user.discoveryPreferences?.friendshipInterestedIn ?? null,
     intent: user.profile?.intent ?? null,
     locationId: user.profile?.locationId ?? null,
     locationName: user.profile?.location?.name ?? null,
@@ -171,16 +155,18 @@ export async function saveDateOfBirth(actor: Actor, input: unknown, deps: { db?:
 /**
  * Gender, and the preference that follows from it.
  *
- * Changing gender is not answering a preference question, so on Dating the derived preference is recomputed and on
- * Friendship the member's own answer is left alone — see `resolveAfterGenderChange`. A member who has not reached
+ * Who a member sees follows from gender and pool, so nothing else is written here: the stored legacy "Show me" is
+ * never touched. A member who has not reached
  * the intent step yet has no preference row to reconcile, and the CONNECTION step will settle it.
  */
 export async function saveGender(actor: Actor, input: unknown, deps: { db?: Db } = {}): Promise<void> {
   const db = deps.db ?? getDb();
   const { gender } = parse(genderSchema.safeParse(input));
+  const current = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { gender: true } });
+  // Woman or Man for new answers; a legacy "Prefer not to say" may be kept, never newly chosen.
+  assertGenderSelectable(gender, current.gender);
   await assertGenderFitsChosenIntent(db, actor.userId, gender);
   await db.user.update({ where: { id: actor.userId }, data: { gender } });
-  await reconcilePreferencesForGender(db, actor.userId, gender);
   await advance(db, actor.userId, "GENDER");
 }
 
@@ -202,84 +188,22 @@ export async function assertGenderFitsChosenIntent(db: DbLike, userId: string, g
 }
 
 /**
- * Re-derives the stored preference after a gender change, wherever gender is edited. Silent when the member has no
- * preferences yet, and silent when the new gender cannot date — that combination is refused at the point where the
- * member actually chooses Dating, not by rejecting a gender they are entitled to state.
- */
-export async function reconcilePreferencesForGender(db: DbLike, userId: string, gender: "WOMAN" | "MAN" | "UNSPECIFIED"): Promise<void> {
-  const prefs = await db.discoveryPreferences.findUnique({
-    where: { userId },
-    select: { connectionIntent: true, friendshipInterestedIn: true },
-  });
-  if (!prefs) return;
-  let resolved;
-  try {
-    resolved = resolveAfterGenderChange({ gender, connectionIntent: prefs.connectionIntent, friendshipInterestedIn: prefs.friendshipInterestedIn });
-  } catch {
-    // Dating with a gender that has no opposite, or Friendship with no answer yet: leave the row as it is and let
-    // the intent step ask. Rewriting it here would change a preference the member never touched.
-    return;
-  }
-  await db.discoveryPreferences.update({ where: { userId }, data: { interestedIn: resolved.interestedIn } });
-}
-
-/**
- * The connection intent. Dating settles its own preference here, which is why Dating never sees a "looking for"
- * step; Friendship reuses the remembered answer when there is one and is asked on the next step when there is not.
+ * The connection intent — the whole of "who will I see": Dating is opposite gender, Friendship everyone in the pool. Nothing
+ * further is asked about it; Dating goes on to "how serious?", Friendship straight to location.
  */
 export async function saveConnectionIntent(actor: Actor, input: unknown, deps: { db?: Db } = {}): Promise<void> {
   const db = deps.db ?? getDb();
   const { connectionIntent } = parse(connectionSchema.safeParse(input));
   const intent = parseConnectionIntent(connectionIntent);
-  const [user, prefs] = await Promise.all([
-    db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { gender: true } }),
-    db.discoveryPreferences.findUnique({ where: { userId: actor.userId }, select: { friendshipInterestedIn: true, interestedIn: true } }),
-  ]);
-  const remembered = prefs?.friendshipInterestedIn ?? null;
-
-  if (intent === "FRIENDSHIP" && !remembered) {
-    // No answer yet: record the intent and let the MEET step ask. `interestedIn` keeps whatever it held, which is
-    // inert until the answer arrives because the pointer has not passed MEET.
-    await db.discoveryPreferences.upsert({
-      where: { userId: actor.userId },
-      create: { userId: actor.userId, connectionIntent: intent, ...DEFAULT_AGE_PREFERENCES },
-      update: { connectionIntent: intent },
-    });
-    await advance(db, actor.userId, "CONNECTION");
-    return;
-  }
-
-  const resolved = resolvePreferences({ gender: user.gender, connectionIntent: intent, friendshipInterestedIn: remembered });
+  const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { gender: true } });
+  assertPoolAllowed(user.gender, intent);
+  // Only the pool is written. The legacy "Show me" columns keep their stored value (or the column default).
   await db.discoveryPreferences.upsert({
     where: { userId: actor.userId },
-    create: { userId: actor.userId, ...resolved, ...DEFAULT_AGE_PREFERENCES },
-    update: resolved,
+    create: { userId: actor.userId, connectionIntent: intent, ...DEFAULT_AGE_PREFERENCES },
+    update: { connectionIntent: intent },
   });
   await advance(db, actor.userId, "CONNECTION");
-}
-
-/**
- * The Friendship answer. Dating does not reach this step, and a Dating member who posts to it anyway is refused:
- * the preference for Dating is derived, never submitted.
- */
-export async function saveInterestedIn(actor: Actor, input: unknown, deps: { db?: Db } = {}): Promise<void> {
-  const db = deps.db ?? getDb();
-  const { interestedIn } = parse(meetSchema.safeParse(input));
-  const choice = parseFriendshipInterestedIn(interestedIn);
-  const [user, prefs] = await Promise.all([
-    db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { gender: true } }),
-    db.discoveryPreferences.findUnique({ where: { userId: actor.userId }, select: { connectionIntent: true } }),
-  ]);
-  if ((prefs?.connectionIntent ?? "DATING") !== "FRIENDSHIP") {
-    throw new ValidationError("Dating shows you the opposite gender, so there is nothing to choose here.");
-  }
-  const resolved = resolvePreferences({ gender: user.gender, connectionIntent: "FRIENDSHIP", friendshipInterestedIn: choice });
-  await db.discoveryPreferences.upsert({
-    where: { userId: actor.userId },
-    create: { userId: actor.userId, ...resolved, ...DEFAULT_AGE_PREFERENCES },
-    update: resolved,
-  });
-  await advance(db, actor.userId, "MEET");
 }
 
 export async function saveIntent(actor: Actor, input: unknown, deps: { db?: Db } = {}): Promise<void> {

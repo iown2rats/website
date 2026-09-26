@@ -24,16 +24,10 @@ export interface ViewerContext {
   /** Null when the viewer has not added a phone number: only their own hidden-contacts list applies then. */
   phoneHash: Uint8Array | null;
   gender: "WOMAN" | "MAN" | "UNSPECIFIED" | null;
-  interestedIn: "WOMEN" | "MEN" | "EVERYONE";
   /** Dating and Friendship are separate pools; see `intentCompatibilitySql`. */
   connectionIntent: "DATING" | "FRIENDSHIP";
   ageMin: number;
   ageMax: number;
-  /**
-   * The Dating "Looking for" filter. Null whenever it does not apply — in particular always null on Friendship,
-   * where a stored value is kept for a switch back but must never narrow the deck (`datingFieldsApply`).
-   */
-  intent: string | null;
   locationScope: "ANYWHERE" | "GREATER_MALE" | "MY_ATOLL" | "SPECIFIC";
   locationId: string | null;
   atollCode: string | null;
@@ -165,17 +159,19 @@ export function intentCompatibilitySql(v: ViewerContext): Prisma.Sql {
 }
 
 /**
- * Gender compatibility, which is a different rule in each pool.
+ * Gender compatibility, which is automatic from each member's own gender and pool (2026-09-26). Nobody chooses
+ * who to be shown any more: the old "Show me: Women / Men / Everyone" answer is not a discovery control.
  *
- * DATING is strictly opposite gender, and that is expressed here as the rule itself rather than by comparing the
- * two stored `interestedIn` values. The stored value is derived from gender on every write, so for a row written
- * under the current policy the two formulations agree — but rows predating the policy exist, and a stale one must
- * not be able to widen anybody's deck. Stating the rule directly means it holds for every row, whatever is stored:
- * a man is shown women and a woman men, full stop, and "Prefer not to say" falls out of Dating discovery on both
- * sides because it satisfies neither branch. Nothing is rewritten to make this true.
+ * DATING is strictly opposite gender: a man is shown women and a woman men, full stop. It is stated as the rule
+ * itself, never by comparing stored preferences, so no stored value — current or stale — can widen or narrow a
+ * Dating deck. "Prefer not to say" satisfies neither branch and so has no Dating discovery on either side, exactly
+ * as before; that is a product decision this rule does not take (docs/ARCHITECTURE.md §7.5).
  *
- * FRIENDSHIP is the reciprocal preference check, where `interestedIn` IS the member's own answer and both
- * directions must agree ("Prefer not to say" is only shown to people who chose Everyone, in both directions).
+ * FRIENDSHIP has no gender rule at all: every member of the pool — Woman, Man or a legacy "Prefer not to say" — is
+ * compatible with every other, subject to the normal visibility, filter and safety rules.
+ *
+ * The stored "Show me" (`DiscoveryPreferences.interestedIn`) is kept for backwards compatibility and is read by no
+ * visibility query, for either pool.
  */
 export function genderCompatibilitySql(v: ViewerContext): Prisma.Sql {
   const viewerGender = v.gender ?? "UNSPECIFIED";
@@ -185,16 +181,7 @@ export function genderCompatibilitySql(v: ViewerContext): Prisma.Sql {
       OR (u.gender = 'MAN' AND ${viewerGender} = 'WOMAN')
     )`;
   }
-  return Prisma.sql`(
-      ${v.interestedIn} = 'EVERYONE'
-      OR (u.gender = 'WOMAN' AND ${v.interestedIn} = 'WOMEN')
-      OR (u.gender = 'MAN' AND ${v.interestedIn} = 'MEN')
-    )
-    AND (
-      cp."interestedIn" = 'EVERYONE'
-      OR (${viewerGender} = 'WOMAN' AND cp."interestedIn" = 'WOMEN')
-      OR (${viewerGender} = 'MAN' AND cp."interestedIn" = 'MEN')
-    )`;
+  return Prisma.sql`TRUE`;
 }
 
 /**
@@ -213,19 +200,19 @@ export function compatibilitySql(v: ViewerContext): Prisma.Sql {
 }
 
 /**
- * The viewer's own filters: age range, the Dating "Looking for", location scope, and (Plus only) advanced filters.
- * The age range is applied here and only here — to the candidate's age, from the viewer's range. It is one-way.
+ * The viewer's own filters: age range, location scope, and (Plus only) advanced filters. The age range is applied
+ * here and only here — to the candidate's age, from the viewer's range. It is one-way.
  *
- * "Looking for" is a romantic question and belongs to Dating alone (src/server/preferences/intent-policy.ts
- * `datingFieldsApply`). `loadViewerContext` already hands a Friendship viewer a null intent; the pool check here is
- * the second lock on the same door, so a context built any other way still cannot let a hidden dating value narrow a
- * Friendship deck — and a candidate's `Profile.intent` is never consulted for Friendship at all.
+ * Relationship intention ("Marriage", "Serious relationship", "Dating", "Still figuring it out") is deliberately NOT
+ * a filter (2026-09-26). It is shown on the profile, but an exact match between the viewer's "Looking for" and the
+ * candidate's answer used to hide otherwise compatible Dating members from each other — and a member with no answer
+ * from everybody who had set one. Neither `DiscoveryPreferences.intent` nor `Profile.intent` is read by any
+ * visibility query; both stay stored as they are.
  */
 export function viewerFilterSql(v: ViewerContext, now: Date): Prisma.Sql {
   const parts: Prisma.Sql[] = [
     Prisma.sql`date_part('year', age(${now}::timestamp, u."dateOfBirth"::timestamp)) BETWEEN ${v.ageMin} AND ${v.ageMax}`,
   ];
-  if (v.connectionIntent === "DATING" && v.intent) parts.push(Prisma.sql`p.intent = ${v.intent}::"RelationshipIntent"`);
 
   switch (v.locationScope) {
     case "GREATER_MALE":

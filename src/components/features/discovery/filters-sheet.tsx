@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { CONNECTION_INTENT_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
+import { CONNECTION_INTENT_LABELS, INTENT_LABELS } from "@/constants/labels";
 import { DISCOVERY } from "@/config/product";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
@@ -11,23 +11,20 @@ import { Input, Select } from "@/components/ui/field";
 import { LockIcon } from "@/components/ui/icons";
 import { PlusTag } from "@/components/ui/badge";
 import type { DiscoveryFiltersDto } from "@/server/discovery/filters";
-import { AGE_RANGE_TOO_NARROW, ageRangeTooNarrow, ageRangeWarning, moveAgeFrom, moveAgeTo, needsOwnAgeConfirmation, rememberedFriendship, resetFilterValues, showMeForMode } from "@/lib/discovery-filters";
+import { AGE_RANGE_TOO_NARROW, ageRangeTooNarrow, ageRangeWarning, moveAgeFrom, moveAgeTo, needsOwnAgeConfirmation, resetFilterValues } from "@/lib/discovery-filters";
 import { DATING_NEEDS_GENDER, type ConnectionIntent } from "@/server/preferences/intent-policy";
 
 /*
  * Prototype "FILTERS SHEET": 22/800 title with a "Reset" text button; Age range with two labelled sliders (From / To,
  * never closer than `filterAgeMinSpan` years, and a "Save it anyway?" check when the new range leaves out the
- * member's own age); "Show me" three
- * 44 px segments (radius 14); Location chips 40 px; "Looking for" chips (Any + 4 intents); bordered "PREMIUM Advanced
- * filters" group with 52 px lock rows; "Apply" 52 px primary. Sheet on phones, modal on desktop.
- * Advanced filters offered: Height and Education — the two the profile actually stores. Occupation and Interests
- * appear in the prototype's list but have no filterable data model yet, so they are not shown as filters.
+ * member's own age); "I'm here for" Dating / Friendship 44 px segments (radius 14); Location chips 40 px; bordered
+ * "PREMIUM Advanced filters" group with 52 px lock rows; "Apply" 52 px primary. Sheet on phones, modal on desktop.
+ * Advanced filters offered: Height and Education — the two the profile actually stores.
  *
- * Dating and Friendship are different products and the sheet shows each its own questions
- * (src/server/preferences/intent-policy.ts): "Looking for" is a Dating question and is not drawn at all on
- * Friendship, and each mode's "Show me" is restored from its own remembered value when the member switches — the
- * Dating one derived from gender, the Friendship one the member's own `friendshipInterestedIn`. None of this is the
- * enforcement; the server ignores hidden values whatever the sheet sends.
+ * There is no "Show me" and no "Looking for" (2026-09-26). Who a member sees follows from their gender and pool —
+ * Dating is opposite gender, Friendship everyone in the pool — and relationship intention is shown on profiles but never
+ * filters anybody out (src/server/discovery/predicate.ts). Switching pool is the whole of the change: Apply, and the
+ * deck is that pool.
  */
 export interface LocationOption {
   id: string;
@@ -46,21 +43,16 @@ export interface FiltersSheetProps {
   onLockedAdvanced: () => void;
 }
 
-type InterestedIn = DiscoveryFiltersDto["interestedIn"];
-type RelationshipIntent = NonNullable<DiscoveryFiltersDto["intent"]>;
+type RelationshipIntent = keyof typeof INTENT_LABELS;
 
-/** Exactly what the sheet submits. Hidden fields ride along unchanged and the server decides what applies. */
+/** Exactly what the sheet submits. */
 export interface FiltersDraft {
   connectionIntent: ConnectionIntent;
-  /** Null only on Friendship before the member has ever answered; Apply waits for an answer then. */
-  interestedIn: InterestedIn | null;
   ageMin: number;
   ageMax: number;
   locationScope: DiscoveryFiltersDto["locationScope"];
   locationId: string | null;
-  /** The Dating "Looking for" filter. Kept (not cleared) while on Friendship so a switch back restores it. */
-  intent: RelationshipIntent | null;
-  /** The member's OWN Dating answer, asked only when switching into Dating without one. */
+  /** The member's OWN Dating answer, offered (optional) only when switching into Dating without one. */
   myIntent: RelationshipIntent | null;
   heightMinCm: number | null;
   heightMaxCm: number | null;
@@ -71,13 +63,12 @@ const INTENTS = Object.entries(INTENT_LABELS) as [RelationshipIntent, string][];
 const HEIGHTS = Array.from({ length: (210 - 140) / 5 + 1 }, (_, i) => 140 + i * 5);
 
 function toDraft(f: DiscoveryFiltersDto): FiltersDraft {
-  return { connectionIntent: f.connectionIntent, interestedIn: f.interestedIn, ageMin: f.ageMin, ageMax: f.ageMax, locationScope: f.locationScope, locationId: f.locationId, intent: f.intent, myIntent: null, heightMinCm: f.heightMinCm, heightMaxCm: f.heightMaxCm, education: f.education };
+  return { connectionIntent: f.connectionIntent, ageMin: f.ageMin, ageMax: f.ageMax, locationScope: f.locationScope, locationId: f.locationId, myIntent: null, heightMinCm: f.heightMinCm, heightMaxCm: f.heightMaxCm, education: f.education };
 }
 
 export function FiltersSheet({ open, onClose, filters, locations, saving, error, onApply, onLockedAdvanced }: FiltersSheetProps) {
   const titleId = useId();
   const [draft, setDraft] = useState<FiltersDraft>(() => toDraft(filters));
-  const [friendshipShowMe, setFriendshipShowMe] = useState<InterestedIn | null>(() => rememberedFriendship(filters));
   const [showPicker, setShowPicker] = useState(filters.locationScope === "SPECIFIC");
   const [wasOpen, setWasOpen] = useState(open);
   const [confirmingAge, setConfirmingAge] = useState(false);
@@ -87,7 +78,6 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
     setWasOpen(open);
     if (open) {
       setDraft(toDraft(filters));
-      setFriendshipShowMe(rememberedFriendship(filters));
       setShowPicker(filters.locationScope === "SPECIFIC");
       setConfirmingAge(false);
     }
@@ -96,31 +86,20 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
   const set = <K extends keyof FiltersDraft>(key: K, value: FiltersDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
   const dating = draft.connectionIntent === "DATING";
   const reset = () => {
-    // The mode and its "Show me" are not filters, so Reset leaves them; everything else returns to THE defaults.
-    setDraft((d) => ({ ...d, ...resetFilterValues(d.connectionIntent, d.intent) }));
+    // The pool is not a filter, so Reset leaves it; everything else returns to THE defaults.
+    setDraft((d) => ({ ...d, ...resetFilterValues() }));
     setShowPicker(false);
   };
   const chooseMode = (v: ConnectionIntent) => {
     if (v === "DATING" && !filters.canDate) return;
-    setDraft((d) => ({
-      ...d,
-      connectionIntent: v,
-      // Each mode restores its own "Show me": Dating's is derived from gender, Friendship's is the member's answer.
-      interestedIn: showMeForMode(v, filters.datingInterestedIn, friendshipShowMe),
-    }));
-  };
-  const chooseFriendshipShowMe = (v: InterestedIn) => {
-    setFriendshipShowMe(v);
-    set("interestedIn", v);
+    set("connectionIntent", v);
   };
   const segment = (on: boolean) => cn("h-11 flex-1 rounded-md text-body-sm font-medium text-text disabled:opacity-45", on ? "bg-primary text-on-primary" : "bg-surface-muted");
   const specificName = locations.find((l) => l.id === draft.locationId)?.name;
-  const needsMyIntent = dating && !filters.hasDatingIntent;
+  const offerMyIntent = dating && filters.canDate && !filters.hasDatingIntent;
   const warning = ageRangeWarning(filters.ownAge, draft.ageMin, draft.ageMax);
   const blockedReason =
     ageRangeTooNarrow(draft.ageMin, draft.ageMax) ? AGE_RANGE_TOO_NARROW
-    : needsMyIntent && !draft.myIntent ? "Answer “What are you looking for?” to switch to Dating."
-    : draft.interestedIn == null ? "Choose who you'd like to meet."
     : draft.locationScope === "SPECIFIC" && !draft.locationId ? "Choose an island or atoll."
     : null;
   // A range that leaves out the member's own age is asked about once, when they change it; it is never corrected.
@@ -148,8 +127,8 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
       </div>
 
       {/*
-        * Age and "Show me" are both short controls, so from the desktop breakpoint they sit side by side instead of
-        * each taking a full row of a 560 px panel. The wrapper is a plain column below that, which keeps the phone
+        * Age and "I'm here for" are both short controls, so from the desktop breakpoint they sit side by side instead
+        * of each taking a full row of a 560 px panel. The wrapper is a plain column below that, which keeps the phone
         * sheet exactly as it was — and keeps it a direct child of the scrolling body, which must not shrink.
         */}
       <div className="flex flex-col gap-4 desktop:grid desktop:grid-cols-2 desktop:gap-3.5">
@@ -182,30 +161,19 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
               >{label}</button>
             ))}
           </div>
-          {!filters.canDate ? <p className="text-caption leading-relaxed text-text-secondary">{DATING_NEEDS_GENDER}</p> : null}
-        </section>
-
-        <section className="flex flex-col gap-2.5">
-          <div className="text-body font-medium">Show me</div>
-          {!dating ? (
-            <div className="flex gap-2" role="radiogroup" aria-label="Show me">
-              {([["WOMEN", "Women"], ["MEN", "Men"], ["EVERYONE", "Everyone"]] as const).map(([v, label]) => (
-                <button key={v} type="button" role="radio" aria-checked={draft.interestedIn === v} onClick={() => chooseFriendshipShowMe(v)} className={segment(draft.interestedIn === v)}>{label}</button>
-              ))}
-            </div>
-          ) : (
-            /* Dating has one answer, so this states it instead of offering a choice that cannot be made. */
-            <p className="text-body-sm text-text-secondary">{draft.interestedIn ? INTERESTED_IN_LABELS[draft.interestedIn] : "—"} — Dating on Mellocrush is opposite gender only.</p>
-          )}
+          {/* Who you'll see follows from the choice itself; there is no second question. */}
+          <p className="text-caption leading-relaxed text-text-secondary" data-testid="pool-explainer">
+            {!filters.canDate ? DATING_NEEDS_GENDER : dating ? "Dating shows you women if you're a man, and men if you're a woman." : "Friendship shows you everyone here for friendship."}
+          </p>
         </section>
       </div>
 
-      {needsMyIntent ? (
-        /* Their OWN answer, not a filter: somebody who came in through Friendship was never asked it, and Dating needs it.
-           Drawn right under the switch that caused it, so it is on screen the moment they tap Dating. */
+      {offerMyIntent ? (
+        /* Their OWN answer, not a filter: somebody who came in through Friendship was never asked it. Optional — it
+           shows on their profile, and not answering never hides anybody. */
         <section className="flex flex-col gap-2.5">
-          <div className="text-body font-medium">What are you looking for?</div>
-          <p className="-mt-1 text-caption text-text-secondary">Dating needs your answer to this. It shows on your profile, and you can change it later in Edit profile.</p>
+          <div className="text-body font-medium">What are you looking for? <span className="font-normal text-text-secondary">(optional)</span></div>
+          <p className="-mt-1 text-caption text-text-secondary">Shown on your profile. You can change it later in Edit profile.</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="What are you looking for?">
             {INTENTS.map(([v, label]) => (
               <Chip key={v} role="radio" aria-checked={draft.myIntent === v} selected={draft.myIntent === v} onClick={() => set("myIntent", v)}>{label}</Chip>
@@ -231,19 +199,6 @@ export function FiltersSheet({ open, onClose, filters, locations, saving, error,
         ) : null}
         <p className="text-caption text-text-secondary">Island or atoll only — Mellocrush never uses distance or GPS.</p>
       </section>
-
-      {/* A Dating question. Not drawn on Friendship at all — the stored answer waits, inert, for a switch back. */}
-      {dating ? (
-        <section className="flex flex-col gap-2.5">
-          <div className="text-body font-medium">Looking for</div>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Looking for">
-            <Chip role="radio" aria-checked={draft.intent === null} selected={draft.intent === null} onClick={() => set("intent", null)}>Any</Chip>
-            {INTENTS.map(([v, label]) => (
-              <Chip key={v} role="radio" aria-checked={draft.intent === v} selected={draft.intent === v} onClick={() => set("intent", v)}>{label}</Chip>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <section className="overflow-hidden rounded-2xl glass-card">
         <div className="flex items-center gap-2 bg-surface-muted px-3.5 py-3.5 text-tag uppercase tracking-[.08em] text-ocean">

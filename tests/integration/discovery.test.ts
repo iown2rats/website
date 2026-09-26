@@ -110,23 +110,20 @@ describe("discovery eligibility", () => {
     }
   });
 
-  it("Friendship enforces mutual preference without assuming heterosexual matching", async () => {
+  it("Friendship has no gender rule: everyone in the pool sees everyone, whatever gender or stored Show me", async () => {
     const f = { connectionIntent: "FRIENDSHIP" as const, now: T0 };
-    const womanWantsWomen = await createUser(db, { ...f, gender: "WOMAN", interestedIn: "WOMEN" });
-    const womanWantsWomen2 = await createUser(db, { ...f, gender: "WOMAN", interestedIn: "WOMEN" });
-    const womanWantsMen = await createUser(db, { ...f, gender: "WOMAN", interestedIn: "MEN" });
-    const manWantsEveryone = await createUser(db, { ...f, gender: "MAN", interestedIn: "EVERYONE" });
-    const manWantsWomen = await createUser(db, { ...f, gender: "MAN", interestedIn: "WOMEN" });
-    const unspecifiedEveryone = await createUser(db, { ...f, gender: "UNSPECIFIED", interestedIn: "EVERYONE" });
-
-    const deck = await getDeckCandidateIds(db, womanWantsWomen, { now: T0 });
-    expect(deck).toEqual([womanWantsWomen2.userId]); // womanWantsMen is a woman but does not want women back
-    const manDeck = await getDeckCandidateIds(db, manWantsWomen, { now: T0 });
-    expect(manDeck).toEqual([womanWantsMen.userId]);
-    // Everyone ↔ Everyone includes "prefer not to say" in both directions.
-    expect(await getDeckCandidateIds(db, manWantsEveryone, { now: T0 })).toContain(unspecifiedEveryone.userId);
-    expect(await getDeckCandidateIds(db, unspecifiedEveryone, { now: T0 })).toContain(manWantsEveryone.userId);
-    expect(await getDeckCandidateIds(db, unspecifiedEveryone, { now: T0 })).not.toContain(manWantsWomen.userId);
+    const members = [
+      await createUser(db, { ...f, gender: "WOMAN", interestedIn: "WOMEN" }),
+      await createUser(db, { ...f, gender: "WOMAN", interestedIn: "MEN" }),
+      await createUser(db, { ...f, gender: "MAN", interestedIn: "EVERYONE" }),
+      await createUser(db, { ...f, gender: "MAN", interestedIn: "WOMEN" }),
+      await createUser(db, { ...f, gender: "UNSPECIFIED", interestedIn: "EVERYONE" }),
+      await createUser(db, { ...f, gender: "UNSPECIFIED", interestedIn: "MEN" }),
+    ];
+    for (const viewer of members) {
+      const deck = await getDeckCandidateIds(db, viewer, { now: T0 });
+      expect(deck.sort()).toEqual(members.filter((m) => m !== viewer).map((m) => m.userId).sort());
+    }
   });
 
   it("applies the viewer's age range only — the candidate's own range never decides who sees them (one-way)", async () => {

@@ -8,7 +8,6 @@ import { NotFoundError } from "@/lib/errors";
 import type { Actor } from "@/server/actor";
 import { getEntitlements } from "@/server/entitlements";
 import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
-import { datingFieldsApply } from "@/server/preferences/intent-policy";
 import { awaitingPhotoReviewSql, baseVisibleSql, compatibilitySql, discoverableSql, notSwipedSql, openToDiscoverySql, orderSql, swipedSql, viewerFilterSql, type ViewerContext } from "./predicate";
 
 /** Loads everything the predicate needs to know about the viewer. */
@@ -27,14 +26,11 @@ export async function loadViewerContext(db: DbLike, userId: string, now: Date): 
     userId,
     phoneHash: user.phoneHash,
     gender: user.gender,
-    interestedIn: prefs?.interestedIn ?? "EVERYONE",
     // Matches the column default: a viewer with no preferences row yet is treated as here to date, never as
     // belonging to both pools.
     connectionIntent,
     ageMin: prefs?.ageMin ?? DEFAULT_AGE_PREFERENCES.ageMin,
     ageMax: prefs?.ageMax ?? DEFAULT_AGE_PREFERENCES.ageMax,
-    // Dating only. On Friendship the stored value is kept for a switch back, and is inert until then.
-    intent: datingFieldsApply(connectionIntent) ? (prefs?.intent ?? null) : null,
     locationScope: prefs?.locationScope ?? "ANYWHERE",
     locationId: prefs?.locationId ?? null,
     atollCode: user.profile?.location?.atollCode ?? null,
@@ -88,7 +84,7 @@ export async function getDeckCandidateIds(db: DbLike, actor: Actor, options: Dec
 }
 
 /**
- * How many compatible, unswiped people exist if the viewer's own filters (age range, intent, location, advanced)
+ * How many compatible, unswiped people exist if the viewer's own filters (age range, location, advanced)
  * were lifted. Used only to tell an empty deck apart from an over-restrictive one; never returns identities.
  */
 export async function countRelaxedCandidates(db: DbLike, actor: Actor, now: Date = new Date()): Promise<number> {

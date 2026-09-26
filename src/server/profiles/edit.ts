@@ -9,8 +9,8 @@ import { InvalidStateError, ValidationError } from "@/lib/errors";
 import { getStorageProvider } from "@/lib/storage";
 import { aboutEditSchema, infoSchema } from "@/lib/validation/profile";
 import type { Actor } from "@/server/actor";
-import { assertGenderFitsChosenIntent, getOnboardingData, reconcilePreferencesForGender, saveAbout, saveIntent } from "@/server/onboarding/onboarding";
-import { datingFieldsApply, type ConnectionIntent } from "@/server/preferences/intent-policy";
+import { assertGenderFitsChosenIntent, getOnboardingData, saveAbout, saveIntent } from "@/server/onboarding/onboarding";
+import { assertGenderSelectable, datingFieldsApply, type ConnectionIntent } from "@/server/preferences/intent-policy";
 import { listPhotos, type PhotoDto } from "@/server/photos/photos";
 import type { CompletionResult } from "./completion";
 
@@ -90,7 +90,10 @@ export async function updateInfo(actor: Actor, input: unknown, deps: { db?: Db }
   if (found.length !== new Set(ids).size) throw new ValidationError("Choose an island or atoll from the list");
   const profile = await db.profile.findUnique({ where: { userId: actor.userId }, select: { id: true } });
   if (!profile) throw new InvalidStateError("Add your name first");
-  // Refused before anything is written: a Dating member cannot become a gender Dating cannot match.
+  // Refused before anything is written: "Prefer not to say" can be kept but not newly chosen, and a Dating member
+  // cannot become a gender Dating cannot match.
+  const current = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { gender: true } });
+  assertGenderSelectable(info.gender, current.gender);
   await assertGenderFitsChosenIntent(db, actor.userId, info.gender);
   await db.$transaction([
     db.user.update({ where: { id: actor.userId }, data: { gender: info.gender } }),
@@ -99,9 +102,6 @@ export async function updateInfo(actor: Actor, input: unknown, deps: { db?: Db }
       data: { locationId: info.locationId, homeLocationId: info.homeLocationId, occupation: info.occupation || null, education: info.education || null, heightCm: info.heightCm },
     }),
   ]);
-  // A Dating member's "Show me" is derived from their gender, so correcting the gender has to move it with them;
-  // a Friendship member's own answer is deliberately left alone. Both decisions live in the policy, not here.
-  await reconcilePreferencesForGender(db, actor.userId, info.gender);
 }
 
 /**

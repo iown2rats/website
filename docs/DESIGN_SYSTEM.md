@@ -213,7 +213,7 @@ Results:
 - Deck geometry unchanged from Phase 4 (radius 26 card, 3 px photo bars, LIKE/PASS stamps, 56/66/48 controls); the header gains a 44 px allowance pill ("28 likes left", or "Likes back in 22h 59m" when exhausted) beside the Filters button.
 - Drag right past 110 px likes, drag left passes, ← / → / ↑ work from the focused card, taps on the left/right 30 % step through photos, the centre tap and the View profile button open the full profile. The next card is rendered from the 400 px thumb; only the current card loads a full-size image.
 - Full profile follows the prototype: hero photo min(70vh, 560px) with white round Back button, 30/800 name + seal, ABOUT ME, aqua "Looking for" pill, prompt card, second photo, info rows, 38 px interest chips, ocean second-prompt card, remaining photos, floating Pass 60 / Like 66. Hidden location and hidden age are simply absent (the payload does not contain them).
-- Filters sheet: 22/800 title + Reset, age sliders (default and Reset 18–60, with a non-blocking warning when the range excludes the member's own age), I'm here for (Dating disabled with an explanation for "Prefer not to say"), Show me segments (editable on Friendship, stated on Dating), Location chips (+ island/atoll select for a specific place), Looking for chips **on Dating only** (plus "What are you looking for?" when switching into Dating without an answer), Premium "Advanced filters" group (locked rows with a lock icon for Free; Height/Education controls for Plus), Apply. Applying persists to the database and reloads the deck.
+- Filters sheet: 22/800 title + Reset, age sliders (default and Reset 18–60, with a non-blocking warning when the range excludes the member's own age), I'm here for (Dating / Friendship, with a caption stating who each shows; Dating disabled with an explanation for a legacy "Prefer not to say"), Location chips (+ island/atoll select for a specific place), "What are you looking for? (optional)" only when switching into Dating without an answer (never blocks Apply). There is no Show me and no Looking for (2026-09-26, ARCHITECTURE §7.5). Premium "Advanced filters" group (locked rows with a lock icon for Free; Height/Education controls for Plus), Apply. Applying persists to the database and reloads the deck.
 - Match overlay: ocean panel, two ripple rings, two tilted white-bordered photo cards, "It's a Match", "You and Yumna liked each other.", Say hello → conversation shell, Keep swiping → deck.
 - Empty states are distinct: "That's everyone for now." (exhausted), "Your filters are hiding everyone." (over-restrictive), "Couldn't load Discover" with Try again (load failure), and "You've used today's 30 likes." with the real countdown (allowance) as a dialog that leaves the deck browsable.
 - Plus: Undo control on the far left restores the passed card on top; a second undo is refused with the server's reason; advanced filter controls unlock. Free never sees the Undo control and the server refuses the action anyway.
@@ -495,7 +495,7 @@ wide tier the row is left-aligned, the sidebar is 248, and main plus any panel f
 | Chats | 352 px conversation list; the thread takes the rest of the group. The detail pane with nothing selected is a proper empty state, not one grey sentence in an empty half-screen. |
 | Profile | Two columns: identity and completion at 400 px on the left, account sections on the right capped at 640. Rows are bounded, because a row dragged across 800 px puts its label and its value at opposite ends of the display. |
 | Settings | Still a bounded 900 px column — settings rows do not benefit from width — but centred in the group rather than pinned left beside a void. |
-| Filters | The desktop panel is 560 px. Age and "Show me" sit side by side from 900 px instead of each taking a full row, and the two age sliders stack within their half rather than becoming 120 px each. |
+| Filters | The desktop panel is 560 px. Age and "I'm here for" sit side by side from 900 px instead of each taking a full row, and the two age sliders stack within their half rather than becoming 120 px each. |
 
 Measured after, at 1920: sidebar at x = 0, content group 1280 wide with 196 px margins either side; at 1440 the group
 fills the remaining width with its 40 px gutters. No horizontal overflow and no page errors at 1920, 1440, 1280, 1024
@@ -1063,3 +1063,16 @@ left arrow to pass"), so both stamps and the hint stay `aria-hidden` rather than
 **Once.** A `thundi.swipeGuideSeen` flag in localStorage, the same mechanism and prefix as the appearance choice.
 No migration: a cleared storage or a second device replays a four-second animation, which is a cheaper failure than
 a column on the members table. The flag is written when the lesson starts, so an interrupted run still counts.
+
+## Discovery pools redesign (2026-09-26)
+
+- **Onboarding**: GENDER offers Woman and Man only (a member who already holds "Prefer not to say" still sees it, so
+  re-saving never forces a change). CONNECTION is followed by "What are you looking for?" on Dating and by location on
+  Friendship; "Who would you like to meet?" is gone. The counter reads "n / 11" on Dating and "n / 10" on Friendship,
+  including the done screen.
+- **Filters sheet / Settings → Discovery preferences**: no Show me and no Looking for rows. The pool control carries a
+  one-line caption (`data-testid="pool-explainer"`) explaining who that pool shows ("Dating shows you women if you're a
+  man, and men if you're a woman." / "Friendship shows you everyone here for friendship.").
+- **Edit profile → Gender**: the same Woman / Man options as onboarding.
+- **Admin user detail**: stored Show me and Looking for are labelled legacy and "not used by discovery".
+

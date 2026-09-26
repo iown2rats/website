@@ -18,7 +18,6 @@ import {
   saveConnectionIntent,
   saveDateOfBirth,
   saveGender,
-  saveInterestedIn,
   saveLocation,
   saveName,
   savePrivacy,
@@ -60,15 +59,31 @@ describe("Dating intent never affects Friendship", () => {
     expect(await isDeckCandidate(db, viewer, neverAsked.userId, T0)).toBe(true);
   });
 
-  it("the viewer context carries no intent on Friendship, and the predicate refuses to apply one even if handed it", async () => {
-    const viewer = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", lookingFor: "DATING" });
-    const v = await loadViewerContext(db, viewer.userId, T0);
-    expect(v.intent).toBeNull();
-    // The second lock: a context built any other way still cannot narrow a Friendship deck by a dating answer.
-    const forged = viewerFilterSql({ ...v, intent: "DATING" }, T0);
-    expect(forged.sql).not.toContain("p.intent");
-    const dating = viewerFilterSql({ ...v, connectionIntent: "DATING", intent: "DATING" }, T0);
-    expect(dating.sql).toContain("p.intent");
+  it("no visibility query reads relationship intention, in either pool (2026-09-26)", async () => {
+    for (const connectionIntent of ["FRIENDSHIP", "DATING"] as const) {
+      const viewer = await createUser(db, { now: T0, gender: "MAN", connectionIntent, lookingFor: "DATING" });
+      const v = await loadViewerContext(db, viewer.userId, T0);
+      expect("intent" in v).toBe(false);
+      for (const sql of [viewerFilterSql(v, T0).sql, compatibilitySql(v).sql]) {
+        expect(sql).not.toContain("p.intent");
+        expect(sql).not.toContain("RelationshipIntent");
+      }
+    }
+  });
+
+  it("no discovery SQL reads the stored Show me (interestedIn), for any gender in either pool", async () => {
+    for (const connectionIntent of ["FRIENDSHIP", "DATING"] as const) {
+      for (const gender of ["MAN", "WOMAN", "UNSPECIFIED"] as const) {
+        const viewer = await createUser(db, { now: T0, gender, connectionIntent, interestedIn: "WOMEN", friendshipInterestedIn: "WOMEN" });
+        const v = await loadViewerContext(db, viewer.userId, T0);
+        expect("interestedIn" in v).toBe(false);
+        const all = [baseVisibleSql(v.userId, v.phoneHash, T0).sql, discoverableSql().sql, compatibilitySql(v).sql, viewerFilterSql(v, T0).sql, notSwipedSql(v.userId, T0).sql];
+        for (const sql of all) expect(sql).not.toMatch(/interestedIn/i);
+        // Friendship has no gender clause at all.
+        if (connectionIntent === "FRIENDSHIP") expect(compatibilitySql(v).sql).not.toContain("gender");
+      }
+    }
+    expect(visibilityMatrixSql("WITH cohort(id, handle) AS (SELECT NULL::text, NULL::text)")).not.toMatch(/interestedIn/i);
   });
 
   it("a Friendship candidate's stale dating answer is irrelevant to every Friendship viewer's stored filter", async () => {
@@ -79,30 +94,24 @@ describe("Dating intent never affects Friendship", () => {
     }
   });
 
-  it("Dating keeps its Looking for: a Dating viewer filtering on Marriage sees Marriage daters only", async () => {
+  it("a Dating viewer's stored 'Looking for: Marriage' no longer narrows the deck: every answer, and none, is shown", async () => {
     const viewer = await createUser(db, { now: T0, gender: "MAN", lookingFor: "MARRIAGE" });
     const marriage = await createUser(db, { now: T0, gender: "WOMAN", intent: "MARRIAGE" });
     const serious = await createUser(db, { now: T0, gender: "WOMAN", intent: "SERIOUS_RELATIONSHIP" });
     const unanswered = await createUser(db, { now: T0, gender: "WOMAN", intent: null });
-    const ids = await deck(viewer);
-    expect(ids).toContain(marriage.userId);
-    expect(ids).not.toContain(serious.userId);
-    expect(ids).not.toContain(unanswered.userId);
+    expect((await deck(viewer)).sort()).toEqual([marriage.userId, serious.userId, unanswered.userId].sort());
   });
 
-  it("switching Dating → Friendship keeps the Dating filter stored but inert, and switching back restores it", async () => {
-    const viewer = await createUser(db, { now: T0, gender: "MAN" });
-    await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "WOMEN", intent: "MARRIAGE" }, { db, now: T0 });
-    // The sheet hides Looking for on Friendship; a crafted request that still sends one changes nothing.
-    const friendship = await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "DATING" }, { db, now: T0 });
-    expect(friendship.intent).toBe("MARRIAGE");
-    expect((await loadViewerContext(db, viewer.userId, T0)).intent).toBeNull();
+  it("a stored 'Looking for' survives every filters save untouched — never overwritten, never applied", async () => {
+    const viewer = await createUser(db, { now: T0, gender: "MAN", lookingFor: "MARRIAGE", intent: "DATING" });
+    // An older client may still send "intent"; it is ignored, and the stored value is carried through.
+    await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "DATING" }, { db, now: T0 });
     const friend = await createUser(db, { now: T0, connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: null });
     expect(await deck(viewer)).toContain(friend.userId);
-
-    const back = await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "WOMEN", intent: friendship.intent }, { db, now: T0 });
-    expect(back.intent).toBe("MARRIAGE");
-    expect((await loadViewerContext(db, viewer.userId, T0)).intent).toBe("MARRIAGE");
+    await saveDiscoveryFilters(viewer, { ...BASE_FILTERS, connectionIntent: "DATING", intent: null }, { db, now: T0 });
+    expect((await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: viewer.userId } })).intent).toBe("MARRIAGE");
+    const dater = await createUser(db, { now: T0, gender: "WOMAN", intent: "FIGURING_OUT" });
+    expect(await deck(viewer)).toContain(dater.userId);
   });
 
   it("an empty Friendship deck is never blamed on a hidden Dating filter", async () => {
@@ -157,15 +166,17 @@ describe("Edit profile follows the same rule", () => {
   });
 });
 
-describe("Friendship → Dating requires the member's own Dating answer", () => {
-  it("refuses the switch without one, and records the answer given in the sheet", async () => {
+describe("Friendship → Dating never needs a relationship-intention answer", () => {
+  it("switches without one — and is discoverable at once — and records the answer when the sheet is given one", async () => {
     const me = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: null });
-    const before = await getDiscoveryFilters(me, { db, now: T0 });
-    expect(before.hasDatingIntent).toBe(false);
-    await expect(saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "MEN", intent: null }, { db, now: T0 })).rejects.toThrow("Choose what you're looking for");
-    expect((await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } })).connectionIntent).toBe("FRIENDSHIP");
+    expect((await getDiscoveryFilters(me, { db, now: T0 })).hasDatingIntent).toBe(false);
+    const switched = await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING" }, { db, now: T0 });
+    expect(switched).toMatchObject({ connectionIntent: "DATING", hasDatingIntent: false });
+    const man = await createUser(db, { now: T0, gender: "MAN", lookingFor: "MARRIAGE" });
+    expect(await deck(man)).toContain(me.userId);
+    expect(await deck(me)).toContain(man.userId);
 
-    const after = await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "MEN", intent: null, myIntent: "SERIOUS_RELATIONSHIP" }, { db, now: T0 });
+    const after = await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", myIntent: "SERIOUS_RELATIONSHIP" }, { db, now: T0 });
     expect(after).toMatchObject({ connectionIntent: "DATING", hasDatingIntent: true });
     expect((await db.profile.findUniqueOrThrow({ where: { userId: me.userId } })).intent).toBe("SERIOUS_RELATIONSHIP");
   });
@@ -177,33 +188,26 @@ describe("Friendship → Dating requires the member's own Dating answer", () => 
   });
 });
 
-describe("Friendship 'Show me' is remembered per mode", () => {
-  /** What the Filters sheet submits on a switch, using the values it restores from the DTO (src/lib/discovery-filters.ts). */
-  async function switchTo(me: TestUser, mode: "DATING" | "FRIENDSHIP") {
-    const f = await getDiscoveryFilters(me, { db, now: T0 });
-    const interestedIn = mode === "DATING" ? f.datingInterestedIn! : (f.friendshipInterestedIn ?? f.interestedIn);
-    return saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: mode, interestedIn, intent: f.intent }, { db, now: T0 });
-  }
-
-  it("Dating → Friendship → Dating → Friendship restores each mode's own value, without leaking one into the other", async () => {
-    // Has a Dating answer already, so the switch into Dating is not held up asking for one (tested separately above).
-    const me = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", intent: "DATING" });
-    let f = await switchTo(me, "DATING");
-    expect(f).toMatchObject({ connectionIntent: "DATING", interestedIn: "WOMEN", friendshipInterestedIn: "EVERYONE" });
-    f = await switchTo(me, "FRIENDSHIP");
-    expect(f).toMatchObject({ connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", friendshipInterestedIn: "EVERYONE" });
-    f = await switchTo(me, "DATING");
-    expect(f).toMatchObject({ connectionIntent: "DATING", interestedIn: "WOMEN", friendshipInterestedIn: "EVERYONE" });
-    f = await switchTo(me, "FRIENDSHIP");
-    expect(f).toMatchObject({ connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE", friendshipInterestedIn: "EVERYONE" });
+describe("stored 'Show me' values are kept, never asked for, never rewritten and never read by discovery", () => {
+  it("saving filters without changing pool never rewrites a stored Show me, whatever the request carries", async () => {
+    const me = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "MEN", friendshipInterestedIn: "MEN" });
+    await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "FRIENDSHIP", interestedIn: "WOMEN" }, { db, now: T0 });
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId }, select: { interestedIn: true, friendshipInterestedIn: true } })).toEqual({ interestedIn: "MEN", friendshipInterestedIn: "MEN" });
   });
 
-  it("a Dating save never overwrites the remembered Friendship answer, whatever 'Show me' the request carries", async () => {
-    const me = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "MEN", intent: "DATING" });
-    await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING", interestedIn: "EVERYONE", intent: null }, { db, now: T0 });
-    const row = await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } });
-    expect(row).toMatchObject({ connectionIntent: "DATING", interestedIn: "WOMEN", friendshipInterestedIn: "MEN" });
-    expect((await getDiscoveryFilters(me, { db, now: T0 })).friendshipInterestedIn).toBe("MEN");
+  it("Dating → Friendship → Dating keeps the remembered Friendship answer, and the deck follows the pool alone", async () => {
+    const me = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "MEN", friendshipInterestedIn: "MEN", intent: "DATING" });
+    const friendWoman = await createUser(db, { now: T0, gender: "WOMAN", connectionIntent: "FRIENDSHIP", interestedIn: "WOMEN" });
+    const datingWoman = await createUser(db, { now: T0, gender: "WOMAN" });
+    // A stored "Men" does not stop him seeing a Friendship woman: Friendship has no gender rule.
+    expect(await deck(me)).toEqual([friendWoman.userId]);
+    await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "DATING" }, { db, now: T0 });
+    expect(await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId }, select: { interestedIn: true, friendshipInterestedIn: true } })).toEqual({ interestedIn: "MEN", friendshipInterestedIn: "MEN" });
+    // …and the stored "Men" does not stop him seeing a Dating woman either: Dating is opposite gender, by rule.
+    expect(await deck(me)).toEqual([datingWoman.userId]);
+    await saveDiscoveryFilters(me, { ...BASE_FILTERS, connectionIntent: "FRIENDSHIP" }, { db, now: T0 });
+    expect((await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } })).friendshipInterestedIn).toBe("MEN");
+    expect(await deck(me)).toEqual([friendWoman.userId]);
   });
 });
 
@@ -326,7 +330,6 @@ describe("18–60 is the one canonical default", () => {
       await saveDateOfBirth(actor, { day: 1, month: 1, year }, { db, now: T0 });
       await saveGender(actor, { gender }, { db });
       await saveConnectionIntent(actor, { connectionIntent: "FRIENDSHIP" }, { db });
-      await saveInterestedIn(actor, { interestedIn: "EVERYONE" }, { db });
       await saveLocation(actor, { locationId: loc.id }, { db });
       const profile = await db.profile.findUniqueOrThrow({ where: { userId: actor.userId } });
       for (const i of [0, 1]) {
@@ -354,15 +357,13 @@ describe("Prefer not to say cannot be stranded on Dating", () => {
     expect((await db.discoveryPreferences.findUniqueOrThrow({ where: { userId: me.userId } })).connectionIntent).toBe("FRIENDSHIP");
   });
 
-  it("a Dating member cannot change their gender to Prefer not to say; a Friendship member can", async () => {
+  it("nobody can newly choose Prefer not to say in Edit profile (2026-09-26), in either pool", async () => {
     const loc = await createLocation(db, { name: "Malé", atollCode: "K", isGreaterMale: true });
-    const dater = await createUser(db, { now: T0, gender: "MAN" });
-    await expect(updateInfo(dater, { gender: "UNSPECIFIED", locationId: loc.id }, { db })).rejects.toThrow("switch to Friendship");
-    expect((await db.user.findUniqueOrThrow({ where: { id: dater.userId } })).gender).toBe("MAN");
-
-    const friend = await createUser(db, { now: T0, gender: "MAN", connectionIntent: "FRIENDSHIP", interestedIn: "EVERYONE" });
-    await updateInfo(friend, { gender: "UNSPECIFIED", locationId: loc.id }, { db });
-    expect((await db.user.findUniqueOrThrow({ where: { id: friend.userId } })).gender).toBe("UNSPECIFIED");
+    for (const connectionIntent of ["DATING", "FRIENDSHIP"] as const) {
+      const member = await createUser(db, { now: T0, gender: "MAN", connectionIntent, interestedIn: "EVERYONE" });
+      await expect(updateInfo(member, { gender: "UNSPECIFIED", locationId: loc.id }, { db })).rejects.toThrow("Choose Woman or Man");
+      expect((await db.user.findUniqueOrThrow({ where: { id: member.userId } })).gender).toBe("MAN");
+    }
   });
 
   it("a member already in that state (it predates the rule) is not rewritten and can still save the rest of their Info", async () => {
@@ -374,15 +375,26 @@ describe("Prefer not to say cannot be stranded on Dating", () => {
     expect((await getDiscoveryFilters(legacy, { db, now: T0 })).canDate).toBe(false);
   });
 
-  it("onboarding: the GENDER step allows it before an intent is chosen, but not once Dating was chosen", async () => {
+  it("onboarding: a new member chooses Woman or Man — Prefer not to say is refused at the GENDER step", async () => {
     const account = await createAccount(db, T0);
     const actor = { userId: account.id };
     await saveName(actor, { name: "Xan" }, { db });
-    await saveGender(actor, { gender: "UNSPECIFIED" }, { db });
-    await expect(saveConnectionIntent(actor, { connectionIntent: "DATING" }, { db })).rejects.toBeInstanceOf(ValidationError);
+    await expect(saveGender(actor, { gender: "UNSPECIFIED" }, { db })).rejects.toThrow("Choose Woman or Man");
+    expect((await db.user.findUniqueOrThrow({ where: { id: actor.userId } })).gender).toBeNull();
     await saveGender(actor, { gender: "MAN" }, { db });
     await saveConnectionIntent(actor, { connectionIntent: "DATING" }, { db });
     await expect(saveGender(actor, { gender: "UNSPECIFIED" }, { db })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("a member mid-onboarding who already holds Prefer not to say keeps it and can re-save it (never changed for them)", async () => {
+    const account = await createAccount(db, T0);
+    const actor = { userId: account.id };
+    await saveName(actor, { name: "Legacy" }, { db });
+    await db.user.update({ where: { id: actor.userId }, data: { gender: "UNSPECIFIED" } });
+    await saveGender(actor, { gender: "UNSPECIFIED" }, { db });
+    await expect(saveConnectionIntent(actor, { connectionIntent: "DATING" }, { db })).rejects.toBeInstanceOf(ValidationError);
+    await saveConnectionIntent(actor, { connectionIntent: "FRIENDSHIP" }, { db });
+    expect((await db.user.findUniqueOrThrow({ where: { id: actor.userId } })).gender).toBe("UNSPECIFIED");
   });
 });
 

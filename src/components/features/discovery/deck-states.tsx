@@ -10,7 +10,7 @@ import { formatDuration } from "@/lib/time";
  * The intentional deck states (Phase 6 §24). They are different situations and say different things:
  *  - exhausted: the viewer has already acted on everybody compatible — "seen everyone" is said only when it is true
  *  - unavailable: nobody compatible is here right now at all. Neutral on purpose: the cause can be other members'
- *    preferences (their age range, their "Show me"), and those are never the viewer's to learn
+ *    preferences (their age range, their pool), and those are never the viewer's to learn
  *  - filters: relaxing the viewer's own filters would show people
  *  - review: people are waiting on photo moderation, so the deck refills on its own — never a count, never a name
  *  - error: the load failed (network / server), retryable

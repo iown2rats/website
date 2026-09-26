@@ -12,25 +12,24 @@ import { getEntitlements } from "@/server/entitlements";
 import { ageFromDateOfBirth } from "@/lib/age";
 import { AGE_RANGE_TOO_NARROW } from "@/lib/discovery-filters";
 import { DEFAULT_AGE_PREFERENCES } from "@/server/preferences/defaults";
-import { canDate, datingFieldsApply, datingInterestedIn, resolvePreferences, type ConnectionIntent } from "@/server/preferences/intent-policy";
+import { assertPoolAllowed, canDate, datingFieldsApply, type ConnectionIntent } from "@/server/preferences/intent-policy";
 
 const RELATIONSHIP_INTENTS = ["SERIOUS_RELATIONSHIP", "DATING", "MARRIAGE", "FIGURING_OUT"] as const;
-type RelationshipIntent = (typeof RELATIONSHIP_INTENTS)[number];
 
 export const filtersSchema = z
   .object({
     connectionIntent: z.enum(["DATING", "FRIENDSHIP"]),
-    // Friendship's answer. Ignored on Dating, where the preference is derived from gender and a submitted value
-    // is not trusted — that is the whole point of deriving it.
-    interestedIn: z.enum(["WOMEN", "MEN", "EVERYONE"]),
+    // The old "Show me". No longer a filter: accepted from an older client so its request still parses, never read.
+    interestedIn: z.enum(["WOMEN", "MEN", "EVERYONE"]).nullable().optional(),
     ageMin: z.number().int().min(DISCOVERY.filterAgeMin).max(DISCOVERY.filterAgeMax),
     ageMax: z.number().int().min(DISCOVERY.filterAgeMin).max(DISCOVERY.filterAgeMax),
     locationScope: z.enum(["ANYWHERE", "GREATER_MALE", "MY_ATOLL", "SPECIFIC"]),
     locationId: z.string().min(1).max(64).nullable().optional(),
-    // The Dating "Looking for" filter. Ignored on Friendship: the stored value is kept, not overwritten.
+    // The old Dating "Looking for" filter. No longer a filter: accepted from an older client, never read; the stored
+    // value is carried through untouched.
     intent: z.enum(RELATIONSHIP_INTENTS).nullable().optional(),
-    // The member's OWN answer to "What are you looking for?", asked by the sheet only when they switch into Dating
-    // without one (a member who onboarded through Friendship was never asked). Ignored everywhere else.
+    // The member's OWN answer to "What are you looking for?", offered (optionally) when they switch into Dating
+    // without one. Written only when their profile has none. Never required: a missing answer hides nobody.
     myIntent: z.enum(RELATIONSHIP_INTENTS).nullable().optional(),
     heightMinCm: z.number().int().min(120).max(230).nullable().optional(),
     heightMaxCm: z.number().int().min(120).max(230).nullable().optional(),
@@ -45,20 +44,16 @@ export const filtersSchema = z
 
 export type FiltersInput = z.infer<typeof filtersSchema>;
 
+/**
+ * What the Filters sheet shows (2026-09-26): age range, Dating/Friendship, location, and Plus advanced filters.
+ * There is no "Show me" (who a member sees follows from their gender and pool) and no "Looking for" (relationship
+ * intention is shown on profiles but never filters anybody out).
+ */
 export interface DiscoveryFiltersDto {
   connectionIntent: ConnectionIntent;
-  /** The preference in force. Read-only in the UI on Dating, because it is derived rather than chosen. */
-  interestedIn: "WOMEN" | "MEN" | "EVERYONE";
-  /** Whether "Show me" is the member's to change here. False on Dating. */
-  interestedInEditable: boolean;
-  /** What "Show me" becomes if they switch to Dating; null when their gender cannot date. Lets the sheet show the
-   *  consequence of the switch immediately instead of leaving a stale answer until the save returns. */
-  datingInterestedIn: "WOMEN" | "MEN" | null;
-  /** THE remembered Friendship answer, the one the sheet restores on a switch into Friendship. Null if never given. */
-  friendshipInterestedIn: "WOMEN" | "MEN" | "EVERYONE" | null;
-  /** False when the member's gender cannot use Dating ("Prefer not to say"); the sheet then explains, not offers. */
+  /** False when the member's gender cannot use Dating (legacy "Prefer not to say"); the sheet then explains, not offers. */
   canDate: boolean;
-  /** Whether the member has their own Dating answer ("What are you looking for?"). Switching into Dating needs one. */
+  /** Whether the member has their own Dating answer. A switch into Dating without one may offer the question, optionally. */
   hasDatingIntent: boolean;
   /** The member's own age, so the sheet can warn when their range leaves it out. Their own, never anybody else's. */
   ownAge: number | null;
@@ -66,8 +61,6 @@ export interface DiscoveryFiltersDto {
   ageMax: number;
   locationScope: "ANYWHERE" | "GREATER_MALE" | "MY_ATOLL" | "SPECIFIC";
   locationId: string | null;
-  /** The stored Dating "Looking for". Shown and applied on Dating only; kept, hidden and inert on Friendship. */
-  intent: RelationshipIntent | null;
   heightMinCm: number | null;
   heightMaxCm: number | null;
   education: string | null;
@@ -82,11 +75,10 @@ export const DEFAULT_FILTERS = {
   ...DEFAULT_AGE_PREFERENCES,
   locationScope: "ANYWHERE",
   locationId: null,
-  intent: null,
   heightMinCm: null,
   heightMaxCm: null,
   education: null,
-} as const satisfies Pick<DiscoveryFiltersDto, "ageMin" | "ageMax" | "locationScope" | "locationId" | "intent" | "heightMinCm" | "heightMaxCm" | "education">;
+} as const satisfies Pick<DiscoveryFiltersDto, "ageMin" | "ageMax" | "locationScope" | "locationId" | "heightMinCm" | "heightMaxCm" | "education">;
 
 export async function getDiscoveryFilters(actor: Actor, options: { db?: Db; now?: Date } = {}): Promise<DiscoveryFiltersDto> {
   const db = options.db ?? getDb();
@@ -101,10 +93,6 @@ export async function getDiscoveryFilters(actor: Actor, options: { db?: Db; now?
   const connectionIntent = prefs?.connectionIntent ?? "DATING";
   return {
     connectionIntent,
-    interestedIn: prefs?.interestedIn ?? "EVERYONE",
-    interestedInEditable: connectionIntent === "FRIENDSHIP",
-    datingInterestedIn: datingInterestedIn(user?.gender ?? null),
-    friendshipInterestedIn: prefs?.friendshipInterestedIn ?? null,
     canDate: canDate(user?.gender ?? null),
     hasDatingIntent: Boolean(profile?.intent),
     ownAge: user?.dateOfBirth ? ageFromDateOfBirth(user.dateOfBirth, now) : null,
@@ -112,7 +100,6 @@ export async function getDiscoveryFilters(actor: Actor, options: { db?: Db; now?
     ageMax: prefs?.ageMax ?? DEFAULT_FILTERS.ageMax,
     locationScope: prefs?.locationScope ?? "ANYWHERE",
     locationId: prefs?.locationId ?? null,
-    intent: prefs?.intent ?? null,
     heightMinCm: advancedEnabled ? (prefs?.heightMinCm ?? null) : null,
     heightMaxCm: advancedEnabled ? (prefs?.heightMaxCm ?? null) : null,
     education: advancedEnabled ? (prefs?.education ?? null) : null,
@@ -135,44 +122,33 @@ export async function saveDiscoveryFilters(actor: Actor, input: unknown, options
   const [entitlements, user, existing, profile] = await Promise.all([
     getEntitlements(db, actor.userId, now),
     db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { gender: true } }),
-    db.discoveryPreferences.findUnique({ where: { userId: actor.userId }, select: { friendshipInterestedIn: true, intent: true } }),
+    db.discoveryPreferences.findUnique({ where: { userId: actor.userId }, select: { connectionIntent: true } }),
     db.profile.findUnique({ where: { userId: actor.userId }, select: { intent: true } }),
   ]);
   const advanced = entitlements.rules.canUseAdvancedFilters;
   const dating = datingFieldsApply(f.connectionIntent);
 
   /*
-   * The intent and its preference are settled by the policy, not by the request.
+   * The pool is the member's choice; who they see in it is not a choice at all (Dating: opposite gender, Friendship:
+   * everyone in the pool), so nothing in the request can widen or narrow a deck by gender.
    *
-   * On Dating the submitted "Show me" is discarded and the value derived from gender, so a crafted request cannot
-   * put a man in the men's pool. On Friendship the submitted value IS the member's answer and is recorded as such,
-   * which is what makes a later switch back to Friendship remember it instead of re-asking. Switching Dating →
-   * Friendship with nothing remembered takes the value in front of them, because the sheet did ask.
+   * Only the pool is written; the legacy "Show me" columns are never touched. A switch INTO Dating is refused for a
+   * gender that has no Dating match. A legacy member already stored on Dating can still save their other filters.
    */
-  const resolved = resolvePreferences({
-    gender: user.gender,
-    connectionIntent: f.connectionIntent,
-    friendshipInterestedIn: f.connectionIntent === "FRIENDSHIP" ? f.interestedIn : (existing?.friendshipInterestedIn ?? null),
-  });
+  if (existing?.connectionIntent !== f.connectionIntent) assertPoolAllowed(user.gender, f.connectionIntent);
 
   /*
-   * Dating needs the member's own answer to "What are you looking for?" before it is set up. Somebody who onboarded
-   * through Friendship was never asked, so switching them into Dating without one is refused rather than leaving a
-   * Dating profile that every "Looking for" filter silently skips. The sheet asks the question inline.
+   * The member's own "What are you looking for?" answer, when they come into Dating without one (somebody who onboarded
+   * through Friendship was never asked). Optional: it is shown on their profile, and a missing answer hides nobody.
    */
   const myIntent = dating && !profile?.intent ? (f.myIntent ?? null) : null;
-  if (dating && !profile?.intent && !myIntent) throw new ValidationError("Choose what you're looking for to use Dating.");
 
-  // The Dating "Looking for" filter: taken from the request on Dating; on Friendship the stored value is carried
-  // through untouched (hidden and inert — the query ignores it) so switching back restores it.
-  const intent = dating ? (f.intent ?? null) : (existing?.intent ?? null);
   const row = {
-    ...resolved,
+    connectionIntent: f.connectionIntent,
     ageMin: f.ageMin,
     ageMax: f.ageMax,
     locationScope: f.locationScope,
     locationId: f.locationScope === "SPECIFIC" ? f.locationId! : null,
-    intent,
     // Free users cannot store advanced values at all: submitting them is a no-op, not a silent upgrade.
     heightMinCm: advanced ? (f.heightMinCm ?? null) : null,
     heightMaxCm: advanced ? (f.heightMaxCm ?? null) : null,

@@ -13,6 +13,8 @@ import { TOTAL_STEPS } from "@/server/onboarding/stages";
  */
 export interface StepFrameProps {
   step: number;
+  /** Steps on this member's path (11 for Dating, 10 for Friendship). Defaults to the longest path. */
+  total?: number;
   title: string;
   subtitle?: string;
   backHref?: string | null;
@@ -22,7 +24,7 @@ export interface StepFrameProps {
   className?: string;
 }
 
-export function StepFrame({ step, title, subtitle, backHref, children, footer, className }: StepFrameProps) {
+export function StepFrame({ step, total = TOTAL_STEPS, title, subtitle, backHref, children, footer, className }: StepFrameProps) {
   return (
     <div className="fixed inset-0 flex flex-col items-center overflow-hidden bg-background text-text">
       <div
@@ -37,8 +39,8 @@ export function StepFrame({ step, title, subtitle, backHref, children, footer, c
           ) : (
             <span aria-hidden="true" className="-ml-2 size-11 shrink-0" />
           )}
-          <ProgressBar value={step} max={TOTAL_STEPS} label="Setup progress" />
-          <StepCounter step={step} total={TOTAL_STEPS} />
+          <ProgressBar value={step} max={total} label="Setup progress" />
+          <StepCounter step={step} total={total} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overflow-x-hidden pt-4.5 animate-fade-in">
           <h1 className="text-h2 text-text">{title}</h1>

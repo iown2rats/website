@@ -8,17 +8,17 @@ import { NameForm } from "@/components/features/onboarding/name-form";
 import { PhotosForm } from "@/components/features/onboarding/photos-form";
 import { PrivacyForm } from "@/components/features/onboarding/privacy-form";
 import { StepFrame } from "@/components/features/onboarding/step-frame";
-import { submitConnectionIntent, submitGender, submitIntent, submitMeet } from "@/actions/onboarding";
+import { submitConnectionIntent, submitGender, submitIntent } from "@/actions/onboarding";
 import { getDb } from "@/lib/db";
 import { pendingPhotosAwaitReview } from "@/lib/photo-policy";
 import { getStorageProvider } from "@/lib/storage";
 import { requireOnboardingUser } from "@/server/auth/current-user";
 import { ROUTES } from "@/server/auth/route-access";
 import { getOnboardingData } from "@/server/onboarding/onboarding";
-import { DONE_META, STAGE_META, hasReached, isOnPath, previousStage, resumeSlug, slugForStage, stageFromSlug, stepNumber, type StageOrComplete } from "@/server/onboarding/stages";
+import { DONE_META, STAGE_META, hasReached, isOnPath, previousStage, resumeSlug, slugForStage, stageFromSlug, stepNumber, totalSteps, type StageOrComplete } from "@/server/onboarding/stages";
 import { listPhotos } from "@/server/photos/photos";
-import { canDate, DATING_NEEDS_GENDER } from "@/server/preferences/intent-policy";
-import { CONNECTION_INTENT_LABELS, GENDER_LABELS, INTENT_LABELS, INTERESTED_IN_LABELS } from "@/constants/labels";
+import { canDate, DATING_NEEDS_GENDER, selectableGenders } from "@/server/preferences/intent-policy";
+import { CONNECTION_INTENT_LABELS, GENDER_LABELS, INTENT_LABELS } from "@/constants/labels";
 
 export default async function OnboardingStagePage({ params }: { params: Promise<{ stage: string }> }) {
   const { stage: slug } = await params;
@@ -27,19 +27,21 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
 
   const actor = await requireOnboardingUser();
   const data = await getOnboardingData(actor);
+  // Already the effective pointer: a stored stage that is off this member's path (MEET) reads as the next real one.
   const pointer = data.stage as StageOrComplete;
+  const total = totalSteps(data.connectionIntent);
 
   // A stage beyond what the user has reached is not openable: resume where they really are.
   // The done screen opens once the privacy stage has been reached; it re-validates everything on submit.
   const gate = stage === "DONE" ? "PRIVACY" : stage;
-  if (!hasReached(pointer, gate)) redirect(`${ROUTES.onboarding}/${resumeSlug(pointer)}`);
-  // The other path's question is not theirs to answer: Dating has no "who would you like to meet", and Friendship
-  // is not asked how serious it is. Opening one by URL resumes where they actually are.
-  if (stage !== "DONE" && !isOnPath(stage, data.connectionIntent)) redirect(`${ROUTES.onboarding}/${resumeSlug(pointer)}`);
+  if (!hasReached(pointer, gate)) redirect(`${ROUTES.onboarding}/${resumeSlug(pointer, data.connectionIntent)}`);
+  // A question that is not on this member's path is not theirs to answer: nobody is asked "who would you like to
+  // meet" any more, and Friendship is not asked how serious it is. Opening one by URL resumes where they really are.
+  if (stage !== "DONE" && !isOnPath(stage, data.connectionIntent)) redirect(`${ROUTES.onboarding}/${resumeSlug(pointer, data.connectionIntent)}`);
 
   if (stage === "DONE") {
     return (
-      <StepFrame step={DONE_META.step} title={DONE_META.title(data.name ?? "")} backHref={`${ROUTES.onboarding}/${STAGE_META.PRIVACY.slug}`}>
+      <StepFrame step={total} total={total} title={DONE_META.title(data.name ?? "")} backHref={`${ROUTES.onboarding}/${STAGE_META.PRIVACY.slug}`}>
         <DoneStep completionPercent={data.completion.percent} missing={data.completion.missingRequired} />
       </StepFrame>
     );
@@ -48,7 +50,7 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
   const meta = STAGE_META[stage];
   const prev = previousStage(stage, data.connectionIntent);
   const backHref = prev ? `${ROUTES.onboarding}/${slugForStage(prev)}` : null;
-  const frame = { step: stepNumber(stage, data.connectionIntent), title: typeof meta.title === "function" ? meta.title(data.name ?? "") : meta.title, subtitle: meta.subtitle || undefined, backHref };
+  const frame = { step: stepNumber(stage, data.connectionIntent), total, title: typeof meta.title === "function" ? meta.title(data.name ?? "") : meta.title, subtitle: meta.subtitle || undefined, backHref };
 
   switch (stage) {
     case "NAME":
@@ -58,7 +60,8 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
     case "GENDER":
       return (
         <StepFrame {...frame}>
-          <ChoiceForm name="gender" label="Gender" action={submitGender} initial={data.gender} options={Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }))} />
+          {/* Woman or Man. "Prefer not to say" is offered only to somebody who already holds it, so it is never taken away. */}
+          <ChoiceForm name="gender" label="Gender" action={submitGender} initial={data.gender} options={selectableGenders(data.gender).map((value) => ({ value, label: GENDER_LABELS[value] }))} />
         </StepFrame>
       );
     case "CONNECTION":
@@ -72,13 +75,6 @@ export default async function OnboardingStagePage({ params }: { params: Promise<
             initial={data.connectionIntent}
             options={Object.entries(CONNECTION_INTENT_LABELS).map(([value, label]) => (value === "DATING" && !canDate(data.gender) ? { value, label, disabled: true, description: DATING_NEEDS_GENDER } : { value, label }))}
           />
-        </StepFrame>
-      );
-    case "MEET":
-      // Friendship only. The prefill is the member's own remembered answer, never the value Dating derived for them.
-      return (
-        <StepFrame {...frame}>
-          <ChoiceForm name="interestedIn" label="Who would you like to meet" action={submitMeet} initial={data.friendshipInterestedIn} options={Object.entries(INTERESTED_IN_LABELS).map(([value, label]) => ({ value, label }))} />
         </StepFrame>
       );
     case "INTENT":

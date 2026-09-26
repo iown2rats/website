@@ -72,16 +72,17 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             <p className="text-body-sm text-text-secondary">No profile row yet.</p>
           )}
         </Panel>
-        <Panel title="Discovery preferences" description="Read-only. What this member is here for and who they have asked to see — for diagnosing who can see whom.">
+        <Panel title="Discovery preferences" description="Read-only. What this member is here for and their own filters — for diagnosing who can see whom. Dating is opposite gender and Friendship is everyone in the pool, automatically; stored legacy values are shown for history and have no effect.">
           {d.discovery ? (
             <KeyValueList
               items={[
                 { label: "I'm here for", value: CONNECTION_INTENT_LABELS[d.discovery.connectionIntent] },
-                { label: "Show me", value: `${INTERESTED_IN_LABELS[d.discovery.showMe]}${d.discovery.connectionIntent === "DATING" ? " (derived from gender)" : ""}` },
-                { label: "Friendship preference", value: d.discovery.friendshipShowMe ? `${INTERESTED_IN_LABELS[d.discovery.friendshipShowMe]}${d.discovery.connectionIntent === "DATING" ? " (remembered, not in use)" : ""}` : "Not answered" },
+                // Legacy. Neither decides who anybody sees, except in a Friendship pair with a "Prefer not to say" member.
+                { label: "Show me (legacy)", value: `${INTERESTED_IN_LABELS[d.discovery.showMe]} · not used by discovery` },
+                { label: "Friendship preference (legacy)", value: d.discovery.friendshipShowMe ? `${INTERESTED_IN_LABELS[d.discovery.friendshipShowMe]} · not used by discovery` : "Not answered" },
                 { label: "Age range", value: `${d.discovery.ageMin}–${d.discovery.ageMax}${d.discovery.ownAgeOutsideRange ? " · excludes their own age" : ""}` },
                 { label: "Location scope", value: d.discovery.locationScope === "SPECIFIC" ? `Specific · ${d.discovery.specificLocation ?? "—"}` : LOCATION_SCOPE_LABELS[d.discovery.locationScope] ?? d.discovery.locationScope },
-                ...(d.discovery.connectionIntent === "DATING" ? [{ label: "Dating Looking for", value: d.discovery.datingLookingFor ? INTENT_LABELS[d.discovery.datingLookingFor as keyof typeof INTENT_LABELS] ?? d.discovery.datingLookingFor : "Any" }] : []),
+                ...(d.discovery.datingLookingFor ? [{ label: "Looking for (legacy)", value: `${INTENT_LABELS[d.discovery.datingLookingFor as keyof typeof INTENT_LABELS] ?? d.discovery.datingLookingFor} · not used by discovery` }] : []),
                 { label: "Discoverable", value: d.privacy ? (d.privacy.paused ? "Paused" : d.privacy.visibility === "EVERYONE" ? "Visible" : "Hidden") + (d.privacy.invisibleMode ? " · Invisible Mode on" : "") : "—" },
               ]}
             />

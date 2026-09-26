@@ -16,7 +16,7 @@ import { PillTabs } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { PageOverlay } from "@/components/layout/page-overlay";
 import type { EditProfileData } from "@/server/profiles/edit";
-import { GENDER_NEEDS_FRIENDSHIP } from "@/server/preferences/intent-policy";
+import { GENDER_NEEDS_FRIENDSHIP, selectableGenders } from "@/server/preferences/intent-policy";
 import { LocationPicker, type LocationOption } from "./location-picker";
 import { PhotoManager } from "./photo-manager";
 
@@ -35,7 +35,6 @@ const SECTIONS: { value: EditSection; label: string }[] = [
   { value: "prompts", label: "Prompts" },
 ];
 const INTENTS = Object.entries(INTENT_LABELS) as [keyof typeof INTENT_LABELS, string][];
-const GENDERS = Object.entries(GENDER_LABELS) as [keyof typeof GENDER_LABELS, string][];
 
 export interface EditProfileProps {
   initial: EditProfileData;
@@ -137,7 +136,8 @@ export function EditProfile({ initial, section: initialSection, locations, inter
               <span className="shrink-0 text-text-secondary">Gender</span>
               <select value={info.gender} onChange={(e) => setInfo({ ...info, gender: e.target.value as InfoDraft["gender"] })} className={cn(valueInput, "appearance-none cursor-pointer")} aria-label="Gender">
                 <option value="" disabled>Choose</option>
-                {GENDERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                {/* Woman or Man; "Prefer not to say" only for a member who already holds it (never removed from them). */}
+                {selectableGenders(initial.gender ?? null).map((value) => <option key={value} value={value}>{GENDER_LABELS[value]}</option>)}
               </select>
             </label>
             <button type="button" onClick={() => setPicker("location")} className={cn(rowClass, "w-full border-0 bg-transparent text-left hover:bg-surface-muted")} aria-haspopup="dialog">

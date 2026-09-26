@@ -153,8 +153,8 @@ export async function getDeck(actor: Actor, input: { excludeHandles?: string[]; 
     // "Awaiting moderation" is asked only when relaxing the filters would not help, so a moderation backlog is
     // never reported as "you have seen everyone". And "seen everyone" is said only when it is true — when there
     // are compatible people and the viewer has acted on all of them. Otherwise nobody compatible is here: a neutral
-    // state that names no reason, because the reason may be somebody else's preferences (their age range, their
-    // "Show me"), and those are never the viewer's to learn.
+    // state that names no reason, because the reason may be somebody else's settings (their pool, their
+    // visibility), and those are never the viewer's to learn.
     if ((await countRelaxedCandidates(db, actor, now)) > 0) emptyReason = "FILTERS";
     else if ((await countAwaitingPhotoReview(db, actor, now)) > 0) emptyReason = "REVIEW";
     else emptyReason = (await countSwipedCompatible(db, actor, now)) > 0 ? "EXHAUSTED" : "UNAVAILABLE";

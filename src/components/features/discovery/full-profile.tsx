@@ -80,7 +80,8 @@ export function FullProfile({ profile, onClose, onPass, onLike, onSuperLike, sup
       <div className="relative flex min-h-0 w-full max-w-[var(--content-max)] flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-30">
           <div className="relative h-[min(70vh,560px)]">
-            <Photo photo={profile.photos[0]} alt={profile.photos[0]?.alt ?? profile.name} className="absolute inset-0" priority />
+            {/* `h-full`, not `absolute inset-0`: Photo's own frame is `relative`, and `cn` does not resolve the conflict. */}
+            <Photo photo={profile.photos[0]} alt={profile.photos[0]?.alt ?? profile.name} className="h-full" priority />
             <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 photo-scrim" />
             <button
               ref={closeRef}

@@ -48,6 +48,17 @@
   --on-photo: #ffffff;
   --on-photo-muted: rgba(255, 255, 255, 0.85);
   --on-photo-glass: rgba(255, 255, 255, 0.16);
+  /* The same glass for chips ON a moving card, where a backdrop-filter would be recomputed every frame. */
+  --on-photo-glass-strong: rgba(255, 255, 255, 0.22);
+  /*
+   * Base of every photo card: what shows before its photo arrives and wherever the photo is not. It must be OPAQUE —
+   * the deck stacks the next member's card directly underneath, so a translucent base (it was --aqua-soft, 94 %
+   * transparent) put the next person's photo on this person's card. Same colour --aqua-soft gives over the page.
+   */
+  --card-base: #f3efe5;
+  /* Frost laid over a locked photo's blurhash (LockedPhoto): leaves its colours, takes what little shape it has. */
+  --locked-frost: rgba(255, 251, 241, 0.7);
+  --locked-frost-edge: rgba(255, 251, 241, 0.56);
   /*
    * Swipe stamps. The only place in Mellocrush with a second hue, and the exception is deliberate: these sit ON a
    * photograph, inside the `on-photo` family that already runs its own white-based palette, and they exist for the
@@ -165,6 +176,9 @@
   --glass: rgba(24, 20, 18, 0.72);
   --glass-strong: rgba(24, 20, 18, 0.88);
   --scrim: rgba(0, 0, 0, 0.6);
+  --card-base: #121211;
+  --locked-frost: rgba(24, 20, 18, 0.72);
+  --locked-frost-edge: rgba(24, 20, 18, 0.58);
   --shadow-sm: 0 12px 32px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.7);
   --stamp-like: #7fd39a;

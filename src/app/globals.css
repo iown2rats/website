@@ -44,6 +44,10 @@
   --color-on-photo: var(--on-photo);
   --color-on-photo-muted: var(--on-photo-muted);
   --color-on-photo-glass: var(--on-photo-glass);
+  --color-on-photo-glass-strong: var(--on-photo-glass-strong);
+  --color-card-base: var(--card-base);
+  --color-locked-frost: var(--locked-frost);
+  --color-locked-frost-edge: var(--locked-frost-edge);
   --color-stamp-like: var(--stamp-like);
   --color-stamp-pass: var(--stamp-pass);
 

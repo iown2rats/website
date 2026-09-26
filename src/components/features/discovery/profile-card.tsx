@@ -26,18 +26,27 @@ export interface ProfileCardProps {
   showPlaceholderLabel?: boolean;
   /** Absolutely fill the parent (deck) instead of sizing itself (grid tiles, showcase). */
   fill?: boolean;
+  /**
+   * How the photo loads. The deck passes "eager" for the card on top and the one beneath it, so the next member's
+   * photo is fetched and decoded while it is still underneath rather than at the moment it is promoted.
+   */
+  loading?: "eager" | "lazy";
+  /** Fetch priority hint for the photo; the deck marks its top card "high". */
+  fetchPriority?: "high" | "low" | "auto";
 }
 
 export function ProfileCard({
   profile,
   photoIndex = 0,
-  likeOpacity = 0,
-  passOpacity = 0,
+  likeOpacity,
+  passOpacity,
   variant = "deck",
   className,
   style,
   showPlaceholderLabel = false,
   fill = false,
+  loading = "lazy",
+  fetchPriority,
 }: ProfileCardProps) {
   const photo = profile.photos[photoIndex] ?? profile.photos[0] ?? null;
   const title = profile.age != null ? `${profile.name}, ${profile.age}` : profile.name;
@@ -46,16 +55,19 @@ export function ProfileCard({
 
   return (
     <div
-      className={cn(fill ? "absolute inset-0" : "relative", "overflow-hidden bg-aqua-soft select-none", variant === "deck" ? "rounded-card shadow-lg" : "rounded-3xl", className)}
-      style={{ ...photoBackground(photo, 160), ...style }}
+      // `bg-card-base` is opaque and `isolate` keeps every layer of this card inside it: in the deck the next member's
+      // card lies directly beneath this one, so nothing on it may ever be see-through. Until the photo arrives the
+      // member's own 400 px variant shows (the background), never an empty frame and never the card below.
+      className={cn(fill ? "absolute inset-0" : "relative", "isolate overflow-hidden bg-card-base select-none", variant === "deck" ? "rounded-card shadow-lg" : "rounded-3xl", className)}
+      style={{ ...photoBackground(photo, 160, "thumb"), ...style }}
     >
       {photo?.locked ? (
         // Stepping through the strip lands on protected photos too. No url exists for them — the server withheld
         // the key — so the blurhash and the lock ARE the photo here (docs/ARCHITECTURE.md §12.18).
-        <LockedPhoto blurhash={photo.blurhash ?? null} className="absolute inset-0" compact />
+        <LockedPhoto blurhash={photo.blurhash ?? null} fill compact />
       ) : photo?.url ? (
         // Signed, short-lived URLs from the storage layer; optimisation happens at upload time (server-produced variants).
-        <Image src={photo.url} alt={photo.alt ?? ""} fill unoptimized sizes="(min-width: 900px) 500px, 100vw" className="object-cover" draggable={false} />
+        <Image src={photo.url} alt={photo.alt ?? ""} fill unoptimized sizes="(min-width: 900px) 500px, 100vw" className="object-cover" draggable={false} loading={loading} fetchPriority={fetchPriority} />
       ) : null}
       {showPlaceholderLabel && isDemoPhoto(photo) ? (
         <span className="pointer-events-none absolute inset-0 grid place-items-center text-tiny font-medium uppercase tracking-[.12em] text-white/45">
@@ -80,20 +92,23 @@ export function ProfileCard({
             * Pass buttons below the card so the gesture and the button read as one action. Both are aria-hidden
             * and pointer-events-none: a screen reader hears the card's own label and the deck's live region, never
             * a stamp that is really just the transform in words, and neither stamp can intercept a drag.
-            * Opacity is passed in, never decided here — see `stampOpacity` in ./swipe-guide.
+            * Opacity is passed in, never decided here — see `stampOpacity` in ./swipe-guide. When no prop is given the
+            * stamps read `--like-stamp` / `--pass-stamp` from an ancestor instead: the deck writes those straight to
+            * the DOM on every pointer move, so a drag never re-renders the card. `--stamp-fade` is the fade, which the
+            * deck sets to 0 ms while a finger is down so the stamp tracks it instead of trailing it.
             */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-6 top-10 flex items-center gap-1.5 rounded-sm border-[2.5px] border-stamp-like px-3.5 py-2 text-h3 tracking-[.06em] text-stamp-like transition-opacity duration-100 -rotate-12"
-            style={{ opacity: likeOpacity }}
+            className="pointer-events-none absolute left-6 top-10 flex items-center gap-1.5 rounded-sm border-[2.5px] border-stamp-like px-3.5 py-2 text-h3 tracking-[.06em] text-stamp-like transition-opacity -rotate-12"
+            style={{ opacity: likeOpacity ?? "var(--like-stamp, 0)", transitionDuration: "var(--stamp-fade, 100ms)" }}
           >
             <HeartIcon size={18} filled strokeWidth={0} />
             LIKE
           </span>
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute right-6 top-10 flex items-center gap-1.5 rounded-sm border-[2.5px] border-stamp-pass px-3.5 py-2 text-h3 tracking-[.06em] text-stamp-pass transition-opacity duration-100 rotate-12"
-            style={{ opacity: passOpacity }}
+            className="pointer-events-none absolute right-6 top-10 flex items-center gap-1.5 rounded-sm border-[2.5px] border-stamp-pass px-3.5 py-2 text-h3 tracking-[.06em] text-stamp-pass transition-opacity rotate-12"
+            style={{ opacity: passOpacity ?? "var(--pass-stamp, 0)", transitionDuration: "var(--stamp-fade, 100ms)" }}
           >
             <CloseIcon size={17} strokeWidth={2.6} />
             PASS
@@ -115,7 +130,7 @@ export function ProfileCard({
               </div>
             ) : null}
             {intent ? (
-              <span className="inline-flex h-6.5 items-center self-start gap-1.5 rounded-full bg-on-photo-glass px-2.5 text-caption-sm font-medium backdrop-blur-[8px]">
+              <span className="inline-flex h-6.5 items-center self-start gap-1.5 rounded-full bg-on-photo-glass-strong px-2.5 text-caption-sm font-medium">
                 Looking for {intent}
               </span>
             ) : null}

@@ -155,6 +155,15 @@ describe("the card tokens are opaque", () => {
     expect(values).toHaveLength(2);
     for (const v of values) expect(v).toMatch(/^#[0-9a-f]{6}$/i);
   });
+
+  it("the locked-photo frost lets through only about 5 % of the hash, in light and dark", () => {
+    const alphas = [...css.matchAll(/--locked-frost(?:-edge)?:\s*rgba\([^)]*,\s*([\d.]+)\)/g)].map((m) => Number(m[1]));
+    expect(alphas).toHaveLength(4);
+    for (const a of alphas) {
+      expect(a).toBeGreaterThanOrEqual(0.93);
+      expect(a).toBeLessThanOrEqual(0.97);
+    }
+  });
 });
 
 describe("the deck renders the next card, keyed and ready", () => {

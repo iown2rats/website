@@ -55,11 +55,11 @@ export function LockedPhoto({
       {/* The frost: keeps the colour, takes the last of the shape, and gives the gold lock a calm field to sit on. */}
       <span aria-hidden="true" className="absolute inset-0 bg-linear-160 from-locked-frost to-locked-frost-edge" />
       <span className="relative flex flex-col items-center gap-2 text-on-photo">
-        <span className="grid size-11 place-items-center rounded-full bg-ocean/75 text-sand shadow-sm" aria-hidden="true">
+        <span className="grid size-11 place-items-center rounded-full bg-ocean/80 text-sand shadow-sm" aria-hidden="true">
           <LockIcon size={compact ? 16 : 20} />
         </span>
-        {compact || !title ? null : <span className="rounded-full bg-ocean/55 px-3 py-0.5 text-body font-semibold text-on-photo">{title}</span>}
-        {compact ? null : <span className="rounded-full bg-ocean/55 px-3 py-0.5 text-caption font-medium text-sand">{label}</span>}
+        {compact || !title ? null : <span className="rounded-full bg-ocean/80 px-3 py-0.5 text-body font-semibold text-on-photo">{title}</span>}
+        {compact ? null : <span className="rounded-full bg-ocean/80 px-3 py-0.5 text-caption font-medium text-sand">{label}</span>}
       </span>
     </>
   );

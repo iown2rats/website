@@ -56,9 +56,13 @@
    * transparent) put the next person's photo on this person's card. Same colour --aqua-soft gives over the page.
    */
   --card-base: #f3efe5;
-  /* Frost laid over a locked photo's blurhash (LockedPhoto): leaves its colours, takes what little shape it has. */
-  --locked-frost: rgba(255, 251, 241, 0.7);
-  --locked-frost-edge: rgba(255, 251, 241, 0.56);
+  /*
+   * Frost laid over a locked photo's blurhash (LockedPhoto). About 95 % opaque: roughly 5 % of the (already
+   * shapeless) hash shows through — a faint hint of the photo's colours and nothing that can be identified.
+   * The hash is all the browser ever receives for a locked photo; the frost is not what protects it.
+   */
+  --locked-frost: rgba(255, 251, 241, 0.95);
+  --locked-frost-edge: rgba(255, 251, 241, 0.94);
   /*
    * Swipe stamps. The only place in Mellocrush with a second hue, and the exception is deliberate: these sit ON a
    * photograph, inside the `on-photo` family that already runs its own white-based palette, and they exist for the
@@ -177,8 +181,8 @@
   --glass-strong: rgba(24, 20, 18, 0.88);
   --scrim: rgba(0, 0, 0, 0.6);
   --card-base: #121211;
-  --locked-frost: rgba(24, 20, 18, 0.72);
-  --locked-frost-edge: rgba(24, 20, 18, 0.58);
+  --locked-frost: rgba(24, 20, 18, 0.95);
+  --locked-frost-edge: rgba(24, 20, 18, 0.94);
   --shadow-sm: 0 12px 32px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.7);
   --stamp-like: #7fd39a;

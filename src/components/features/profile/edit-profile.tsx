@@ -5,7 +5,7 @@ import { useState } from "react";
 import { saveAboutSection, saveInfo } from "@/actions/profile";
 import { GENDER_LABELS, INTENT_LABELS } from "@/constants/labels";
 import { INTEREST_LIMITS, PROMPT_LIMITS } from "@/config/product";
-import { HEIGHT_RANGE, PROFILE_TEXT_LIMITS } from "@/lib/validation/profile";
+import { HEIGHT_RANGE, PROFILE_TEXT_LIMITS } from "@/lib/profile-limits";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Chip, RadioCard, RadioGroup } from "@/components/ui/choice";

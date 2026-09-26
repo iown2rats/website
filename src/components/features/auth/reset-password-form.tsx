@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { resetPasswordAction } from "@/actions/email-auth";
-import { PASSWORD_RULES } from "@/server/auth/password";
+import { PASSWORD_RULES } from "@/lib/password-rules";
 import { ROUTES } from "@/server/auth/route-access";
 import { GlassPasswordField, GlassSubmit } from "./glass-field";
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useReducer, useTransition } from "react";
 import { registerWithEmailAction, signInWithEmailAction } from "@/actions/email-auth";
-import { PASSWORD_RULES } from "@/server/auth/password";
+import { PASSWORD_RULES } from "@/lib/password-rules";
 import { ROUTES } from "@/server/auth/route-access";
 import { authCardReducer, initialAuthCardState, MODE_COPY, type AuthCardMode } from "./auth-card-state";
 import { GlassField, GlassPasswordField, GlassSubmit } from "./glass-field";

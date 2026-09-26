@@ -296,7 +296,9 @@ describe("12–17 · what the recipient receives", () => {
     await superLikeUser(a, b.userId, { db, now: T0, message });
 
     const photos = await db.profilePhoto.findMany({ where: { profile: { userId: a.userId } }, select: { blurhash: true, storageKey: true, thumbKey: true } });
-    const leaks = ["Ahmed", "Secretname", a.handle, a.userId, "Diver", "Boat captain", "31", message, "diving", ...photos.flatMap((ph) => [ph.blurhash, ph.storageKey, ph.thumbKey])];
+    const leaks = ["Ahmed", "Secretname", a.handle, a.userId, "Diver", "Boat captain", message, "diving", ...photos.flatMap((ph) => [ph.blurhash, ph.storageKey, ph.thumbKey])];
+    // The sender's age (31) as a value of its own — not the digits "31" inside a random id or a timestamp.
+    const age = /"age":\s*31\b|[^\w:.-]31[^\w:.-]/;
     const likesPage = JSON.stringify(await page(b));
     const likesYou = JSON.stringify(await getLikesYou(b, { db, now: at(T0, minutes(1)) }));
     const feed = JSON.stringify(await getNotificationFeed(b, {}, { db, storage, now: at(T0, minutes(1)) }));
@@ -305,6 +307,7 @@ describe("12–17 · what the recipient receives", () => {
       expect(likesYou).not.toContain(leak);
       expect(feed).not.toContain(leak);
     }
+    for (const json of [likesPage, likesYou, feed]) expect(json).not.toMatch(age);
     // A in B's Discover deck is just a card: nothing on it says they Super Liked B, and no message rides along.
     const deck = await getDeck(b, {}, { db, storage, now: at(T0, minutes(1)) });
     const card = deck.cards.find((c) => c.handle === a.handle);

@@ -13,6 +13,7 @@
  * it is a one-line change to PARAMS.
  */
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, type ScryptOptions } from "node:crypto";
+import { PASSWORD_RULES } from "@/lib/password-rules";
 
 /** `promisify` picks scrypt's shortest overload, which has no options object, so wrap it explicitly. */
 function scrypt(password: string, salt: Buffer, keyLength: number, options: ScryptOptions): Promise<Buffer> {
@@ -25,10 +26,7 @@ export const PARAMS = { N: 2 ** 16, r: 8, p: 1, keyLength: 32, saltBytes: 16 } a
 /** scrypt needs roughly 128 · N · r bytes; give it headroom so Node does not refuse the allocation. */
 const MAX_MEM = 256 * 1024 * 1024;
 
-export const PASSWORD_RULES = {
-  minLength: 10,
-  maxLength: 200,
-} as const;
+export { PASSWORD_RULES };
 
 export interface PasswordProblem {
   code: "TOO_SHORT" | "TOO_LONG" | "TOO_SIMPLE" | "COMMON";

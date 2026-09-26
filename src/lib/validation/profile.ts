@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HEIGHT_RANGE, PROFILE_TEXT_LIMITS } from "@/lib/profile-limits";
 import { aboutSchema, intentSchema, noMarkup } from "./onboarding";
 
 /**
@@ -6,8 +7,7 @@ import { aboutSchema, intentSchema, noMarkup } from "./onboarding";
  * two validation definitions. Zod objects strip unknown keys, so mass assignment is impossible by construction.
  */
 
-export const PROFILE_TEXT_LIMITS = { occupation: 60, education: 60 } as const;
-export const HEIGHT_RANGE = { min: 120, max: 230 } as const;
+export { HEIGHT_RANGE, PROFILE_TEXT_LIMITS };
 
 /** Edit profile → Info. Name and date of birth are not editable (prototype: read-only rows). */
 export const infoSchema = z.object({
